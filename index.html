@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F0F0F">
+<title>목양노트</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600&family=Noto+Serif+KR:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0F0F0F; --surface:#191616; --surface2:#221D1E; --line:#2E2727;
+    --text:#F4F1F0; --dim:#A79E9C; --brand:#F24557; --action:#D61E3E;
+    --rose-bg:#33171C; --rose-tx:#F8909C; --warn-bg:#201A14; --warn-tx:#E8B473;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif;-webkit-text-size-adjust:100%}
+  body{display:flex;justify-content:center;min-height:100vh}
+  #app{width:100%;max-width:430px;min-height:100vh;display:flex;flex-direction:column;position:relative}
+  h1,h2,h3,p{margin:0}
+  button{font-family:inherit}
+  .serif{font-family:'Noto Serif KR',serif}
+  .screen{flex-grow:1;display:flex;flex-direction:column}
+  .screen[hidden]{display:none}
+  .pad{padding:0 20px}
+  .center{flex-grow:1;display:flex;flex-direction:column;justify-content:center;padding:32px 24px}
+
+  /* 버튼 */
+  .btn{width:100%;height:52px;border:none;border-radius:12px;background:var(--action);
+    color:#fff;font-size:15px;font-weight:500;cursor:pointer}
+  .btn:disabled{opacity:.5;cursor:default}
+  .btn-ghost{width:100%;height:52px;border:1px solid var(--line);border-radius:12px;
+    background:transparent;color:var(--text);font-size:15px;cursor:pointer}
+  .btn-sm{height:38px;padding:0 12px;border:1px solid var(--line);border-radius:9px;
+    background:transparent;color:var(--text);font-size:12px;cursor:pointer}
+  .btn-sm.danger{color:var(--rose-tx);border-color:#3A2226}
+  .link{background:none;border:none;color:var(--brand);font-size:13px;cursor:pointer;padding:8px}
+
+  /* 입력 */
+  label{display:block;font-size:12px;color:var(--dim);margin:0 0 6px}
+  input,select{width:100%;height:48px;padding:0 14px;border:1px solid var(--line);
+    border-radius:12px;background:var(--surface);color:var(--text);font-size:15px;
+    font-family:inherit;appearance:none}
+  input:focus,select:focus{outline:2px solid var(--brand);outline-offset:-1px}
+  .field{margin-bottom:14px}
+
+  /* 카드 */
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px}
+  .tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  .tile{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 12px}
+  .tile .k{font-size:11px;color:var(--dim)}
+  .tile .v{font-size:18px;font-weight:600;margin-top:3px}
+  .chip{display:inline-flex;align-items:center;gap:4px;font-size:11px;border-radius:999px;
+    padding:4px 10px;background:var(--surface2);color:#CFC5C3}
+  .chip.rose{background:var(--rose-bg);color:var(--rose-tx)}
+  .chip.warn{background:var(--warn-bg);color:var(--warn-tx)}
+  .muted{color:var(--dim);font-size:13px;line-height:1.7}
+  .sec-title{font-size:12px;letter-spacing:.06em;color:var(--dim);margin:22px 0 10px}
+  .row{display:flex;align-items:center;gap:10px;background:var(--surface);
+    border:1px solid var(--line);border-radius:14px;padding:12px}
+  .row .grow{flex-grow:1;min-width:0}
+  .row .nm{font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .row .sub{font-size:12px;color:var(--dim);margin-top:3px;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
+  .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+  .list{display:flex;flex-direction:column;gap:8px}
+  .off{opacity:.45}
+
+  /* 상단바 / 하단탭 */
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:16px 14px 10px}
+  .icon-btn{width:44px;height:44px;border:none;background:none;color:var(--text);
+    display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .tabbar{margin-top:auto;display:flex;border-top:1px solid var(--line);background:#141111;
+    padding-bottom:env(safe-area-inset-bottom)}
+  .tabbar button{flex-grow:1;height:64px;border:none;background:none;color:var(--dim);
+    font-size:11px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:4px;cursor:pointer}
+  .tabbar button.on{color:var(--brand);font-weight:500}
+
+  /* 모달 */
+  dialog{width:min(92vw,400px);border:1px solid var(--line);border-radius:18px;
+    background:var(--surface);color:var(--text);padding:20px}
+  dialog::backdrop{background:rgba(0,0,0,.6)}
+  dialog h3{font-size:17px;font-weight:600;margin-bottom:14px}
+
+  /* 토스트 */
+  #toast{position:fixed;left:50%;bottom:86px;transform:translateX(-50%);
+    background:var(--surface2);border:1px solid var(--line);border-radius:999px;
+    padding:10px 18px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;
+    max-width:88vw;text-align:center;z-index:50}
+  #toast.on{opacity:1}
+  .err{color:var(--rose-tx);font-size:13px;line-height:1.6;margin-top:10px;min-height:1px}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- 로딩 -->
+  <section class="screen" id="s-loading">
+    <div class="center" style="align-items:center">
+      <p class="muted">불러오는 중…</p>
+    </div>
+  </section>
+
+  <!-- 로그인 -->
+  <section class="screen" id="s-login" hidden>
+    <div class="center">
+      <h1 class="serif" style="font-size:30px;font-weight:600">목양노트</h1>
+      <p class="muted" style="margin-top:8px">맡겨진 영혼을 기록하고 함께 기도해요.</p>
+
+      <div style="height:32px"></div>
+
+      <button class="btn-ghost" id="btn-google" style="display:flex;align-items:center;justify-content:center;gap:8px">
+        <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.6l6.7-6.7C35.6 2.6 30.2.5 24 .5 14.6.5 6.5 5.9 2.6 13.7l7.8 6c1.9-5.7 7.2-10.2 13.6-10.2z"/><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.7 7l7.6 5.9c4.4-4.1 6.8-10.1 6.8-17.4z"/><path fill="#FBBC05" d="M10.4 28.3c-.5-1.4-.8-2.8-.8-4.3s.3-3 .8-4.3l-7.8-6C1 16.7 0 20.2 0 24s1 7.3 2.6 10.3l7.8-6z"/><path fill="#34A853" d="M24 47.5c6.2 0 11.5-2 15.3-5.6l-7.6-5.9c-2.1 1.4-4.8 2.3-7.7 2.3-6.4 0-11.7-4.4-13.6-10.2l-7.8 6C6.5 42.1 14.6 47.5 24 47.5z"/></svg>
+        구글 계정으로 로그인
+      </button>
+
+      <p class="muted" style="text-align:center;margin:18px 0 14px;font-size:12px">또는 이메일로</p>
+
+      <div class="field"><label for="in-email">이메일</label>
+        <input id="in-email" type="email" autocomplete="username" placeholder="name@example.com"></div>
+      <div class="field"><label for="in-pw">비밀번호</label>
+        <input id="in-pw" type="password" autocomplete="current-password" placeholder="6자 이상"></div>
+
+      <button class="btn" id="btn-email-login">로그인</button>
+      <div style="display:flex;justify-content:space-between;margin-top:6px">
+        <button class="link" id="btn-signup">처음이신가요? 가입하기</button>
+        <button class="link" id="btn-reset">비밀번호 찾기</button>
+      </div>
+      <p class="err" id="login-err"></p>
+    </div>
+  </section>
+
+  <!-- 이메일 인증 대기 -->
+  <section class="screen" id="s-verify" hidden>
+    <div class="center">
+      <h2 class="serif" style="font-size:22px;font-weight:600">메일함을 확인해 주세요</h2>
+      <p class="muted" style="margin-top:10px"><span id="verify-email"></span> 주소로 인증 메일을 보냈어요.
+        메일 속 링크를 누른 뒤 아래 버튼을 눌러주세요.</p>
+      <div style="height:24px"></div>
+      <button class="btn" id="btn-verified">인증했어요</button>
+      <div style="height:8px"></div>
+      <button class="btn-ghost" id="btn-resend">인증 메일 다시 보내기</button>
+      <button class="link" id="btn-logout-1" style="margin-top:10px">다른 계정으로 로그인</button>
+      <p class="err" id="verify-err"></p>
+    </div>
+  </section>
+
+  <!-- 최초 설정 -->
+  <section class="screen" id="s-setup" hidden>
+    <div class="center">
+      <span class="chip rose">최초 설정</span>
+      <h2 class="serif" style="font-size:24px;font-weight:600;margin-top:12px">목양노트를 시작해요</h2>
+      <p class="muted" style="margin-top:8px">교회와 첫 진을 만들어요. 이 설정은 한 번만 해요.</p>
+      <div style="height:24px"></div>
+      <div class="field"><label for="st-church">교회 이름</label>
+        <input id="st-church" placeholder="예) 은혜교회"></div>
+      <div class="field"><label for="st-name">내 이름</label>
+        <input id="st-name" placeholder="예) 김현우"></div>
+      <div class="field"><label for="st-jin">첫 진 이름</label>
+        <input id="st-jin" placeholder="예) 1진"></div>
+      <button class="btn" id="btn-setup">시작하기</button>
+      <button class="link" id="btn-logout-2" style="margin-top:10px">로그아웃</button>
+      <p class="err" id="setup-err"></p>
+    </div>
+  </section>
+
+  <!-- 초대 수락 -->
+  <section class="screen" id="s-accept" hidden>
+    <div class="center">
+      <span class="chip rose">초대를 받았어요</span>
+      <h2 class="serif" style="font-size:24px;font-weight:600;margin-top:12px">환영해요</h2>
+      <p class="muted" id="accept-info" style="margin-top:8px"></p>
+      <div style="height:24px"></div>
+      <div class="field"><label for="ac-name">이름</label>
+        <input id="ac-name" placeholder="이름을 적어주세요"></div>
+      <button class="btn" id="btn-accept">초대 수락하고 시작하기</button>
+      <button class="link" id="btn-logout-3" style="margin-top:10px">로그아웃</button>
+      <p class="err" id="accept-err"></p>
+    </div>
+  </section>
+
+  <!-- 승인 대기 -->
+  <section class="screen" id="s-pending" hidden>
+    <div class="center">
+      <h2 class="serif" style="font-size:22px;font-weight:600">승인 대기 중이에요</h2>
+      <p class="muted" style="margin-top:10px"><span id="pending-email"></span> 계정은 아직 등록되지 않았어요.
+        진장에게 이 이메일 주소로 초대를 요청해 주세요.</p>
+      <div style="height:24px"></div>
+      <button class="btn-ghost" id="btn-recheck">다시 확인</button>
+      <button class="link" id="btn-logout-4" style="margin-top:10px">로그아웃</button>
+    </div>
+  </section>
+
+  <!-- 홈 -->
+  <section class="screen" id="s-home" hidden>
+    <div class="topbar">
+      <div class="pad" style="padding-left:6px">
+        <p class="muted" id="home-date" style="font-size:12px"></p>
+        <h1 style="font-size:21px;font-weight:600;margin-top:4px" id="home-title">—</h1>
+      </div>
+      <button class="icon-btn" id="btn-logout-5" aria-label="로그아웃">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 17l5-5-5-5M20 12H9M12 20H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h6"/></svg>
+      </button>
+    </div>
+
+    <div class="pad">
+      <div style="display:flex;gap:6px;margin-bottom:14px">
+        <span class="chip" id="home-role">—</span>
+        <span class="chip" id="home-where"></span>
+      </div>
+      <div class="tiles">
+        <div class="tile"><p class="k">구성원</p><p class="v" id="t-members">—</p></div>
+        <div class="tile"><p class="k">셀</p><p class="v" id="t-cells">—</p></div>
+        <div class="tile"><p class="k">대기 중 초대</p><p class="v" id="t-invites">—</p></div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <span class="chip rose">다음 단계</span>
+        <h3 class="serif" style="font-size:18px;font-weight:600;margin-top:12px">영혼 카드는 곧 열려요</h3>
+        <p class="muted" style="margin-top:8px">지금은 계정과 조직을 세우는 단계예요.
+          리더들을 먼저 초대해 두면, 영혼 카드가 열릴 때 바로 쓸 수 있어요.</p>
+      </div>
+
+      <button class="btn-ghost" id="btn-manage" style="margin-top:14px" hidden>리더 관리</button>
+    </div>
+
+    <nav class="tabbar">
+      <button class="on">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5 12 4.2l8 6.3V19a1.5 1.5 0 0 1-1.5 1.5H15V15H9v5.5H5.5A1.5 1.5 0 0 1 4 19z"/></svg>홈
+      </button>
+      <button class="soon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9.5" cy="8.5" r="3"/><path d="M4 19.5v-1a4 4 0 0 1 4-4h3a4 4 0 0 1 4 4v1M16.5 6.2a3 3 0 0 1 0 4.6M17.5 14.7a4 4 0 0 1 2.5 3.7v1.1"/></svg>영혼들
+      </button>
+      <button class="soon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5.5" width="17" height="15" rx="2.5"/><path d="M3.5 10.5h17M8.5 3.5v4M15.5 3.5v4"/></svg>캘린더
+      </button>
+      <button class="soon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="16" rx="2.5"/><path d="m8 12.5 2.6 2.6L16.5 9.5"/></svg>셀모임
+      </button>
+      <button class="soon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>더보기
+      </button>
+    </nav>
+  </section>
+
+  <!-- 리더 관리 -->
+  <section class="screen" id="s-manage" hidden>
+    <div class="topbar">
+      <button class="icon-btn" id="btn-back" aria-label="뒤로">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5m6-6-6 6 6 6"/></svg>
+      </button>
+      <h2 style="font-size:17px;font-weight:600">리더 관리</h2>
+      <span style="width:44px"></span>
+    </div>
+
+    <div class="pad" style="padding-bottom:28px;overflow-y:auto">
+      <button class="btn" id="btn-invite-open">리더 초대하기</button>
+
+      <h3 class="sec-title">구성원</h3>
+      <div class="list" id="list-members"></div>
+
+      <h3 class="sec-title">대기 중인 초대</h3>
+      <div class="list" id="list-invites"></div>
+
+      <h3 class="sec-title">셀</h3>
+      <div class="list" id="list-cells"></div>
+      <button class="btn-ghost" id="btn-cell-add" style="margin-top:8px;height:44px;font-size:13px">셀 추가</button>
+
+      <div id="jin-block" hidden>
+        <h3 class="sec-title">진</h3>
+        <div class="list" id="list-jins"></div>
+        <button class="btn-ghost" id="btn-jin-add" style="margin-top:8px;height:44px;font-size:13px">진 추가</button>
+      </div>
+    </div>
+  </section>
+
+  <div id="toast"></div>
+</div>
+
+<!-- 초대 모달 -->
+<dialog id="dlg-invite">
+  <h3>리더 초대</h3>
+  <div class="field"><label for="iv-name">이름</label><input id="iv-name" placeholder="예) 김서연"></div>
+  <div class="field"><label for="iv-email">이메일</label>
+    <input id="iv-email" type="email" placeholder="초대받을 구글 계정 주소"></div>
+  <div class="field"><label for="iv-role">역할</label>
+    <select id="iv-role"></select></div>
+  <div class="field" id="iv-jin-wrap" hidden><label for="iv-jin">진</label><select id="iv-jin"></select></div>
+  <div class="field" id="iv-cell-wrap"><label for="iv-cell">셀</label><select id="iv-cell"></select></div>
+  <p class="err" id="invite-err"></p>
+  <div style="display:flex;gap:8px;margin-top:6px">
+    <button class="btn-ghost" id="iv-cancel" style="height:46px">취소</button>
+    <button class="btn" id="iv-send" style="height:46px">초대 보내기</button>
+  </div>
+</dialog>
+
+<script type="module" src="./app.js"></script>
+</body>
+</html>
