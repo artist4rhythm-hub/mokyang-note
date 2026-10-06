@@ -20,6 +20,10 @@
     --rose-bg:#33171C; --rose-tx:#F8909C; --warn-bg:#201A14; --warn-tx:#E8B473;
     --lock-bg:#221D1D; --lock-tx:#BCB2AF; --ok-bg:#16241C; --ok-tx:#7FCB9B;
     --side:0px;
+    /* 브라우저가 직접 그리는 것들(날짜 달력, 드롭다운 목록, 알림창,
+       스크롤바)도 어두운 화면에 맞춰 그리도록 알려줍니다.
+       이게 없으면 흰 바탕에 흰 글씨가 되어 안 보이는 곳이 생겨요. */
+    color-scheme: dark;
   }
   *{box-sizing:border-box}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
@@ -54,7 +58,26 @@
   input,select{height:48px;padding:0 14px}
   textarea{min-height:92px;line-height:1.7;resize:none;overflow:hidden}
   input:focus,select:focus,textarea:focus{outline:2px solid var(--brand);outline-offset:-1px}
-  input::placeholder,textarea::placeholder{color:#6E6260}
+  input::placeholder,textarea::placeholder{color:#8A7F7D;opacity:1}
+  /* 드롭다운을 폈을 때 목록 글씨가 안 보이지 않도록 */
+  select option,select optgroup{background:#1E1A1A;color:#F4F1F0}
+  /* 날짜·시간 칸: 아직 안 적은 부분과 달력 아이콘이 묻히지 않도록 */
+  input[type="date"],input[type="time"]{color:var(--text)}
+  input[type="date"]::-webkit-datetime-edit-text,
+  input[type="time"]::-webkit-datetime-edit-text{color:var(--dim);padding:0 1px}
+  input[type="date"]::-webkit-datetime-edit-year-field,
+  input[type="date"]::-webkit-datetime-edit-month-field,
+  input[type="date"]::-webkit-datetime-edit-day-field,
+  input[type="time"]::-webkit-datetime-edit-hour-field,
+  input[type="time"]::-webkit-datetime-edit-minute-field,
+  input[type="time"]::-webkit-datetime-edit-ampm-field{color:var(--text)}
+  input[type="date"]:not(:focus):invalid::-webkit-datetime-edit,
+  input[type="time"]:not(:focus):invalid::-webkit-datetime-edit{color:#8A7F7D}
+  input[type="date"]::-webkit-calendar-picker-indicator,
+  input[type="time"]::-webkit-calendar-picker-indicator{filter:invert(1) brightness(.8);
+    opacity:.75;cursor:pointer}
+  input[type="date"]::-webkit-calendar-picker-indicator:hover,
+  input[type="time"]::-webkit-calendar-picker-indicator:hover{opacity:1}
   .field{margin-bottom:14px}
   .hint{font-size:11px;color:var(--dim);margin-top:6px;line-height:1.6}
   .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -203,6 +226,45 @@
   .matrix td.ongoing{background:var(--rose-bg);color:var(--rose-tx)}
   .matrix td.dropped{background:var(--warn-bg);color:var(--warn-tx)}
   .matrix td.planned{color:var(--dim)}
+
+  /* ── 출석률 그래프 ──
+     한 가지만 재는 그래프라 색도 하나만 씁니다. 숫자는 글자 색으로 두어
+     색만으로 뜻을 전하지 않게 했어요. */
+  .chart{margin-top:12px;max-width:600px}
+  .chart .plot{display:flex;align-items:flex-end;gap:2px;height:112px;position:relative;
+    padding-top:16px}
+  .chart .avg{position:absolute;left:0;right:0;border-top:1px dashed #3C3433;pointer-events:none}
+  .chart .bar{flex:1 1 0;min-width:0;max-width:46px;display:flex;flex-direction:column;
+    justify-content:flex-end;height:100%;cursor:default}
+  .chart .bar i{display:block;width:100%;background:var(--brand);border-radius:4px 4px 0 0;
+    min-height:2px}
+  .chart .bar.zero i{background:#6B5C5D;border-radius:2px}
+  .chart .bar .val{font-size:10px;color:var(--text);text-align:center;white-space:nowrap;
+    margin-bottom:3px;line-height:1}
+  .chart .xaxis{display:flex;gap:2px;margin-top:6px}
+  .chart .xaxis span{flex:1 1 0;min-width:0;max-width:46px;text-align:center;font-size:10px;
+    color:var(--dim);overflow:hidden;white-space:nowrap}
+  .hbars{display:flex;flex-direction:column;gap:9px;margin-top:12px;max-width:600px}
+  .hbars .hb{display:grid;grid-template-columns:72px 1fr 42px;align-items:center;gap:10px}
+  .hbars .hb .who{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .hbars .hb .track{height:9px;border-radius:999px;background:#2A2424;overflow:hidden}
+  .hbars .hb .track i{display:block;height:100%;background:var(--brand);border-radius:999px;
+    min-width:3px}
+  .hbars .hb .pct{font-size:12px;color:var(--text);text-align:right;font-variant-numeric:tabular-nums}
+  .hbars .hb.low .pct{color:var(--warn-tx)}
+
+  /* 순서 배정 */
+  .ordrow{display:flex;align-items:center;gap:8px;background:var(--surface);
+    border:1px solid var(--line);border-radius:12px;padding:8px 10px}
+  .ordrow .no{width:26px;font-size:12px;color:var(--dim);flex-shrink:0;text-align:center}
+  .ordrow .who{flex-grow:1;min-width:0;font-size:14px;overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap}
+  .ordrow button{width:38px;height:38px;flex-shrink:0;border:1px solid var(--line);
+    border-radius:10px;background:transparent;color:var(--text);cursor:pointer;font-size:14px}
+  .ordrow button:disabled{opacity:.3;cursor:default}
+
+  .row .sub2{font-size:12px;color:var(--dim);margin-top:2px;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
 
   dialog{width:min(94vw,460px);max-height:88vh;border:1px solid var(--line);border-radius:18px;
     background:var(--surface);color:var(--text);padding:20px;overflow-y:auto}
@@ -391,9 +453,12 @@
   <section class="screen" id="s-souls" hidden>
     <div class="topbar">
       <h1 style="font-size:21px;font-weight:600;padding-left:6px">영혼들</h1>
-      <button class="icon-btn" id="btn-soul-new" aria-label="영혼 추가">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-      </button>
+      <div style="display:flex;align-items:center;gap:4px">
+        <button class="btn-sm" id="btn-order-souls">순서</button>
+        <button class="icon-btn" id="btn-soul-new" aria-label="영혼 추가">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+      </div>
     </div>
     <div class="pad">
       <input id="soul-search" placeholder="이름으로 찾기" style="height:44px">
@@ -426,7 +491,10 @@
       </div>
     </div>
     <div class="scroll pad" style="padding-top:8px">
-      <h3 class="sec-title" id="cal-day-title">날짜를 눌러보세요</h3>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <h3 class="sec-title" id="cal-day-title" style="margin-bottom:10px">날짜를 눌러보세요</h3>
+        <button class="btn-sm" id="btn-cal-add" style="flex-shrink:0">＋ 이 날 기록</button>
+      </div>
       <div class="list" id="cal-day-list"></div>
       <button class="btn-ghost" id="btn-ics" style="margin-top:16px;height:44px;font-size:13px;max-width:360px">전체 일정 내려받기 (구글 캘린더용)</button>
     </div>
@@ -443,6 +511,7 @@
     </div>
     <div class="scroll pad">
       <div class="tiles" id="meet-tiles"></div>
+      <div id="meet-chart"></div>
       <h3 class="sec-title">모임 기록</h3>
       <div class="list" id="list-meets"></div>
     </div>
@@ -461,21 +530,27 @@
       </button>
     </div>
     <div class="scroll pad">
-      <div class="wide3">
+      <div class="wide">
         <div class="field"><label for="m-date">모임 날짜</label><input id="m-date" type="date"></div>
-        <div class="field"><label for="m-time">시간</label><input id="m-time" type="time"></div>
         <div class="field"><label for="m-cell">셀</label><select id="m-cell"></select></div>
       </div>
       <div class="wide">
+        <div class="field"><label>몇 시부터 몇 시까지</label>
+          <div class="two">
+            <input id="m-time" type="time" aria-label="시작 시간">
+            <input id="m-time-end" type="time" aria-label="끝나는 시간">
+          </div>
+        </div>
         <div class="field"><label for="m-place">장소</label><input id="m-place" placeholder="예) 우리 집, 카페"></div>
-        <div class="field"><label for="m-topic">나눔 주제 · 본문</label><input id="m-topic" placeholder="예) 요한복음 15장"></div>
       </div>
+      <div class="field"><label for="m-topic">나눔 주제 · 본문</label><input id="m-topic" placeholder="예) 요한복음 15장"></div>
 
-      <div style="display:flex;align-items:center;justify-content:space-between;margin:18px 0 10px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin:18px 0 10px;flex-wrap:wrap;gap:8px">
         <h3 style="font-size:12px;letter-spacing:.06em;color:var(--dim)">출석과 나눔</h3>
         <div style="display:flex;gap:6px">
           <button class="btn-sm" id="btn-all-present">모두 출석</button>
           <button class="btn-sm" id="btn-all-open">전부 펼치기</button>
+          <button class="btn-sm" id="btn-order-meet">순서</button>
         </div>
       </div>
       <p class="hint" style="margin:-4px 0 10px">여기 적은 근황과 기도제목은 그 사람의 영혼 카드에도 자동으로 쌓여요.</p>
@@ -514,13 +589,18 @@
           <button data-k="cell">셀모임 후</button>
         </div></div>
 
-      <div class="wide3">
+      <div class="wide">
         <div class="field"><label for="log-date">날짜</label><input id="log-date" type="date"></div>
-        <div class="field"><label for="log-time">시간</label><input id="log-time" type="time"></div>
-        <div class="field"><label for="log-place">어디서</label>
-          <input id="log-place" placeholder="예) 카페, 집, 교회">
-          <div class="quick" id="log-quick"></div></div>
+        <div class="field"><label>몇 시부터 몇 시까지</label>
+          <div class="two">
+            <input id="log-time" type="time" aria-label="시작 시간">
+            <input id="log-time-end" type="time" aria-label="끝나는 시간">
+          </div>
+          <p class="hint" id="log-dur">끝나는 시간까지 적으면 얼마나 함께했는지 남아요.</p></div>
       </div>
+      <div class="field"><label for="log-place">어디서</label>
+        <input id="log-place" placeholder="예) 카페, 집, 교회">
+        <div class="quick" id="log-quick"></div></div>
 
       <h3 class="sec-title">만나기 전 — 기도하며 받은 것</h3>
       <div class="wide">
@@ -658,7 +738,7 @@
         <div class="inner"><div class="wide">
           <div class="field"><label for="e-reg">교회 등록일</label>
             <input id="e-reg" inputmode="numeric" placeholder="2024-03 또는 2024-03-05"></div>
-          <div class="field"><label for="e-bap">세례일</label>
+          <div class="field"><label for="e-bap">침례일</label>
             <input id="e-bap" inputmode="numeric" placeholder="2020-05-10"></div>
           <div class="field"><label for="e-married">결혼기념일</label>
             <input id="e-married" inputmode="numeric" placeholder="5-20"></div>
@@ -1011,6 +1091,54 @@
   <div class="dlg-btns">
     <button class="btn-ghost" id="rp-close">닫기</button>
     <button class="btn" id="rp-copy">복사하기</button>
+  </div>
+</dialog>
+
+<!-- 캘린더에서 이 날 무엇을 적을지 고르기 -->
+<dialog id="dlg-calnew">
+  <h3 id="calnew-title">이 날 기록 남기기</h3>
+  <p class="muted" style="margin-bottom:14px" id="calnew-sub"></p>
+  <div class="field"><label for="cn-kind">무엇을 적을까요</label>
+    <select id="cn-kind">
+      <option value="one">1:1 만남</option>
+      <option value="small">소그룹 모임</option>
+      <option value="cell">셀모임 (출석 포함)</option>
+    </select></div>
+  <div class="field" id="cn-soul-wrap"><label for="cn-soul">누구와</label>
+    <select id="cn-soul"></select></div>
+  <p class="err" id="calnew-err"></p>
+  <div class="dlg-btns">
+    <button class="btn-ghost" id="cn-cancel">취소</button>
+    <button class="btn" id="cn-go">적으러 가기</button>
+  </div>
+</dialog>
+
+<!-- 셀원 순서 배정 -->
+<dialog id="dlg-order">
+  <h3>셀원 순서 정하기</h3>
+  <p class="muted" style="margin-bottom:14px">영혼 목록과 출석 명단에 이 순서로 나와요.
+    위아래 화살표로 옮긴 뒤 저장을 누르세요.</p>
+  <div class="list" id="order-list"></div>
+  <p class="err" id="order-err"></p>
+  <div class="dlg-btns">
+    <button class="btn-ghost" id="ord-cancel">취소</button>
+    <button class="btn" id="ord-save">저장</button>
+  </div>
+</dialog>
+
+<!-- 침례 -->
+<dialog id="dlg-bap">
+  <h3>침례</h3>
+  <p class="muted" style="margin-bottom:14px">침례를 받은 날을 적어주세요.
+    적어두면 해마다 그 날이 캘린더에 기념일로 떠요.</p>
+  <div class="field"><label for="bp-date">침례 받은 날</label>
+    <input id="bp-date" placeholder="2024-05-19 또는 2024-5-19">
+    <p class="hint">정확한 날을 모르면 연도와 월만 적어도 돼요. (예: 2024-5)</p></div>
+  <p class="err" id="bap-err"></p>
+  <div class="dlg-btns">
+    <button class="btn-ghost" id="bp-cancel">취소</button>
+    <button class="btn-sm danger" id="bp-clear" style="height:46px;flex-shrink:0">지우기</button>
+    <button class="btn" id="bp-save">저장</button>
   </div>
 </dialog>
 
