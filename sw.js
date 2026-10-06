@@ -3,7 +3,7 @@
    - Firebase 통신은 절대 캐시하지 않음 (항상 최신 데이터)
    - 파일을 새로 올리면 CACHE 이름을 바꿔 새 버전을 받게 함 */
 
-const CACHE = "mokja-v5-icon2";
+const CACHE = "mokja-v6";
 const SHELL = [
   "./",
   "./index.html",
