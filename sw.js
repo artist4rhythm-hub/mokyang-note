@@ -1,9 +1,9 @@
-/* 목양노트 서비스 워커
+/* 목자의 삶 — 서비스 워커
    - 앱 화면(html/js/아이콘)만 캐시해서 오프라인에서도 열리게 함
    - Firebase 통신은 절대 캐시하지 않음 (항상 최신 데이터)
    - 파일을 새로 올리면 CACHE 이름을 바꿔 새 버전을 받게 함 */
 
-const CACHE = "mokyang-v4";
+const CACHE = "mokja-v5-icon2";
 const SHELL = [
   "./",
   "./index.html",

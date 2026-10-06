@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0F0F0F">
-<title>목양노트</title>
+<title>목자의 삶</title>
 <link rel="manifest" href="./manifest.json">
 <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
-<meta name="apple-mobile-web-app-title" content="목양노트">
+<meta name="apple-mobile-web-app-title" content="목자의 삶">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600&family=Noto+Serif+KR:wght@500;600&display=swap" rel="stylesheet">
@@ -139,14 +139,34 @@
   .att button.on[data-v="online"]{background:var(--surface2);color:#CFC5C3;border-color:#3B3231}
   .att button.on[data-v="absent"]{background:var(--rose-bg);color:var(--rose-tx);border-color:#3A2226}
 
-  .ladder{display:flex;gap:6px;margin-top:12px;padding:0}
-  .ladder li{flex-grow:1;list-style:none;min-width:0}
-  .ladder .bar{height:6px;border-radius:999px;background:var(--line)}
-  .ladder .bar.done{background:#B8324A}
-  .ladder .bar.ing{background:var(--brand)}
-  .ladder .bar.drop{background:#4A3A2A}
-  .ladder p{margin:6px 0 0;font-size:11px;color:var(--dim);overflow:hidden;
-    text-overflow:ellipsis;white-space:nowrap}
+  /* 훈련 현황 — 등급이 아니라 나열 */
+  .courses{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px}
+  .cbox{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:#141111}
+  .cbox .cn{font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .cbox .cs{font-size:11px;margin-top:5px;color:var(--dim)}
+  .cbox.done{border-color:#245237;background:var(--ok-bg)}
+  .cbox.done .cs{color:var(--ok-tx)}
+  .cbox.ongoing{border-color:#3A2226;background:var(--rose-bg)}
+  .cbox.ongoing .cs{color:var(--rose-tx)}
+  .cbox.dropped{border-color:#3A2E1E;background:var(--warn-bg)}
+  .cbox.dropped .cs{color:var(--warn-tx)}
+  .cbox .pbar{height:5px;border-radius:999px;background:#2E2727;margin-top:8px;overflow:hidden}
+  .cbox .pbar i{display:block;height:100%;background:var(--brand)}
+
+  /* 회차 점 */
+  .dots{display:flex;gap:5px;flex-wrap:wrap;margin-top:10px}
+  .dots span{width:24px;height:24px;border-radius:999px;border:1px solid var(--line);
+    display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--dim)}
+  .dots span.ok{background:var(--rose-bg);border-color:#3A2226;color:var(--rose-tx);font-weight:500}
+
+  /* 회차 입력 줄 */
+  .sesrow{display:flex;align-items:center;gap:8px;background:var(--surface);
+    border:1px solid var(--line);border-radius:12px;padding:8px 10px}
+  .sesrow .no{width:42px;font-size:12px;color:var(--dim);flex-shrink:0}
+  .sesrow input{height:42px;font-size:14px;flex-grow:1;min-width:0}
+  .sesrow button{width:42px;height:42px;flex-shrink:0;border:1px solid var(--line);
+    border-radius:10px;background:transparent;color:#6E6260;cursor:pointer}
+  .sesrow button.ok{background:var(--ok-bg);border-color:#245237;color:var(--ok-tx)}
 
   dialog{width:min(94vw,410px);max-height:88vh;border:1px solid var(--line);border-radius:18px;
     background:var(--surface);color:var(--text);padding:20px;overflow-y:auto}
@@ -176,7 +196,7 @@
   <!-- 로그인 -->
   <section class="screen" id="s-login" hidden>
     <div class="center">
-      <h1 class="serif" style="font-size:30px;font-weight:600">목양노트</h1>
+      <h1 class="serif" style="font-size:30px;font-weight:600">목자의 삶</h1>
       <p class="muted" style="margin-top:8px">맡겨진 영혼을 기록하고 함께 기도해요.</p>
       <div style="height:32px"></div>
       <button class="btn-ghost" id="btn-google" style="display:flex;align-items:center;justify-content:center;gap:8px">
@@ -216,7 +236,7 @@
   <section class="screen" id="s-setup" hidden>
     <div class="center">
       <span class="chip rose">최초 설정</span>
-      <h2 class="serif" style="font-size:24px;font-weight:600;margin-top:12px">목양노트를 시작해요</h2>
+      <h2 class="serif" style="font-size:24px;font-weight:600;margin-top:12px">목자의 삶을 시작해요</h2>
       <p class="muted" style="margin-top:8px">교회와 첫 진을 만들어요. 이 설정은 한 번만 해요.</p>
       <div style="height:24px"></div>
       <div class="field"><label for="st-church">교회 이름</label><input id="st-church" placeholder="예) 은혜교회"></div>
@@ -567,6 +587,7 @@
       <div class="list" id="list-cells"></div>
       <button class="btn-ghost" id="btn-cell-add" style="margin-top:8px;height:44px;font-size:13px">셀 추가</button>
       <h3 class="sec-title">훈련 과정</h3>
+      <p class="hint" style="margin:-4px 0 10px">↑↓ 로 보이는 순서를 바꿔요. 등급이 아니라 목록 순서일 뿐이에요.</p>
       <div class="list" id="list-courses"></div>
       <button class="btn-ghost" id="btn-course-add" style="margin-top:8px;height:44px;font-size:13px">훈련 과정 추가</button>
       <div id="jin-block" hidden>
@@ -675,8 +696,9 @@
 
 <!-- 훈련 기록 -->
 <dialog id="dlg-train">
-  <h3>훈련 기록</h3>
-  <div class="field"><label for="tr-course">과정</label><select id="tr-course"></select></div>
+  <h3 id="train-title">훈련 기록</h3>
+  <div class="field"><label for="tr-course">과정</label><select id="tr-course"></select>
+    <p class="hint" id="tr-course-hint"></p></div>
   <div class="two">
     <div class="field"><label for="tr-cohort">기수</label><input id="tr-cohort" placeholder="예) 12기"></div>
     <div class="field"><label for="tr-status">상태</label>
@@ -696,6 +718,39 @@
   <div class="dlg-btns">
     <button class="btn-ghost" id="tr-cancel">취소</button>
     <button class="btn" id="tr-save">저장</button>
+  </div>
+</dialog>
+
+<!-- 회차 기록 -->
+<dialog id="dlg-sessions">
+  <h3 id="ses-title">회차 기록</h3>
+  <p class="muted" id="ses-sub" style="margin-bottom:12px"></p>
+  <div class="quick" style="margin:0 0 14px">
+    <button type="button" id="ses-next">다음 회차 오늘로</button>
+    <button type="button" id="ses-weekly">매주 같은 요일로 채우기</button>
+  </div>
+  <div class="list" id="ses-list" style="margin-bottom:14px"></div>
+  <div id="ses-done-hint"></div>
+  <p class="err" id="ses-err"></p>
+  <div class="dlg-btns">
+    <button class="btn-ghost" id="ses-cancel">닫기</button>
+    <button class="btn" id="ses-save">저장</button>
+  </div>
+</dialog>
+
+<!-- 훈련 과정 편집 -->
+<dialog id="dlg-course">
+  <h3 id="course-title">훈련 과정</h3>
+  <div class="field"><label for="co-name">과정 이름</label>
+    <input id="co-name" placeholder="예) 새로운 삶"></div>
+  <div class="field"><label for="co-sessions">총 회차</label>
+    <input id="co-sessions" type="number" inputmode="numeric" min="1" max="60" value="1">
+    <p class="hint">여러 번 모이는 과정이면 횟수를 적어주세요. 예) 새로운 삶 8회<br>
+      한 번에 끝나는 과정이면 1 로 두면 돼요.</p></div>
+  <p class="err" id="course-err"></p>
+  <div class="dlg-btns">
+    <button class="btn-ghost" id="co-cancel">취소</button>
+    <button class="btn" id="co-save">저장</button>
   </div>
 </dialog>
 
