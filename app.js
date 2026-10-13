@@ -22,7 +22,18 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
 const APP_NAME = "목자의 삶";
-const APP_VERSION = "7.0 (2026-10-06)";
+const APP_VERSION = "9.0 (2026-10-13)";
+
+/* 사진 크기 — 얼굴을 알아볼 수 있는 선에서 가장 작게.
+   얼굴 하나가 가로 80px은 되어야 알아보는데, 여럿이 한 줄로 선
+   단체 사진이면 전체가 1,200px은 돼야 그게 나옵니다. */
+const PHOTO = {
+  face:   { max: 480, q: 0.72 },   // 영혼 카드 얼굴 사진 (크게 볼 때)
+  faceTh: { max:  64, q: 0.62 },   // 목록에 뜨는 아주 작은 사본
+  shot:   { max:1200, q: 0.70 },   // 모임 사진 원본
+  shotTh: { max:  96, q: 0.62 }    // 기록 안에 붙는 작은 사본
+};
+const MAX_SHOTS = 3;
 
 const firebaseConfig = {
   apiKey: "AIzaSyBxdl2JT2qRGZPPYdOz0BRNIjE-Z4g-Ftk",
@@ -47,9 +58,10 @@ if ("serviceWorker" in navigator) {
 const $ = (id) => document.getElementById(id);
 const SCREENS = ["s-loading","s-login","s-verify","s-setup","s-accept","s-pending",
                  "s-home","s-souls","s-cal","s-meet","s-meeting","s-log","s-soul",
-                 "s-edit","s-train","s-search","s-more","s-manage"];
+                 "s-edit","s-train","s-search","s-usage","s-more","s-manage"];
 const show = (id) => {
   SCREENS.forEach(s => $(s).hidden = (s !== id));
+  if (id !== "s-loading" && typeof bump === "function") bump(id.replace(/^s-/, ""), "screen");
   const sb = $("sidebar");
   const inApp = !["s-loading","s-login","s-verify","s-setup","s-accept","s-pending"].includes(id);
   sb.style.display = inApp ? "" : "none";
@@ -72,7 +84,17 @@ const ROLE   = { super:"수퍼 관리자", jinjang:"진장", coach:"코치", lea
 const STATUS = { new:"새가족", settling:"정착 중", growing:"성장", cand:"리더 후보", care:"돌봄 필요" };
 const SCOPE  = { private:"나만 보기", leader:"담당 리더", coach:"코치 공유" };
 const RTYPE  = { meet:"만남", pray:"기도", heart:"받은 마음" };
-const KIND   = { one:"1:1 만남", small:"소그룹", cell:"셀모임" };
+/* 기본 모임 종류 — 지울 수 없고, 교회가 직접 더 만들 수 있습니다.
+   solo 가 true 면 한 명만, false 면 여러 명을 고릅니다. */
+const BASE_KINDS = [
+  { id:"one",   name:"1:1 만남",    solo:true,  order:1 },
+  { id:"small", name:"소그룹 모임",  solo:false, order:2 },
+  { id:"cell",  name:"셀모임 후",    solo:false, order:3 }
+];
+const kindList = () => [...BASE_KINDS, ...state.meetTypes]
+  .sort((a,b)=>(a.order||99)-(b.order||99));
+const kindOf = (id) => kindList().find(k => k.id === id) || BASE_KINDS[0];
+const kindName = (id) => (kindList().find(k => k.id === id) || {}).name || "만남";
 const TSTAT  = { planned:"수강 예정", ongoing:"수강 중", done:"수료", dropped:"중도 포기" };
 const ATT    = { present:"출석", online:"온라인", absent:"결석" };
 const PLACES = ["카페","식사","집","교회","전화","산책"];
@@ -201,17 +223,30 @@ function fmtPhone(v) {
 /* ── 상태 ── */
 const state = {
   user:null, me:null,
-  jins:[], cells:[], members:[], invites:[], courses:[],
+  jins:[], cells:[], members:[], invites:[], courses:[], meetTypes:[], orgAt:0,
+  soulsAt:0, meetingsAt:0,
   souls:[], meetings:[], trainings:[], allRecords:null, allTrainings:null,
   soul:null, records:[], soulTab:"rec", recKw:"", recType:"all",
   meeting:null, log:null,
-  prayIdx:0, filter:"all", photoCache:{}, editingId:null, editPhoto:undefined,
+  prayIdx:0, filter:"all", photoCache:{}, editingId:null, editPhoto:undefined, editThumb:undefined,
   editDirty:false, lastTab:"home", calMonth:null, calPick:null, gsFilter:"all"
 };
 const uid = () => auth.currentUser ? auth.currentUser.uid : null;
 const isLeaderOf = (s) => s && s.leaderUid === uid();
 const canLead = () => state.me && (state.me.role === "leader" || state.me.isLeader === true);
+/* 진장은 셀리더를 목양하므로, 셀을 맡지 않아도 카드를 만들 수 있습니다 */
+const canMakeSoul = () => canLead() || (state.me && state.me.role === "jinjang");
+/* 셀리더 카드는 셀 구성원이 아니므로 출석 명단에 넣지 않습니다 */
+const isLeaderCard = (s) => s && s.kind === "leader";
 const initial = (name) => (name || "?").trim().slice(-1);
+/* 목록·명단에 쓰는 동그란 얼굴.
+   작은 사본은 영혼 카드 안에 들어 있어서 따로 불러오지 않습니다. */
+function avatar(s, px) {
+  const size = px ? `width:${px}px;height:${px}px;font-size:${Math.round(px*0.38)}px;` : "";
+  return s.thumb
+    ? `<span class="ava" style="${size}background-image:url(${s.thumb})"></span>`
+    : `<span class="ava" style="${size}">${esc(initial(s.name))}</span>`;
+}
 const pack = (s) => s.docs.map(d => ({ id:d.id, ...d.data() }));
 /* 리더가 정한 순서 먼저, 안 정한 사람은 이름순으로 뒤에 */
 const bySeq = (a,b) =>
@@ -226,6 +261,43 @@ function birthText(s) {
     ? `${Number(p[1])}월 ${Number(p[2])}일${s.lunar ? " (음력)" : ""}`
     : (p[1] !== "00" ? `${Number(p[1])}월` : "");
   return [year, md].filter(Boolean).join(" · ");
+}
+
+/* ── 사진 줄이기 ──
+   브라우저에서 바로 줄여서 넣습니다. 원본은 올라가지 않아요. */
+function shrink(file, spec) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("사진을 읽지 못했어요."));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("사진 형식을 알아보지 못했어요."));
+      img.onload = () => {
+        const scale = Math.min(1, spec.max / Math.max(img.width, img.height));
+        const cv = document.createElement("canvas");
+        cv.width = Math.max(1, Math.round(img.width * scale));
+        cv.height = Math.max(1, Math.round(img.height * scale));
+        const cx = cv.getContext("2d");
+        cx.fillStyle = "#000"; cx.fillRect(0, 0, cv.width, cv.height);
+        cx.drawImage(img, 0, 0, cv.width, cv.height);
+        resolve(cv.toDataURL("image/jpeg", spec.q));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+/* 저장되는 칸 하나는 1MB를 넘으면 안 됩니다.
+   그 전에 품질을 더 낮춰서라도 들어가게 합니다. */
+async function shrinkFit(file, spec, limit) {
+  let q = spec.q, max = spec.max, out = "";
+  for (let i = 0; i < 4; i++) {
+    out = await shrink(file, { max, q });
+    if (out.length <= limit) return out;
+    q = Math.max(0.3, q - 0.12); max = Math.round(max * 0.8);
+  }
+  if (out.length > limit) throw new Error("사진이 너무 커요. 다른 사진을 골라주세요.");
+  return out;
 }
 
 /* ── 입력 편의 ── */
@@ -387,23 +459,33 @@ $("btn-accept").onclick = async () => {
 };
 
 /* ════════ 데이터 ════════ */
-async function loadOrg() {
+/* 조직도(진·셀·구성원·훈련과정·모임종류)는 자주 바뀌지 않습니다.
+   화면을 옮길 때마다 다시 읽으면 하루 읽기 횟수의 상당 부분이
+   여기서 날아가므로, 한 번 읽고 10분 동안 재사용합니다. */
+const ORG_TTL = 10 * 60 * 1000;
+async function loadOrg(force) {
+  if (!force && state.orgAt && Date.now() - state.orgAt < ORG_TTL) return;
   const me = state.me, isSuper = me.role === "super";
   const mine = (col) => isSuper ? getDocs(collection(db, col))
     : getDocs(query(collection(db, col), where("jinId","==",me.jinId)));
   try {
-    const [jins, cells, users, invites, courses] = await Promise.all([
+    const [jins, cells, users, invites, courses, mtypes] = await Promise.all([
       getDocs(collection(db,"jins")), mine("cells"), mine("users"), mine("invites"),
-      getDocs(collection(db,"courses"))
+      getDocs(collection(db,"courses")), getDocs(collection(db,"meetTypes"))
     ]);
     state.jins = pack(jins);
     state.cells = pack(cells);
     state.members = pack(users).sort((a,b)=>(a.name||"").localeCompare(b.name||"","ko"));
     state.invites = pack(invites);
     state.courses = pack(courses).filter(c=>c.active!==false).sort((a,b)=>(a.order||0)-(b.order||0));
+    state.meetTypes = pack(mtypes).filter(t=>t.active!==false)
+      .map(t=>({ ...t, solo:false, order:(t.order||0)+10 }))
+      .sort((a,b)=>(a.order||0)-(b.order||0));
+    state.orgAt = Date.now();
   } catch (e) { toast(msgOf(e)); }
 }
-async function loadSouls() {
+async function loadSouls(force) {
+  if (!force && state.soulsAt && Date.now() - state.soulsAt < ORG_TTL) return;
   const me = state.me, col = collection(db,"souls");
   const out=[], seen={};
   const push = (rows) => rows.forEach(r => { if(!seen[r.id]){seen[r.id]=true;out.push(r);} });
@@ -415,9 +497,11 @@ async function loadSouls() {
     }
     if (me.role === "jinjang") push(pack(await getDocs(query(col, where("jinId","==",me.jinId)))));
     state.souls = out.filter(s=>s.active!==false).sort(bySeq);
+    state.soulsAt = Date.now();
   } catch (e) { state.souls=[]; toast(msgOf(e)); }
 }
-async function loadMeetings() {
+async function loadMeetings(force) {
+  if (!force && state.meetingsAt && Date.now() - state.meetingsAt < ORG_TTL) return;
   const me = state.me, col = collection(db,"meetings");
   const out=[], seen={};
   const push = (rows) => rows.forEach(r => { if(!seen[r.id]){seen[r.id]=true;out.push(r);} });
@@ -429,6 +513,7 @@ async function loadMeetings() {
     }
     if (me.role === "jinjang") push(pack(await getDocs(query(col, where("jinId","==",me.jinId)))));
     state.meetings = out.sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")));
+    state.meetingsAt = Date.now();
   } catch (e) { state.meetings=[]; toast(msgOf(e)); }
 }
 async function loadRecords(soulId, canSeeAll) {
@@ -500,7 +585,13 @@ async function loadPhoto(soulId) {
   } catch { state.photoCache[soulId]=null; }
   return state.photoCache[soulId];
 }
-const invalidate = () => { state.allRecords = null; state.allTrainings = null; };
+/* 내가 무언가를 바꿨으면 모아둔 것을 버려서 다음에 새로 읽게 합니다.
+   반대로 그냥 화면만 옮길 때는 다시 읽지 않습니다 — 읽기 횟수가
+   하루 한도에 닿는 가장 큰 이유가 이것이었어요. */
+const invalidate = () => {
+  state.allRecords = null; state.allTrainings = null;
+  state.soulsAt = 0; state.meetingsAt = 0;
+};
 
 /* ── 출석 계산 ── */
 const cellMeetings = (cellId) => state.meetings.filter(m => m.cellId === cellId);
@@ -609,7 +700,7 @@ function renderPray() {
         <span style="font-size:11px;color:var(--dim)">${state.prayIdx+1} / ${list.length}</span>
       </div>
       <div style="display:flex;align-items:center;gap:12px;margin-top:14px;cursor:pointer" data-gosoul="${s.id}">
-        <span class="ava">${esc(initial(s.name))}</span>
+        ${avatar(s)}
         <div style="min-width:0">
           <h2 class="serif" style="font-size:20px;font-weight:600">${esc(s.name)}</h2>
           <div style="display:flex;gap:6px;margin-top:6px">
@@ -703,14 +794,14 @@ $("btn-quick-add").onclick = () => {
 
 /* ════════ 영혼 목록 ════════ */
 async function openSouls() {
-  if (!canLead() && state.me.role!=="coach" && state.me.role!=="jinjang") {
+  if (!canMakeSoul() && state.me.role!=="coach" && state.me.role!=="jinjang") {
     toast("영혼 카드는 담당 리더만 볼 수 있어요. 리더 관리에서 '나도 셀을 맡아요'를 켤 수 있어요."); return;
   }
   show("s-loading");
   await loadOrg(); await loadSouls(); await loadMeetings();
   renderFilter(); renderSouls();
-  $("btn-soul-new").hidden = !canLead();
-  $("btn-order-souls").hidden = !canLead() || state.souls.filter(isLeaderOf).length < 2;
+  $("btn-soul-new").hidden = !canMakeSoul();
+  $("btn-order-souls").hidden = !canMakeSoul() || state.souls.filter(isLeaderOf).length < 2;
   markSide("souls"); show("s-souls");
 }
 function renderFilter() {
@@ -739,7 +830,7 @@ function renderSouls() {
     const bt = birthText(s), bd = annivIn(s.birth);
     const rate = attendRate(s.id, s.cellId);
     return `<div class="row" data-open="${s.id}" style="cursor:pointer">
-      <span class="ava">${esc(initial(s.name))}</span>
+      ${avatar(s)}
       <div class="grow">
         <p class="nm">${esc(s.name)}</p>
         <p class="sub">${bt ? esc(bt) : "생일 미입력"}${
@@ -748,7 +839,8 @@ function renderSouls() {
           agoShort(n)}${rate===null?"":` · 출석 ${rate}%`}${
           (s.prayOpen||0)>0?` · 기도 ${s.prayOpen}`:""}</p>
       </div>
-      <span class="chip ${s.status==="care"?"warn":"rose"}">${esc(STATUS[s.status]||"—")}</span>
+      <span class="chip ${isLeaderCard(s)?"":s.status==="care"?"warn":"rose"}">${
+        isLeaderCard(s)?"셀리더":esc(STATUS[s.status]||"—")}</span>
     </div>`;
   }).join("") || `<p class="muted">${
     kw ? "찾는 이름이 없어요."
@@ -799,6 +891,7 @@ $("ord-save").onclick = async () => {
       if (s.seq !== i+1) writes.push(updateDoc(doc(db,"souls",s.id), { seq:i+1 }));
     });
     await Promise.all(writes);
+    state.soulsAt = 0;
     orderList.forEach((s,i)=>{
       s.seq = i+1;
       const inList = state.souls.find(x=>x.id===s.id); if (inList) inList.seq = i+1;
@@ -830,9 +923,11 @@ async function openSoul(soulId) {
   $("soul-ava").textContent = photo ? "" : initial(s.name);
   $("soul-ava").style.backgroundImage = photo ? `url(${photo})` : "";
   $("soul-name").textContent = s.name;
-  const cell = state.cells.find(c=>c.id===s.cellId);
-  $("soul-chips").innerHTML = `<span class="chip rose">${esc(STATUS[s.status]||"—")}</span>`
-    + (cell?`<span class="chip">${esc(cell.name)}</span>`:"");
+  const cell = state.cells.find(c=>c.id===(isLeaderCard(s)?s.ofCellId:s.cellId));
+  $("soul-chips").innerHTML =
+    (isLeaderCard(s) ? `<span class="chip">셀리더</span>` : "")
+    + `<span class="chip rose">${esc(STATUS[s.status]||"—")}</span>`
+    + (cell?`<span class="chip">${esc(cell.name)}${isLeaderCard(s)?" 담당":""}</span>`:"");
   const tel = (s.phone||"").replace(/\D/g,"");
   $("soul-contact").innerHTML = tel ? `
     <div style="display:flex;gap:8px;max-width:420px">
@@ -891,7 +986,7 @@ function recCard(r, kw, showSoul) {
   const span = fmtSpan(r.time, r.timeEnd);
   const dur = durText(r.time, r.timeEnd);
   const head = r.type==="meet"
-    ? `${KIND[r.kind]||"만남"} · ${fmtDate(r.date)}${span?" "+esc(span):""}${r.place?" · "+esc(r.place):""}`
+    ? `${esc(kindName(r.kind))} · ${fmtDate(r.date)}${span?" "+esc(span):""}${r.place?" · "+esc(r.place):""}`
     : `${RTYPE[r.type]||r.type} · ${fmtDate(r.date)}`;
   return `<article class="rec">
     <div class="head">
@@ -900,18 +995,75 @@ function recCard(r, kw, showSoul) {
     </div>
     ${r.type!=="meet" && r.body ? `<p class="body${r.type==="heart"?" serif":""}">${hl(r.body,kw)}</p>` : ""}
     ${blocks.map(([l,v])=>`<div class="blk"><p class="lbl">${l}</p><p>${hl(v,kw)}</p></div>`).join("")}
+    ${(r.photos||[]).length?`<div class="shots">${r.photos.map((p,i)=>
+      `<div class="sh" style="background-image:url(${p.thumb})" data-viewshot="${r.id}:${i}"
+        role="button" aria-label="사진 ${i+1} 크게 보기"></div>`).join("")}</div>`:""}
     <div class="foot">
+      ${r.planned?`<span class="chip warn">예정 · ${(()=>{const d=daysUntil(r.date);
+        return d===null?"":d>0?`D-${d}`:d===0?"오늘":`${-d}일 지남`;})()}</span>`:""}
+      ${(r.withNames||[]).length>1?`<span class="chip">${esc(r.withNames.join(", "))}</span>`:""}
       ${r.type==="pray"?`<span class="chip ${r.prayStatus==="answered"?"ok":""}">${r.prayStatus==="answered"?"응답됨":"기도 중 "+((daysSince(r.date)||0)+1)+"일째"}</span>`:""}
       ${r.type==="heart"?`<span class="chip">${r.who==="soul"?"이 친구가 받은 은혜":"내가 받은 마음"}</span>`:""}
       ${dur?`<span class="chip">${dur}</span>`:""}
       ${r.meetingId?`<span class="chip">셀모임에서</span>`:""}
       ${r.by===uid()&&!showSoul?`
+        ${r.planned?`<button class="btn-sm" data-editrec="${r.id}" data-rtype="meet">만났어요 — 기록 채우기</button>`:""}
         ${r.type==="pray"&&r.prayStatus!=="answered"?`<button class="btn-sm" data-answer="${r.id}">응답됐어요</button>`:""}
         <button class="btn-sm" data-editrec="${r.id}" data-rtype="${r.type}">수정</button>
         <button class="btn-sm danger" data-delrec="${r.id}">삭제</button>`:""}
       ${showSoul?`<button class="btn-sm" data-gosoul2="${r.soulId}">카드 열기</button>`:""}
     </div>
   </article>`;
+}
+
+/* ── 한 사람의 출석 ──
+   도넛 하나는 '얼마나 왔나'를, 네모 칸 열두 개는 '언제 빠졌나'를 보여줍니다.
+   같은 60%라도 띄엄띄엄 빠진 것과 최근 다섯 주 내리 빠진 것은
+   전혀 다른 상황인데, 숫자 하나로는 그게 안 보입니다. */
+function attendBlock(soulId, cellId) {
+  const ms = cellMeetings(cellId);
+  if (!ms.length) return "";
+  const marked = ms.filter(m => m.attendance && m.attendance[soulId]);
+  const rate = marked.length
+    ? Math.round(marked.filter(m => m.attendance[soulId] !== "absent").length / marked.length * 100)
+    : null;
+  /* 오래된 것이 왼쪽에 오도록 — 왼쪽에서 오른쪽으로 읽습니다 */
+  const last12 = ms.slice(0, 12).reverse();
+  const R = 30, C = 2 * Math.PI * R, on = rate === null ? 0 : C * rate / 100;
+  const cells = last12.map(m => {
+    const v = (m.attendance && m.attendance[soulId]) || "none";
+    const why = v === "absent" && m.reasons && m.reasons[soulId] ? ` · ${m.reasons[soulId]}` : "";
+    const label = v === "none" ? "기록 없음" : ATT[v];
+    return `<i class="${v}" title="${esc(fmtDate(m.date))} · ${esc(label)}${esc(why)}"></i>`;
+  }).join("");
+  return `<div class="card" style="margin-bottom:12px">
+    <h3 style="font-size:13px;font-weight:600;margin-bottom:12px">셀모임 출석</h3>
+    <div class="ring">
+      <svg width="84" height="84" viewBox="0 0 84 84" role="img"
+        aria-label="출석률 ${rate===null?"기록 없음":rate+"퍼센트"}">
+        <circle cx="42" cy="42" r="${R}" fill="none" stroke="#2A2424" stroke-width="9"/>
+        ${rate===null?"":`<circle cx="42" cy="42" r="${R}" fill="none" stroke="var(--brand)"
+          stroke-width="9" stroke-linecap="round" stroke-dasharray="${on.toFixed(1)} ${(C-on).toFixed(1)}"
+          transform="rotate(-90 42 42)"/>`}
+        <text class="rv" x="42" y="42" text-anchor="middle" dominant-baseline="middle"
+          >${rate===null?"—":rate+"%"}</text>
+        <text class="rk" x="42" y="58" text-anchor="middle">출석률</text>
+      </svg>
+      <div style="min-width:0">
+        <p style="font-size:14px;line-height:1.7">${marked.length}번 중
+          <b>${marked.filter(m=>m.attendance[soulId]!=="absent").length}번</b> 나왔어요</p>
+        <p class="muted" style="font-size:12px;margin-top:4px">
+          최근 ${last12.length}주 흐름 — 왼쪽이 오래된 쪽이에요</p>
+        <div class="weeks">${cells}</div>
+      </div>
+    </div>
+    <div class="legend">
+      <span><i class="present" style="background:#2E7D54;border-color:#2E7D54"></i>출석</span>
+      <span><i class="online" style="background:#4A4140;border-color:#5A4F4E"></i>온라인</span>
+      <span><i class="absent" style="background:var(--rose-bg);border-color:#5A2A32"></i>결석</span>
+      <span><i></i>기록 없음</span>
+    </div>
+  </div>`;
 }
 
 function renderSoulBody() {
@@ -924,6 +1076,7 @@ function renderSoulBody() {
     if (kw) list = list.filter(r => recText(r).toLowerCase().includes(kw.toLowerCase()));
     const types = [["all","전체"],["meet","만남"],["pray","기도"],["heart","받은 마음"]];
     box.innerHTML = `
+      ${s.kind==="leader" ? "" : attendBlock(s.id, s.cellId)}
       <input id="rec-search" placeholder="기록 안에서 찾기 (예: 이직, 어머니)" value="${esc(state.recKw)}" style="height:44px">
       <div class="seg" id="rec-type">${types.map(([k,l])=>
         `<button data-rty="${k}" class="${state.recType===k?"on":""}">${l}</button>`).join("")}</div>
@@ -1056,6 +1209,13 @@ function renderSoulBody() {
 
 $("soul-body").addEventListener("click", async (ev) => {
   const s = state.soul;
+  const vs = ev.target.closest("[data-viewshot]");
+  if (vs) {
+    const [rid, i] = vs.dataset.viewshot.split(":");
+    const r = state.records.find(x=>x.id===rid);
+    if (r && r.photos && r.photos[Number(i)]) showPhoto(r.photos[Number(i)]);
+    return;
+  }
   const del = ev.target.closest("[data-delrec]");
   if (del) {
     if (!confirm("이 기록을 지울까요? 되돌릴 수 없어요.")) return;
@@ -1128,13 +1288,25 @@ function openLog(soulId, recId, opts) {
   const mine = state.souls.filter(isLeaderOf);
   if (!mine.length) { toast("먼저 영혼 카드를 하나 만들어 주세요."); return; }
   const rec = recId ? state.records.find(r=>r.id===recId) : null;
-  state.log = { soulId: soulId || (state.soul&&isLeaderOf(state.soul)?state.soul.id:mine[0].id),
-                recId: recId||null, kind: rec?rec.kind:(o.kind||"one"), back: o.back||null };
-  $("log-title").textContent = rec ? "만남 기록 수정" : "만남 기록";
+  const first = soulId || (state.soul&&isLeaderOf(state.soul)?state.soul.id:mine[0].id);
+  state.log = {
+    recId: recId||null,
+    kind: rec?rec.kind:(o.kind||"one"),
+    back: o.back||null,
+    /* 소그룹은 여럿을 고르니 늘 목록으로 들고 다닙니다 */
+    picked: rec ? [soulId || first] : [first],
+    shots: rec ? (rec.photos||[]).slice() : [],
+    planned: rec ? !!rec.planned : !!o.planned
+  };
+  $("log-title").textContent = rec
+    ? "만남 기록 수정" : (state.log.planned ? "만남 예약" : "만남 기록");
+  $("log-kind").innerHTML = kindList().map(k=>
+    `<button data-k="${k.id}">${esc(k.name)}</button>`).join("");
   $("log-soul-wrap").hidden = !!rec;
-  $("log-soul").innerHTML = mine.map(s=>
-    `<option value="${s.id}"${s.id===state.log.soulId?" selected":""}>${esc(s.name)}</option>`).join("");
+  $("log-picks").innerHTML = mine.map(s=>
+    `<button type="button" data-pick="${s.id}">${esc(s.name)}</button>`).join("");
   syncLogKind();
+  renderShots();
   $("log-date").value = rec ? rec.date : (o.date || todayStr());
   $("log-time").value = rec?(rec.time||""):"";
   $("log-time-end").value = rec?(rec.timeEnd||""):"";
@@ -1149,6 +1321,8 @@ function openLog(soulId, recId, opts) {
   $("log-spirit").value = rec?(rec.spiritual||""):"";
   $("log-pray").value = "";
   $("log-pray").parentElement.hidden = !!rec;
+  $("btn-log-plan").hidden = !!rec;
+  $("btn-log-save").textContent = state.log.planned && !rec ? "예약 저장" : "저장";
   $("log-scope").value = rec?rec.scope:"leader";
   $("log-todo-on").checked = false; $("log-todo-fields").hidden = true;
   $("log-todo-text").value = ""; $("log-todo-due").value = plusDays(7);
@@ -1171,10 +1345,30 @@ $("log-time").addEventListener("input", syncLogDur);
 $("log-time-end").addEventListener("input", syncLogDur);
 $("log-kind").addEventListener("click",(ev)=>{
   const b = ev.target.closest("[data-k]"); if(!b) return;
-  state.log.kind = b.dataset.k; syncLogKind();
+  state.log.kind = b.dataset.k;
+  /* 1:1로 바꾸면 여럿 고른 것을 첫 사람만 남깁니다 */
+  if (kindOf(state.log.kind).solo && state.log.picked.length > 1)
+    state.log.picked = state.log.picked.slice(0,1);
+  syncLogKind();
+});
+$("log-picks").addEventListener("click",(ev)=>{
+  const b = ev.target.closest("[data-pick]"); if(!b) return;
+  const id = b.dataset.pick, L = state.log, solo = kindOf(L.kind).solo;
+  if (solo) { L.picked = [id]; }
+  else if (L.picked.includes(id)) L.picked = L.picked.filter(x=>x!==id);
+  else L.picked = [...L.picked, id];
+  syncLogKind();
 });
 function syncLogKind() {
-  $("log-kind").querySelectorAll("[data-k]").forEach(b=>b.classList.toggle("on", b.dataset.k===state.log.kind));
+  const L = state.log, k = kindOf(L.kind), solo = k.solo;
+  $("log-kind").querySelectorAll("[data-k]").forEach(b=>b.classList.toggle("on", b.dataset.k===L.kind));
+  $("log-picks").querySelectorAll("[data-pick]").forEach(b=>
+    b.classList.toggle("on", L.picked.includes(b.dataset.pick)));
+  $("log-soul-label").textContent = solo ? "누구를 만났나요" : "누구누구를 만났나요 (여러 명 고를 수 있어요)";
+  const names = L.picked.map(id=>(state.souls.find(s=>s.id===id)||{}).name).filter(Boolean);
+  $("log-pick-hint").textContent = !names.length
+    ? "한 명 이상 골라주세요."
+    : solo ? "" : `${names.length}명 — ${names.join(", ")}. 같은 기록이 고른 사람 모두의 카드에 쌓여요.`;
 }
 $("log-quick").addEventListener("click",(ev)=>{
   const b = ev.target.closest("[data-place]"); if(!b) return;
@@ -1182,52 +1376,146 @@ $("log-quick").addEventListener("click",(ev)=>{
 });
 $("log-todo-on").onchange = () => { $("log-todo-fields").hidden = !$("log-todo-on").checked; };
 
-$("btn-log-save").onclick = async () => {
-  const L = state.log;
-  const soulId = $("log-soul-wrap").hidden ? L.soulId : $("log-soul").value;
+/* ── 모임 사진 ──
+   기록 안에는 작은 사본만 넣고, 큰 사진은 따로 둡니다.
+   그래야 기록 목록을 열 때마다 큰 사진을 내려받지 않아요. */
+function renderShots() {
+  const shots = state.log.shots;
+  $("log-shots").innerHTML = shots.map((p,i)=>`
+    <div class="sh" style="background-image:url(${p.thumb})" data-shot="${i}" role="button"
+      aria-label="사진 ${i+1} 크게 보기">
+      <button type="button" data-rmshot="${i}" aria-label="사진 ${i+1} 빼기">×</button>
+    </div>`).join("")
+    + (shots.length < MAX_SHOTS
+      ? `<button type="button" class="add" id="btn-add-shot">＋ 사진<br>${shots.length}/${MAX_SHOTS}</button>`
+      : "");
+  const a = $("btn-add-shot"); if (a) a.onclick = () => $("log-photo-input").click();
+}
+$("log-shots").addEventListener("click", async (ev) => {
+  const rm = ev.target.closest("[data-rmshot]");
+  if (rm) {
+    ev.stopPropagation();
+    state.log.shots.splice(Number(rm.dataset.rmshot), 1); renderShots(); return;
+  }
+  const open = ev.target.closest("[data-shot]");
+  if (open) { const p = state.log.shots[Number(open.dataset.shot)]; if (p) showPhoto(p); }
+});
+$("log-photo-input").onchange = async (ev) => {
+  const files = [...(ev.target.files||[])]; ev.target.value = "";
+  const room = MAX_SHOTS - state.log.shots.length;
+  if (!files.length) return;
+  if (files.length > room) toast(`${MAX_SHOTS}장까지만 넣을 수 있어요. 앞의 ${room}장만 넣을게요.`);
+  toast("사진을 줄이는 중이에요…");
+  for (const f of files.slice(0, room)) {
+    try {
+      const [big, small] = await Promise.all([
+        shrinkFit(f, PHOTO.shot, 900000),
+        shrinkFit(f, PHOTO.shotTh, 14000)
+      ]);
+      state.log.shots.push({ thumb: small, full: big, id: null });
+      renderShots();
+    } catch (e) { toast(e.message || "사진 하나를 넣지 못했어요."); }
+  }
+};
+async function showPhoto(p) {
+  let src = p.full;
+  if (!src && p.id) {
+    try {
+      const d = await getDoc(doc(db,"recordPhotos",p.id));
+      src = d.exists() ? d.data().data : null;
+    } catch (e) { toast(msgOf(e)); }
+  }
+  $("pv-img").src = src || p.thumb;
+  $("photo-view").showModal();
+}
+$("pv-close").onclick = () => { $("photo-view").close(); $("pv-img").src = ""; };
+
+$("btn-log-plan").onclick = () => saveLog(true);
+$("btn-log-save").onclick = () => saveLog(false);
+
+async function saveLog(asPlan) {
+  const L = state.log, scope = $("log-scope").value;
   const v = (id) => $(id).value.trim();
   const did=v("log-did"), talked=v("log-talked"), update=v("log-update");
+  const ids = L.picked.slice();
   $("log-err").textContent = "";
-  if (!did && !talked && !update && !v("log-bheart") && !v("log-dheart") && !v("log-spirit")) {
-    $("log-err").textContent = "한 칸이라도 적어주세요."; return;
+  if (!ids.length) { $("log-err").textContent = "누구를 만났는지 골라주세요."; return; }
+  const planned = asPlan || L.planned;
+  /* 예약은 아직 안 만난 일이라 내용이 비어도 됩니다 */
+  if (!planned && !did && !talked && !update && !v("log-bheart") && !v("log-dheart") && !v("log-spirit")) {
+    $("log-err").textContent = "한 칸이라도 적어주세요. 아직 안 만났다면 '예약으로'를 눌러주세요."; return;
   }
-  $("btn-log-save").disabled = true;
+  $("btn-log-save").disabled = true; $("btn-log-plan").disabled = true;
   try {
-    const data = {
-      type:"meet", kind:L.kind, scope:$("log-scope").value,
-      date: $("log-date").value||todayStr(),
+    const date = $("log-date").value || todayStr();
+    /* 여러 명이면 한 번에 묶어두고, 한 사람 기록을 고치면 나머지도 같이 */
+    const groupId = ids.length > 1 ? (L.groupId || "g" + Date.now()) : null;
+    const names = ids.map(id=>(state.souls.find(s=>s.id===id)||{}).name).filter(Boolean);
+    const base = {
+      type:"meet", kind:L.kind, scope, date,
       time: $("log-time").value||"", timeEnd: $("log-time-end").value||"",
       place: v("log-place"), beforeHeart:v("log-bheart"), beforeWord:v("log-bword"),
       did, talked, duringHeart:v("log-dheart"), update, spiritual:v("log-spirit"),
-      body: talked || did || update || v("log-dheart"),
+      body: talked || did || update || v("log-dheart") || (planned ? "만나기로 했어요" : ""),
+      planned, groupId, withNames: ids.length > 1 ? names : [],
       by: uid(), byName: state.me.name||""
     };
+
     if (L.recId) {
-      await updateDoc(doc(db,"souls",soulId,"records",L.recId), data);
+      const soulId = ids[0];
+      const photos = await putShots(soulId, L.recId, scope);
+      await updateDoc(doc(db,"souls",soulId,"records",L.recId), { ...base, photos });
     } else {
-      await addDoc(collection(db,"souls",soulId,"records"), { ...data, createdAt: serverTimestamp() });
-      const prayTxt = v("log-pray");
-      if (prayTxt) {
-        await addDoc(collection(db,"souls",soulId,"records"), {
-          type:"pray", scope:$("log-scope").value, date:data.date, body:prayTxt,
-          prayStatus:"praying", by:uid(), byName:state.me.name||"", createdAt: serverTimestamp()
-        });
+      for (const soulId of ids) {
+        const ref = await addDoc(collection(db,"souls",soulId,"records"),
+          { ...base, photos: [], createdAt: serverTimestamp() });
+        const photos = await putShots(soulId, ref.id, scope);
+        if (photos.length) await updateDoc(doc(db,"souls",soulId,"records",ref.id), { photos });
+
+        const prayTxt = v("log-pray");
+        if (prayTxt) {
+          await addDoc(collection(db,"souls",soulId,"records"), {
+            type:"pray", scope, date, body:prayTxt,
+            prayStatus:"praying", by:uid(), byName:state.me.name||"", createdAt: serverTimestamp()
+          });
+        }
+        /* 예약은 아직 만난 게 아니니 '마지막 만남'을 건드리지 않습니다 */
+        const patch = planned ? {} : { lastMetAt: date };
+        if ($("log-todo-on").checked && v("log-todo-text")) {
+          const target = state.souls.find(x=>x.id===soulId)||{};
+          patch.todos = [...(target.todos||[]),
+            { id:"t"+Date.now()+soulId.slice(0,4), text:v("log-todo-text"),
+              due:$("log-todo-due").value||"", done:false }];
+        }
+        if (Object.keys(patch).length) {
+          await updateDoc(doc(db,"souls",soulId), patch);
+          const inList = state.souls.find(x=>x.id===soulId); if (inList) Object.assign(inList, patch);
+        }
       }
-      const patch = { lastMetAt: data.date };
-      if ($("log-todo-on").checked && v("log-todo-text")) {
-        const target = state.souls.find(x=>x.id===soulId)||{};
-        patch.todos = [...(target.todos||[]),
-          { id:"t"+Date.now(), text:v("log-todo-text"), due:$("log-todo-due").value||"", done:false }];
-      }
-      await updateDoc(doc(db,"souls",soulId), patch);
-      const inList = state.souls.find(x=>x.id===soulId); if (inList) Object.assign(inList, patch);
     }
     invalidate();
-    toast(L.recId?"고쳤어요.":"기록했어요.");
-    if (L.back === "cal") openCal(); else openSoul(soulId);
+    toast(L.recId ? "고쳤어요."
+      : planned ? `${fmtDate(date)} 만남을 예약했어요.`
+      : ids.length > 1 ? `${ids.length}명 카드에 기록했어요.` : "기록했어요.");
+    bump(planned ? "planCreate" : "recordCreate");
+    if (L.back === "cal") openCal(); else openSoul(ids[0]);
   } catch (e) { $("log-err").textContent = msgOf(e); }
-  finally { $("btn-log-save").disabled = false; }
-};
+  finally { $("btn-log-save").disabled = false; $("btn-log-plan").disabled = false; }
+}
+
+/* 아직 안 올린 사진만 올리고, 기록에 넣을 목록을 돌려줍니다 */
+async function putShots(soulId, recId, scope) {
+  const out = [];
+  for (const p of state.log.shots) {
+    if (p.id) { out.push({ id:p.id, thumb:p.thumb }); continue; }
+    const ref = await addDoc(collection(db,"recordPhotos"), {
+      soulId, recordId: recId, scope, data: p.full,
+      by: uid(), createdAt: serverTimestamp()
+    });
+    out.push({ id: ref.id, thumb: p.thumb });
+  }
+  return out;
+}
 
 /* ════════ 기도제목 · 받은 마음 ════════ */
 const dlgRec = $("dlg-rec");
@@ -1385,7 +1673,7 @@ $("tr-save").onclick = async () => {
     if (editing) await updateDoc(doc(db,"souls",state.soul.id,"trainings",editing), data);
     else await addDoc(collection(db,"souls",state.soul.id,"trainings"),
       { ...data, sessionLog:[], createdAt: serverTimestamp() });
-    await loadTrainings(state.soul.id); invalidate();
+    await loadTrainings(state.soul.id); invalidate(); bump("trainSave");
     dlgTrain.close(); editingTrainId=null; renderSoulBody();
     toast(editing?"고쳤어요.":"훈련 기록을 더했어요.");
   } catch (e) { $("train-err").textContent = msgOf(e); }
@@ -1490,18 +1778,50 @@ $("co-save").onclick=async()=>{
       await addDoc(collection(db,"courses"),{name,sessions,order:mx+1,active:true,createdAt:serverTimestamp()});
       await log("훈련 과정 추가",name);
     }
-    await loadOrg(); dlgCourse.close(); toast("저장했어요.");
+    await loadOrg(true); dlgCourse.close(); toast("저장했어요.");
     if(courseAfter) courseAfter(); else openManage();
   } catch(e){ $("course-err").textContent=msgOf(e); }
   finally { $("co-save").disabled=false; }
 };
+/* ── 모임 종류 ── */
+const dlgMtype = $("dlg-mtype");
+let editingTypeId = null;
+function openMtypeDlg(typeId) {
+  editingTypeId = typeId || null;
+  const t = typeId ? state.meetTypes.find(x=>x.id===typeId) : null;
+  $("mtype-title").textContent = t ? "모임 종류 수정" : "모임 종류 추가";
+  $("mt-name").value = t ? t.name : "";
+  $("mtype-err").textContent = "";
+  dlgMtype.showModal(); setTimeout(()=>$("mt-name").focus(),120);
+}
+$("mt-cancel").onclick = () => dlgMtype.close();
+$("mt-save").onclick = async () => {
+  const name = $("mt-name").value.trim();
+  if (!name) { $("mtype-err").textContent = "이름을 적어주세요."; return; }
+  $("mt-save").disabled = true;
+  try {
+    if (editingTypeId) {
+      await updateDoc(doc(db,"meetTypes",editingTypeId), { name });
+      await log("모임 종류 수정", name);
+    } else {
+      const mx = state.meetTypes.reduce((m,t)=>Math.max(m,t.order||0),0);
+      await addDoc(collection(db,"meetTypes"),
+        { name, order:mx+1, active:true, createdAt:serverTimestamp() });
+      await log("모임 종류 추가", name);
+    }
+    await loadOrg(true); dlgMtype.close(); toast("저장했어요."); openManage();
+  } catch (e) { $("mtype-err").textContent = msgOf(e); }
+  finally { $("mt-save").disabled = false; }
+};
+$("btn-mtype-add").onclick = () => openMtypeDlg(null);
+
 async function moveCourse(courseId, dir) {
   const list=[...state.courses];
   const i=list.findIndex(c=>c.id===courseId), j=i+dir;
   if(i<0||j<0||j>=list.length) return;
   [list[i],list[j]]=[list[j],list[i]];
   try { await Promise.all(list.map((c,idx)=>updateDoc(doc(db,"courses",c.id),{order:idx+1})));
-    await loadOrg(); openManage(); }
+    await loadOrg(true); openManage(); }
   catch(e){ toast(msgOf(e)); }
 }
 
@@ -1509,7 +1829,7 @@ async function moveCourse(courseId, dir) {
 async function openTrainBoard() {
   show("s-loading");
   await loadOrg(); await loadSouls();
-  const all = await loadAllTrainings(true);
+  const all = await loadAllTrainings();
   const latest = {};
   all.forEach(t=>{
     const k = t.soulId+"|"+t.courseId, cur = latest[k];
@@ -1572,7 +1892,7 @@ async function openTrainBoard() {
     const extra = ing ? ` · ${esc(ing.courseName)} 수강 중`
       : plan ? ` · ${esc(plan.courseName)} 예정` : "";
     return `<div class="row" data-gosoul3="${s.id}" style="cursor:pointer">
-      <span class="ava">${esc(initial(s.name))}</span>
+      ${avatar(s)}
       <div class="grow"><p class="nm">${esc(s.name)}</p>
         <p class="sub">${s.baptizedAt?`침례 ${fmtDate(s.baptizedAt,true)}`:"침례 아직"}</p>
         <p class="sub2">수료 ${done}개${extra}</p></div>
@@ -1590,7 +1910,7 @@ $("train-list").addEventListener("click",(ev)=>{
 async function openSearch() {
   show("s-loading");
   await loadOrg(); await loadSouls();
-  await loadAllRecords(true);
+  await loadAllRecords();
   state.gsFilter = "all"; $("gs-kw").value = "";
   renderGs(); show("s-search");
   setTimeout(()=>$("gs-kw").focus(),150);
@@ -1642,8 +1962,10 @@ function calEvents() {
       place:m.place||"", id:m.id });
   });
   (state.allRecords||[]).filter(r=>r.type==="meet").forEach(r=>{
-    ev.push({ date:r.date, kind:"record", color:"#7FCB9B",
-      title:`${r.soulName} · ${KIND[r.kind]||"만남"}`, sub:r.body||"", time:r.time||"",
+    ev.push({ date:r.date, kind:r.planned?"plan":"record",
+      color: r.planned ? "#E8B473" : "#7FCB9B",
+      title:`${r.planned?"[예정] ":""}${r.soulName} · ${kindName(r.kind)}`,
+      sub:r.body||"", time:r.time||"",
       timeEnd:r.timeEnd||"", place:r.place||"", soulId:r.soulId });
   });
   const y = Number(state.calMonth.split("-")[0]);
@@ -1812,7 +2134,7 @@ const EDIT_FIELDS = ["e-name","e-gender","e-birth","e-phone","e-address","e-addr
   "e-reg","e-bap","e-married","e-position","e-invitedby","e-verse","e-hobby","e-mbti",
   "e-food","e-avoid","e-interest","e-memo","e-status","e-cycle","e-cell"];
 function openEdit(soulId) {
-  state.editingId=soulId; state.editPhoto=undefined; state.editDirty=false;
+  state.editingId=soulId; state.editPhoto=undefined; state.editThumb=undefined; state.editDirty=false;
   const s = soulId?state.souls.find(x=>x.id===soulId):null;
   $("edit-title").textContent = s?"프로필 수정":"영혼 추가";
   $("btn-del-soul").hidden = !s;
@@ -1845,6 +2167,14 @@ function openEdit(soulId) {
   $("e-status").value=(s&&s.status)||"new";
   $("e-cycle").value=String((s&&s.contactCycle)||0);
   if(s&&s.cellId) $("e-cell").value=s.cellId; else if(state.me.cellId) $("e-cell").value=state.me.cellId;
+  /* 셀리더 카드 — 진장만 만들 수 있고, 셀 구성원이 아니라 명단에서 빠집니다 */
+  const canLeaderCard = state.me.role==="jinjang" || state.me.role==="super";
+  $("e-leader-wrap").hidden = !canLeaderCard;
+  $("e-is-leader").checked = !!(s && s.kind==="leader");
+  $("e-ofcell").innerHTML = use.map(c=>
+    `<option value="${c.id}"${s&&s.ofCellId===c.id?" selected":""}>${esc(c.name)}</option>`).join("")
+    || `<option value="">셀 없음</option>`;
+  syncLeaderCard();
   const ph = s?state.photoCache[s.id]:null;
   $("edit-ava").style.backgroundImage = ph?`url(${ph})`:"";
   $("edit-ava").textContent = ph?"":($("e-name").value?initial($("e-name").value):"+");
@@ -1852,6 +2182,13 @@ function openEdit(soulId) {
   show("s-edit");
   setTimeout(()=>{ if(!s) $("e-name").focus(); },120);
 }
+function syncLeaderCard() {
+  const on = $("e-is-leader").checked;
+  $("e-cell-wrap").hidden = on;      // 셀리더는 셀 구성원이 아닙니다
+  $("e-ofcell-wrap").hidden = !on;
+}
+$("e-is-leader").onchange = () => { syncLeaderCard(); state.editDirty = true; };
+
 function fmtRaw(s) {
   const p=String(s).split("-"); if(p.length<3) return s;
   if(p[0]==="0000") return `${Number(p[1])}-${Number(p[2])}`;
@@ -1900,35 +2237,29 @@ $("btn-postcode").onclick=()=>{
 };
 $("btn-photo").onclick=()=>$("photo-input").click();
 $("btn-photo-del").onclick=()=>{
-  state.editPhoto=null; state.editDirty=true;
+  state.editPhoto=null; state.editThumb=null; state.editDirty=true;
   $("edit-ava").style.backgroundImage=""; $("edit-ava").textContent=initial($("e-name").value||"?");
   updateFoldCounts();
 };
-$("photo-input").onchange=(ev)=>{
-  const file=ev.target.files&&ev.target.files[0]; if(!file) return;
-  const reader=new FileReader();
-  reader.onload=()=>{
-    const img=new Image();
-    img.onload=()=>{
-      const max=480, scale=Math.min(1,max/Math.max(img.width,img.height));
-      const cv=document.createElement("canvas");
-      cv.width=Math.round(img.width*scale); cv.height=Math.round(img.height*scale);
-      cv.getContext("2d").drawImage(img,0,0,cv.width,cv.height);
-      const data=cv.toDataURL("image/jpeg",0.72);
-      if(data.length>700000){ toast("사진이 너무 커요. 다른 사진을 골라주세요."); return; }
-      state.editPhoto=data; state.editDirty=true;
-      $("edit-ava").style.backgroundImage=`url(${data})`; $("edit-ava").textContent="";
-      updateFoldCounts();
-    };
-    img.src=reader.result;
-  };
-  reader.readAsDataURL(file); ev.target.value="";
+$("photo-input").onchange=async(ev)=>{
+  const file=ev.target.files&&ev.target.files[0]; ev.target.value="";
+  if(!file) return;
+  try{
+    /* 큰 사진과, 목록에 뜰 아주 작은 사본을 같이 만듭니다 */
+    const [big,small] = await Promise.all([
+      shrinkFit(file, PHOTO.face, 700000),
+      shrinkFit(file, PHOTO.faceTh, 12000)
+    ]);
+    state.editPhoto=big; state.editThumb=small; state.editDirty=true;
+    $("edit-ava").style.backgroundImage=`url(${big})`; $("edit-ava").textContent="";
+    updateFoldCounts();
+  }catch(e){ toast(e.message||"사진을 넣지 못했어요."); }
 };
 $("btn-save-soul").onclick=async()=>{
   const name=$("e-name").value.trim();
   $("edit-err").textContent="";
   if(!name){ $("edit-err").textContent="이름은 꼭 적어주세요."; $("e-name").focus(); return; }
-  if(!canLead()){ $("edit-err").textContent="셀을 맡은 사람만 영혼 카드를 만들 수 있어요."; return; }
+  if(!canMakeSoul()){ $("edit-err").textContent="셀을 맡은 분과 진장만 영혼 카드를 만들 수 있어요."; return; }
   if(!state.me.jinId){ $("edit-err").textContent="먼저 리더 관리에서 내 진과 셀을 지정해 주세요."; return; }
   const dates={};
   for(const [key,id,label] of [["birth","e-birth","생일"],["registeredAt","e-reg","교회 등록일"],
@@ -1945,8 +2276,14 @@ $("btn-save-soul").onclick=async()=>{
     verse:$("e-verse").value.trim(), hobby:$("e-hobby").value.trim(), mbti:$("e-mbti").value.trim(),
     food:$("e-food").value.trim(), avoid:$("e-avoid").value.trim(),
     interest:$("e-interest").value.trim(), memo:$("e-memo").value.trim(),
-    status:$("e-status").value, contactCycle:Number($("e-cycle").value)||0,
-    cellId:$("e-cell").value||null, ...dates };
+    status:$("e-status").value, contactCycle:Number($("e-cycle").value)||0, ...dates };
+  if ($("e-is-leader").checked) {
+    /* 셀리더 카드는 cellId 를 비워둡니다. 그래야 코치에게 안 보이고
+       그 셀의 출석 명단에도 안 들어갑니다. */
+    data.kind = "leader"; data.cellId = null; data.ofCellId = $("e-ofcell").value || null;
+  } else {
+    data.kind = "member"; data.cellId = $("e-cell").value || null; data.ofCellId = null;
+  }
   $("btn-save-soul").disabled=true;
   try {
     let soulId=state.editingId;
@@ -1960,8 +2297,12 @@ $("btn-save-soul").onclick=async()=>{
     if(state.editPhoto!==undefined){
       await setDoc(doc(db,"photos",soulId),{self:state.editPhoto},{merge:true});
       state.photoCache[soulId]=state.editPhoto;
+      /* 목록에 쓸 작은 사본은 영혼 카드 자체에 둡니다 — 목록이 사진을
+         따로 불러오지 않아도 되도록 */
+      await updateDoc(doc(db,"souls",soulId),{ thumb: state.editThumb || "" });
     }
-    state.editDirty=false; await loadSouls(); invalidate();
+    state.editDirty=false; invalidate(); await loadSouls(true);
+    if(!state.editingId) bump("soulCreate");
     toast("저장했어요."); openSoul(soulId);
   } catch(e){ $("edit-err").textContent=msgOf(e); }
   finally { $("btn-save-soul").disabled=false; }
@@ -1969,7 +2310,7 @@ $("btn-save-soul").onclick=async()=>{
 $("btn-del-soul").onclick=async()=>{
   if(!confirm("이 카드를 목록에서 보관할까요? 기록은 지워지지 않아요.")) return;
   try { await updateDoc(doc(db,"souls",state.editingId),{active:false});
-    state.editDirty=false; await loadSouls(); invalidate(); toast("보관했어요."); openSouls(); }
+    state.editDirty=false; invalidate(); await loadSouls(true); toast("보관했어요."); openSouls(); }
   catch(e){ toast(msgOf(e)); }
 };
 
@@ -2145,7 +2486,7 @@ function renderAttendance(mine) {
     const has=(nt.update||nt.pray);
     return `<div class="member">
       <div class="top">
-        <span class="ava" style="width:34px;height:34px;font-size:13px">${esc(initial(s.name))}</span>
+        ${avatar(s, 34)}
         <div class="grow" style="flex-grow:1;min-width:0">
           <p class="nm">${esc(s.name)}</p>
           ${has&&!open?`<p class="sub" style="margin-top:2px">${esc((nt.update||nt.pray).slice(0,24))}…</p>`:""}
@@ -2233,7 +2574,7 @@ $("btn-meeting-save").onclick=async()=>{
       }
     }
     await updateDoc(doc(db,"meetings",mid), { ...data, recRefs:refs });
-    await loadMeetings(); invalidate(); toast("저장했어요.");
+    await loadMeetings(); invalidate(); toast("저장했어요."); bump("meetingSave");
     if (mt.back === "cal") openCal(); else openMeet();
   } catch(e){ $("meeting-err").textContent=msgOf(e); }
   finally { $("btn-meeting-save").disabled=false; }
@@ -2292,6 +2633,7 @@ async function openMore() {
   $("more-name").textContent=me.name||"";
   $("more-email").textContent=`${me.email||""} · ${ROLE[me.role]||me.role}`;
   $("app-ver").textContent=APP_VERSION;
+  $("btn-go-usage").hidden = me.role!=="super";
   $("install-sub").textContent = window.matchMedia("(display-mode: standalone)").matches
     ? "이미 앱으로 설치되어 있어요":"폰 홈 화면에서 바로 열 수 있어요";
   markSide("more"); show("s-more");
@@ -2355,18 +2697,20 @@ $("btn-export-souls").onclick=async()=>{
     fmtDate(s.registeredAt,true),fmtDate(s.baptizedAt,true),fmtDate(s.marriedAt,true),
     s.position,s.invitedBy,s.verse,s.hobby,s.mbti,s.food,s.avoid,s.interest,
     s.contactCycle||"",s.lastMetAt||"",s.prayOpen||0,s.memo]);
+  bump("exportCsv"); await log("명단 내려받기", `${rows.length}명`);
   download(`목자의삶_영혼명단_${todayStr()}.csv`,[csvRow(head),...rows.map(csvRow)].join("\r\n"));
   toast(`${rows.length}명을 내려받았어요.`);
 };
 $("btn-export-recs").onclick=async()=>{
   toast("기록을 모으는 중이에요…");
   await loadOrg(); await loadSouls();
-  const all=await loadAllRecords(true);
+  const all=await loadAllRecords();
   const head=["이름","종류","만남유형","날짜","시간","장소","내용","무엇을했나","나눈이야기",
     "만나기전마음","주신말씀","만나면서받은마음","근황","영적상태","공개범위"];
-  const rows=all.map(r=>[r.soulName,RTYPE[r.type]||r.type,r.kind?(KIND[r.kind]||""):"",
+  const rows=all.map(r=>[r.soulName,RTYPE[r.type]||r.type,r.kind?kindName(r.kind):"",
     r.date,r.time||"",r.place||"",r.body||"",r.did||"",r.talked||"",r.beforeHeart||"",
     r.beforeWord||"",r.duringHeart||"",r.update||"",r.spiritual||"",SCOPE[r.scope]||r.scope]);
+  bump("exportCsv"); await log("기록 내려받기", `${rows.length}건`);
   download(`목자의삶_기록_${todayStr()}.csv`,[csvRow(head),...rows.map(csvRow)].join("\r\n"));
   toast(`${rows.length}건을 내려받았어요.`);
 };
@@ -2386,6 +2730,7 @@ $("btn-export-all").onclick=async()=>{
     const backup={ 앱:APP_NAME, 버전:APP_VERSION, 만든날짜:todayStr(),
       만든사람:{이름:state.me.name,이메일:state.me.email,역할:ROLE[state.me.role]},
       진:state.jins, 셀:state.cells, 훈련과정:state.courses, 영혼:souls, 셀모임:state.meetings };
+    await log("전체 백업 내려받기", `영혼 ${souls.length}명`);
     download(`목자의삶_전체백업_${todayStr()}.json`,JSON.stringify(backup,null,2),"application/json");
     toast("백업 파일을 내려받았어요.");
   }catch(e){ toast(msgOf(e)); }
@@ -2394,7 +2739,7 @@ $("btn-export-all").onclick=async()=>{
 /* ════════ 리더 관리 ════════ */
 async function openManage() {
   show("s-loading");
-  await loadOrg();
+  await loadOrg(true);
   const isSuper=state.me.role==="super";
   const cellName=(id)=>(state.cells.find(c=>c.id===id)||{}).name||"";
   const jinName=(id)=>(state.jins.find(j=>j.id===id)||{}).name||"";
@@ -2449,6 +2794,15 @@ async function openManage() {
         <button class="btn-sm" data-act="cedit" data-cid="${c.id}">수정</button>
       </div></div>`).join("")
     || `<p class="muted">훈련 과정을 등록하면 영혼 카드에 현황이 생겨요.<br>예) 새로운 삶(8회), 확신의 삶, 제자훈련</p>`;
+  $("list-mtypes").innerHTML =
+    BASE_KINDS.map(k=>`<div class="row"><div class="grow"><p class="nm">${esc(k.name)}</p>
+      <p class="sub">기본 — 지울 수 없어요${k.solo?" · 한 명":" · 여러 명"}</p></div></div>`).join("")
+    + state.meetTypes.map(t=>`<div class="row"><div class="grow"><p class="nm">${esc(t.name)}</p>
+        <p class="sub">직접 만든 종류 · 여러 명</p></div>
+        <div style="display:flex;gap:4px;flex-shrink:0">
+          <button class="btn-sm" data-act="tedit" data-tid="${t.id}">수정</button>
+          <button class="btn-sm danger" data-act="thide" data-tid="${t.id}">숨기기</button>
+        </div></div>`).join("");
   $("jin-block").hidden=!isSuper;
   if(isSuper){
     $("list-jins").innerHTML=state.jins.map(j=>{
@@ -2501,6 +2855,13 @@ $("s-manage").addEventListener("click",async(ev)=>{
     catch(e){ toast(msgOf(e)); }
   }
   if(act==="cells") openCellsDlg(el.dataset.uid);
+  if(act==="tedit") openMtypeDlg(el.dataset.tid);
+  if(act==="thide"){
+    if(!confirm("이 모임 종류를 목록에서 숨길까요? 이미 적은 기록은 그대로 남아요.")) return;
+    try{ await updateDoc(doc(db,"meetTypes",el.dataset.tid),{active:false});
+      await log("모임 종류 숨김",el.dataset.tid); await loadOrg(true); openManage(); }
+    catch(e){ toast(msgOf(e)); }
+  }
   if(act==="cup") moveCourse(el.dataset.cid,-1);
   if(act==="cdown") moveCourse(el.dataset.cid,1);
   if(act==="cedit") openCourseDlg(el.dataset.cid);
@@ -2539,7 +2900,7 @@ async function addCell(after) {
   const jinId = state.me.role==="super"?(state.me.jinId||(state.jins[0]&&state.jins[0].id)):state.me.jinId;
   if(!jinId){ toast("먼저 진을 만들어 주세요."); return; }
   try{ await addDoc(collection(db,"cells"),{name:name.trim(),jinId,active:true,createdAt:serverTimestamp()});
-    await log("셀 추가",name.trim()); await loadOrg(); toast("셀을 만들었어요.");
+    await log("셀 추가",name.trim()); await loadOrg(true); toast("셀을 만들었어요.");
     if(after) after(); else openManage(); }
   catch(e){ toast(msgOf(e)); }
 }
@@ -2600,3 +2961,154 @@ async function log(action, target, detail) {
   try{ await addDoc(collection(db,"audit"),{ by:uid(), byName:state.me?state.me.name:"",
     action, target:target||"", detail:detail||"", at:serverTimestamp() }); }catch{}
 }
+
+/* ════════ 사용 현황 ════════
+   화면을 누를 때마다 한 줄씩 쌓으면 쓰기 횟수가 금세 한도에 닿습니다.
+   그래서 메모리에 모았다가 30초마다, 그리고 화면을 덮을 때 한 번만 올립니다.
+   사람 한 명의 하루치가 칸 하나입니다. 접속 위치는 모으지 않아요. */
+const usage = { screens:{}, acts:{}, opens:0, dirty:false };
+const mergeCount = (a,b) => {
+  const o = { ...(a||{}) };
+  Object.entries(b||{}).forEach(([k,v]) => { o[k] = (o[k]||0) + v; });
+  return o;
+};
+function deviceKind() {
+  const w = Math.min(screen.width, screen.height);
+  const standalone = window.matchMedia("(display-mode: standalone)").matches;
+  const kind = w < 500 ? "폰" : w < 1100 ? "패드" : "컴퓨터";
+  return standalone ? kind + " (앱)" : kind;
+}
+function bump(what, kind) {
+  if (!state.me) return;
+  if (kind === "screen") usage.screens[what] = (usage.screens[what]||0) + 1;
+  else usage.acts[what] = (usage.acts[what]||0) + 1;
+  usage.dirty = true;
+}
+async function flushUsage() {
+  if (!usage.dirty || !state.me || !uid()) return;
+  const payload = { screens:{...usage.screens}, acts:{...usage.acts}, opens:usage.opens };
+  usage.screens = {}; usage.acts = {}; usage.opens = 0; usage.dirty = false;
+  try {
+    const ref = doc(db, "usage", `${uid()}_${todayStr()}`);
+    const snap = await getDoc(ref);
+    const old = snap.exists() ? snap.data() : null;
+    await setDoc(ref, {
+      uid: uid(), name: state.me.name || "", role: state.me.role,
+      jinId: state.me.jinId || null, date: todayStr(),
+      opens: ((old && old.opens) || 0) + payload.opens,
+      screens: mergeCount(old && old.screens, payload.screens),
+      acts: mergeCount(old && old.acts, payload.acts),
+      hours: mergeCount(old && old.hours, { [String(new Date().getHours())]: 1 }),
+      device: deviceKind(), lastAt: serverTimestamp()
+    }, { merge: true });
+  } catch {
+    /* 못 올려도 앱은 그대로 굴러가야 합니다 — 다음 번에 다시 모읍니다 */
+    usage.screens = mergeCount(usage.screens, payload.screens);
+    usage.acts = mergeCount(usage.acts, payload.acts);
+    usage.opens += payload.opens; usage.dirty = true;
+  }
+}
+setInterval(flushUsage, 30000);
+document.addEventListener("visibilitychange", () => { if (document.hidden) flushUsage(); });
+window.addEventListener("pagehide", flushUsage);
+
+/* ── 수퍼 관리자용 화면 ── */
+const SCREEN_NAME = { home:"홈", souls:"영혼들", cal:"캘린더", meet:"셀모임", more:"더보기",
+  soul:"영혼 카드", log:"만남 기록", meeting:"셀모임 입력", train:"훈련 현황",
+  search:"기록 검색", manage:"리더 관리", usage:"사용 현황", edit:"영혼 수정" };
+const ACT_NAME = { recordCreate:"기록 남김", planCreate:"만남 예약", meetingSave:"셀모임 저장",
+  soulCreate:"영혼 추가", trainSave:"훈련 기록", exportCsv:"내려받기" };
+
+async function openUsage() {
+  if (state.me.role !== "super") { toast("수퍼 관리자만 볼 수 있어요."); return; }
+  show("s-loading");
+  await flushUsage();
+  await loadOrg();
+  let rows = [], audit = [];
+  try {
+    const since = plusDays(-30);
+    const [u, a] = await Promise.all([
+      getDocs(query(collection(db, "usage"), where("date", ">=", since))),
+      getDocs(collection(db, "audit"))
+    ]);
+    rows = pack(u);
+    audit = pack(a).sort((x, y) => (y.at && y.at.seconds || 0) - (x.at && x.at.seconds || 0)).slice(0, 100);
+  } catch (e) { toast(msgOf(e)); }
+
+  const days = {}, people = {}, screens = {};
+  rows.forEach(r => {
+    (days[r.date] = days[r.date] || new Set()).add(r.uid);
+    const p = people[r.uid] = people[r.uid] || { name: r.name, role: r.role, opens: 0, acts: 0, last: "", device: r.device };
+    p.opens += r.opens || 0;
+    p.acts += Object.values(r.acts || {}).reduce((n, v) => n + v, 0);
+    if (r.date > p.last) { p.last = r.date; p.device = r.device; }
+    Object.entries(r.screens || {}).forEach(([k, v]) => { screens[k] = (screens[k] || 0) + v; });
+  });
+  const dayList = Object.keys(days).sort();
+  const peopleList = Object.entries(people)
+    .map(([k, v]) => ({ uid: k, ...v, quiet: daysSince(v.last) }))
+    .sort((a, b) => (b.quiet ?? 0) - (a.quiet ?? 0));
+  const activeN = peopleList.filter(p => (p.quiet ?? 99) <= 7).length;
+
+  $("usage-tiles").innerHTML = tile("구성원", state.members.length + "명")
+    + tile("이번 주 접속", activeN + "명")
+    + tile("30일 기록", peopleList.reduce((n, p) => n + p.acts, 0) + "건");
+
+  /* 날짜별 접속자 수 — 한 가지만 재므로 색도 하나입니다 */
+  if (dayList.length >= 2) {
+    const last = dayList.slice(-30);
+    const peak = Math.max(...last.map(d => days[d].size), 1);
+    const keep = new Set([0, Math.floor((last.length - 1) / 2), last.length - 1]);
+    $("usage-chart").innerHTML = `
+      <div class="card" style="margin-top:14px">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px">
+          <h3 style="font-size:13px;font-weight:600">날마다 몇 명이 썼나</h3>
+          <span class="muted" style="font-size:12px">최근 ${last.length}일 · 최대 ${peak}명</span>
+        </div>
+        <div class="chart"><div class="plot">
+          ${last.map((d, i) => {
+            const n = days[d].size;
+            return `<div class="bar${n === 0 ? " zero" : ""}" title="${fmtDate(d)} · ${n}명">
+              ${i === last.length - 1 ? `<span class="val">${n}명</span>` : ""}
+              <i style="height:${Math.round(n / peak * 100)}%"></i></div>`;
+          }).join("")}
+        </div>
+        <div class="xaxis">${last.map((d, i) => {
+          const p = d.split("-");
+          return `<span>${keep.has(i) ? `${Number(p[1])}/${Number(p[2])}` : ""}</span>`;
+        }).join("")}</div></div>
+      </div>`;
+  } else {
+    $("usage-chart").innerHTML = `<p class="muted" style="margin-top:14px">이틀 이상 쌓이면 그래프가 생겨요.</p>`;
+  }
+
+  $("usage-people").innerHTML = peopleList.map(p => {
+    const q = p.quiet;
+    const quiet = q === null ? "" : q === 0 ? "오늘 접속" : q === 1 ? "어제 접속" : `${q}일째 안 들어옴`;
+    return `<div class="row ${q !== null && q > 30 ? "off" : ""}">
+      <span class="ava">${esc(initial(p.name))}</span>
+      <div class="grow"><p class="nm">${esc(p.name || "—")}</p>
+        <p class="sub">${esc(ROLE[p.role] || "")} · ${esc(p.device || "")} · 기록 ${p.acts}건</p></div>
+      <span class="chip ${q !== null && q >= 14 ? "warn" : ""}">${quiet}</span>
+    </div>`;
+  }).join("") || `<p class="muted">아직 쌓인 게 없어요. 하루이틀 쓰시면 보여요.</p>`;
+
+  const total = Object.values(screens).reduce((n, v) => n + v, 0);
+  const sorted = Object.entries(screens).sort((a, b) => b[1] - a[1]);
+  $("usage-screens").innerHTML = total ? `<div class="hbars">${sorted.map(([k, v]) => `
+    <div class="hb"><span class="who">${esc(SCREEN_NAME[k] || k)}</span>
+      <span class="track"><i style="width:${Math.round(v / sorted[0][1] * 100)}%"></i></span>
+      <span class="pct">${Math.round(v / total * 100)}%</span></div>`).join("")}</div>`
+    : `<p class="muted">아직 쌓인 게 없어요.</p>`;
+
+  $("usage-audit").innerHTML = audit.map(a => `
+    <div class="row"><div class="grow">
+      <p class="nm">${esc(a.action)}${a.detail ? " · " + esc(a.detail) : ""}</p>
+      <p class="sub">${esc(a.byName || "")} · ${a.at && a.at.seconds
+        ? new Date(a.at.seconds * 1000).toLocaleString("ko-KR") : "—"}</p>
+    </div></div>`).join("") || `<p class="muted">중요 기록이 아직 없어요.</p>`;
+
+  show("s-usage");
+}
+$("usage-back").onclick = () => openMore();
+$("btn-go-usage").onclick = () => openUsage();
