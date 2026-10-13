@@ -475,6 +475,7 @@
         <span class="chip" id="home-where"></span>
       </div>
       <div class="tiles" id="home-tiles"></div>
+      <div id="home-soon"></div>
       <div id="home-absent"></div>
       <div class="wide" style="margin-top:14px">
         <div id="home-pray"></div>
@@ -735,11 +736,19 @@
         <div class="field" id="e-cell-wrap"><label for="e-cell">소속 셀</label><select id="e-cell"></select></div>
       </div>
       <div class="field" id="e-leader-wrap" hidden>
-        <label class="check"><input type="checkbox" id="e-is-leader"> 이 사람은 셀리더예요</label>
-        <p class="hint">켜면 셀모임 출석 명단에는 안 나오고, 훈련 현황과 기록만 쌓여요.
-          진장만 볼 수 있고 코치에게는 안 보여요.</p>
-        <div id="e-ofcell-wrap" hidden style="margin-top:10px">
+        <label for="e-kind">어떤 카드인가요</label>
+        <select id="e-kind">
+          <option value="member">셀원 — 셀모임에 출석하는 분</option>
+          <option value="leader">셀리더 — 셀을 맡은 분</option>
+          <option value="coach">코치 — 셀리더를 맡은 분</option>
+        </select>
+        <p class="hint" id="e-kind-hint"></p>
+        <div id="e-ofcell-wrap" hidden style="margin-top:12px">
           <label for="e-ofcell">맡고 있는 셀</label><select id="e-ofcell"></select></div>
+        <div id="e-link-wrap" hidden style="margin-top:12px">
+          <label for="e-link">이 사람의 계정</label><select id="e-link"></select>
+          <p class="hint">계정을 연결하면 <b>그 사람 본인은 이 카드를 절대 못 봅니다.</b>
+            목양하려고 적는 글이니까요. 꼭 연결해 주세요.</p></div>
       </div>
       <div id="no-cell-help"></div>
       <p class="hint" style="margin:4px 0 16px">아래는 아는 것만 적으면 돼요. 나중에 언제든 채울 수 있어요.</p>
@@ -820,6 +829,7 @@
       </details>
 
       <p class="err" id="edit-err"></p>
+      <button class="btn-ghost" id="btn-hand" style="margin-top:10px;height:44px;font-size:13px;max-width:320px" hidden>다른 리더에게 넘기기</button>
       <button class="btn-ghost" id="btn-del-soul" style="margin-top:10px;height:44px;font-size:13px;max-width:320px" hidden>이 영혼 카드 보관하기</button>
     </div>
     <div class="savebar"><button class="btn" id="btn-save-soul">저장</button></div>
@@ -856,6 +866,28 @@
       <p class="hint" id="gs-count" style="margin-top:10px"></p>
     </div>
     <div class="scroll pad" style="padding-top:8px"><div class="list" id="gs-list"></div></div>
+  </section>
+
+  <!-- 내 기록 (본인 전용) -->
+  <section class="screen" id="s-mine" hidden>
+    <div class="topbar">
+      <button class="icon-btn" id="mine-back" aria-label="뒤로">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5m6-6-6 6 6 6"/></svg>
+      </button>
+      <h2 style="font-size:17px;font-weight:600">내 기록</h2>
+      <span style="width:44px"></span>
+    </div>
+    <div class="scroll pad">
+      <div class="card" style="background:var(--lock-bg);border-color:#2E2727">
+        <p style="font-size:13px;line-height:1.8;color:#CFC5C3">
+          여기는 <b>나 자신에 대해</b> 적는 곳이에요. 영혼 카드와는 다릅니다.<br>
+          기본은 나만 봅니다. 줄마다 '진장에게 보이기'를 켤 수 있고, 켠 줄만 보여요.</p>
+      </div>
+      <div class="seg" id="mine-filter"></div>
+      <p class="hint" id="mine-count" style="margin-top:10px"></p>
+      <div class="list" id="mine-list" style="margin-top:4px"></div>
+    </div>
+    <div class="savebar"><button class="btn" id="btn-mine-new">기록 남기기</button></div>
   </section>
 
   <!-- 사용 현황 (수퍼 관리자) -->
@@ -913,6 +945,11 @@
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5.5" width="17" height="15" rx="2.5"/><path d="M3.5 10.5h17M8.5 3.5v4M15.5 3.5v4"/></svg>
               <span class="grow"><span class="nm" style="display:block">구글 캘린더에 연동하기</span>
                 <span class="sub" style="display:block">내 구글 캘린더에 셀 일정 띄우는 법</span></span>
+            </button>
+            <button class="row" id="btn-go-mine" style="text-align:left;cursor:pointer;width:100%">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 4.5h11v15l-5.5-3-5.5 3z"/></svg>
+              <span class="grow"><span class="nm" style="display:block">내 기록</span>
+                <span class="sub" style="display:block">나 자신에 대해 — 기본은 나만 봐요</span></span>
             </button>
             <button class="row" id="btn-go-usage" style="text-align:left;cursor:pointer;width:100%" hidden>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 19.5h15M7 16V9.5M12 16V5M17 16v-4.5"/></svg>
@@ -1169,6 +1206,49 @@
   <div class="dlg-btns">
     <button class="btn-ghost" id="rp-close">닫기</button>
     <button class="btn" id="rp-copy">복사하기</button>
+  </div>
+</dialog>
+
+<!-- 내 기록 쓰기 -->
+<dialog id="dlg-mine">
+  <h3 id="mine-title">내 기록</h3>
+  <div class="field"><label>무엇에 대해</label>
+    <div class="seg" style="margin:0" id="mn-kind">
+      <button data-mk="heart" class="on">받은 마음</button>
+      <button data-mk="pray">기도제목</button>
+      <button data-mk="meet">만남 · 일지</button>
+    </div></div>
+  <div class="field"><label for="mn-date">날짜</label><input id="mn-date" type="date"></div>
+  <div class="field"><label for="mn-body" id="mn-body-label">내용</label>
+    <textarea id="mn-body" placeholder="오늘 내 마음에 있는 것"></textarea></div>
+  <div class="field"><label for="mn-scope">누가 보나요</label>
+    <select id="mn-scope">
+      <option value="private">나만 보기</option>
+      <option value="upline">진장에게 보이기</option>
+    </select></div>
+  <p class="err" id="mine-err"></p>
+  <div class="dlg-btns">
+    <button class="btn-ghost" id="mn-cancel">취소</button>
+    <button class="btn" id="mn-save">저장</button>
+  </div>
+</dialog>
+
+<!-- 카드 인계 -->
+<dialog id="dlg-hand">
+  <h3>카드 넘기기</h3>
+  <p class="muted" style="margin-bottom:14px" id="hand-sub"></p>
+  <div class="field"><label for="hd-to">누구에게</label><select id="hd-to"></select></div>
+  <div class="field"><label>어디까지 넘길까요</label>
+    <div class="list" id="hd-scope"></div></div>
+  <div class="card" style="background:var(--warn-bg);border-color:#3A2E1E;margin-bottom:14px">
+    <p style="font-size:12px;line-height:1.8;color:#E8D9C4">
+      '나만 보기'로 적은 것은 어느 쪽을 고르셔도 넘어가지 않아요. 그건 적은 사람 것이니까요.<br>
+      넘긴 기록은 되돌릴 수 없습니다. 넘긴 일은 중요 기록에 남아요.</p>
+  </div>
+  <p class="err" id="hand-err"></p>
+  <div class="dlg-btns">
+    <button class="btn-ghost" id="hd-cancel">취소</button>
+    <button class="btn" id="hd-go">넘기기</button>
   </div>
 </dialog>
 
