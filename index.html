@@ -253,6 +253,23 @@
   .hbars .hb .pct{font-size:12px;color:var(--text);text-align:right;font-variant-numeric:tabular-nums}
   .hbars .hb.low .pct{color:var(--warn-tx)}
 
+  /* 흐름 보기 — 근황·기도를 날짜 줄로 축 */
+  .flow{position:relative;margin-top:4px;padding-left:14px}
+  .flow::before{content:"";position:absolute;left:4px;top:8px;bottom:8px;width:1px;
+    background:var(--line)}
+  .flow .fr{display:grid;grid-template-columns:64px 1fr;gap:10px;padding:9px 0;
+    position:relative;align-items:start}
+  .flow .fr + .fr{border-top:1px solid #241F1F}
+  .flow .fr::before{content:"";position:absolute;left:-14px;top:17px;width:9px;height:9px;
+    border-radius:999px;background:var(--surface);border:1px solid var(--line)}
+  .flow .fr.cell::before{background:var(--brand);border-color:var(--brand)}
+  .flow .fr.ok::before{background:#2E7D54;border-color:#2E7D54}
+  .flow .fd{font-size:11px;color:var(--dim);padding-top:2px;line-height:1.5}
+  .flow .ft{font-size:14px;line-height:1.75;color:#E6E1E0;white-space:pre-wrap;
+    word-break:break-word}
+  .flow .fm{font-size:11px;color:var(--dim);margin-top:3px}
+  .flow .fr.done .ft{color:var(--dim)}
+
   /* 출석 도넛 + 12주 칸 */
   .ring{display:flex;align-items:center;gap:16px}
   .ring svg{flex-shrink:0}
@@ -585,6 +602,7 @@
       <div style="display:flex;align-items:center;justify-content:space-between;margin:18px 0 10px;flex-wrap:wrap;gap:8px">
         <h3 style="font-size:12px;letter-spacing:.06em;color:var(--dim)">출석과 나눔</h3>
         <div style="display:flex;gap:6px">
+          <button class="btn-sm" id="btn-pray-sheet">기도제목 모아보기</button>
           <button class="btn-sm" id="btn-all-present">모두 출석</button>
           <button class="btn-sm" id="btn-all-open">전부 펼치기</button>
           <button class="btn-sm" id="btn-order-meet">순서</button>
@@ -593,7 +611,12 @@
       <p class="hint" style="margin:-4px 0 10px">여기 적은 근황과 기도제목은 그 사람의 영혼 카드에도 자동으로 쌓여요.</p>
       <div class="list" id="list-att"></div>
 
-      <div class="field" style="margin-top:16px"><label for="m-visitor">새 방문자</label>
+      <div class="field" style="margin-top:16px"><label>모임 사진</label>
+        <div class="shots" id="m-shots"></div>
+        <input type="file" id="m-photo-input" accept="image/*" hidden multiple>
+        <p class="hint">모임 하나에 3장까지. 여럿이 같이 찍힌 사진이라 한 사람 카드가 아니라
+          이 모임에 붙어요. 이 모임을 볼 수 있는 분이 같이 봅니다.</p></div>
+      <div class="field"><label for="m-visitor">새 방문자</label>
         <input id="m-visitor" placeholder="이름을 적어주세요 (여러 명이면 쉼표로)"></div>
       <div class="field"><label for="m-note">모임 메모</label>
         <textarea id="m-note" placeholder="모임 전체에 대한 메모"></textarea></div>
@@ -1230,6 +1253,17 @@
   <div class="dlg-btns">
     <button class="btn-ghost" id="mn-cancel">취소</button>
     <button class="btn" id="mn-save">저장</button>
+  </div>
+</dialog>
+
+<!-- 오늘 같이 기도할 제목 -->
+<dialog id="dlg-pray-sheet">
+  <h3 id="pray-sheet-title">기도제목</h3>
+  <p class="muted" style="margin-bottom:14px" id="pray-sheet-sub"></p>
+  <div class="list" id="pray-sheet-body"></div>
+  <div class="dlg-btns">
+    <button class="btn-ghost" id="ps-close">닫기</button>
+    <button class="btn" id="ps-copy">복사하기</button>
   </div>
 </dialog>
 

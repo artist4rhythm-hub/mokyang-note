@@ -22,7 +22,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
 const APP_NAME = "목자의 삶";
-const APP_VERSION = "10.0 (2026-10-13)";
+const APP_VERSION = "11.0 (2026-10-16)";
 
 /* 사진 크기 — 얼굴을 알아볼 수 있는 선에서 가장 작게.
    얼굴 하나가 가로 80px은 되어야 알아보는데, 여럿이 한 줄로 선
@@ -226,7 +226,7 @@ const state = {
   jins:[], cells:[], members:[], invites:[], courses:[], meetTypes:[], orgAt:0,
   soulsAt:0, meetingsAt:0, myNotes:[], mineFilter:"all", shared:[],
   souls:[], meetings:[], trainings:[], allRecords:null, allTrainings:null,
-  soul:null, records:[], soulTab:"rec", recKw:"", recType:"all",
+  soul:null, records:[], soulTab:"rec", recKw:"", recType:"all", flowAsc:false,
   meeting:null, log:null,
   prayIdx:0, filter:"all", photoCache:{}, editingId:null, editPhoto:undefined, editThumb:undefined,
   editDirty:false, lastTab:"home", calMonth:null, calPick:null, gsFilter:"all"
@@ -851,9 +851,12 @@ function renderFilter() {
   const f = [["all","전체"],["care","돌봄 필요"],["new","새가족"],["due","연락할 때"]];
   $("soul-filter").innerHTML = f.map(([k,l])=>`<button data-f="${k}" class="${state.filter===k?"on":""}">${l}</button>`).join("");
 }
-$("soul-filter").addEventListener("click",(ev)=>{
+$("soul-filter").addEventListener("click",async(ev)=>{
   const b = ev.target.closest("[data-f]"); if(!b) return;
-  state.filter = b.dataset.f; renderFilter(); renderSouls();
+  state.filter = b.dataset.f; renderFilter();
+  /* 만난 횟수를 세려면 기록이 있어야 합니다 */
+  if (state.filter === "new" && !state.allRecords) { await loadAllRecords(); }
+  renderSouls();
 });
 $("soul-search").oninput = () => renderSouls();
 function contactDue(s) {
@@ -868,8 +871,34 @@ function renderSouls() {
   if (state.filter==="new") list = list.filter(s=>s.status==="new");
   if (state.filter==="due") list = list.filter(contactDue);
   if (kw) list = list.filter(s=>(s.name||"").includes(kw));
+  const newView = state.filter === "new";
+  const metCount = {};
+  if (newView) (state.allRecords||[]).forEach(r=>{
+    if (r.type === "meet" && !r.planned) metCount[r.soulId] = (metCount[r.soulId]||0) + 1;
+  });
   $("list-souls").innerHTML = list.map(s=>{
     const n = daysSince(s.lastMetAt), st = absentStreak(s.id,s.cellId);
+    if (newView) {
+      /* 새가족은 '등록하고 몇 주 지났나'가 제일 중요한 숫자입니다.
+         반갑게 맞고는 정신없이 지내다 보면 석 달이 지나 있거든요. */
+      const days = daysSince(s.registeredAt);
+      const weeks = days === null ? null : Math.floor(days / 7) + 1;
+      const met = metCount[s.id] || 0;
+      const slow = weeks !== null && weeks >= 4 && met < 2;
+      return `<div class="row" data-open="${s.id}" style="cursor:pointer">
+        ${avatar(s)}
+        <div class="grow">
+          <p class="nm">${esc(s.name)}</p>
+          <p class="sub">${weeks === null
+            ? "교회 등록일을 적어주세요"
+            : `등록 ${weeks}주차 · 그동안 만남 ${met}번`}${
+            (s.prayOpen||0)>0?` · 기도 ${s.prayOpen}`:""}</p>
+          <p class="sub2">${agoShort(n)}${
+            attendRate(s.id,s.cellId)===null?"":` · 출석 ${attendRate(s.id,s.cellId)}%`}</p>
+        </div>
+        <span class="chip ${slow?"warn":"rose"}">${slow?"챙길 때":"새가족"}</span>
+      </div>`;
+    }
     const bt = birthText(s), bd = annivIn(s.birth);
     const rate = attendRate(s.id, s.cellId);
     return `<div class="row" data-open="${s.id}" style="cursor:pointer">
@@ -1115,10 +1144,16 @@ function renderSoulBody() {
 
   if (state.soulTab === "rec") {
     const kw = state.recKw.trim();
+    /* '근황'은 따로 있는 종류가 아니라, 만남 기록 안의 근황 칸입니다.
+       셀모임에서 적은 것도 1:1에서 적은 것도 다 여기로 모입니다. */
+    const flowing = state.recType === "update" || state.recType === "pray";
     let list = state.records;
-    if (state.recType !== "all") list = list.filter(r=>r.type===state.recType);
+    if (state.recType === "update") list = list.filter(r=>r.type==="meet" && r.update);
+    else if (state.recType !== "all") list = list.filter(r=>r.type===state.recType);
     if (kw) list = list.filter(r => recText(r).toLowerCase().includes(kw.toLowerCase()));
-    const types = [["all","전체"],["meet","만남"],["pray","기도"],["heart","받은 마음"]];
+    if (flowing && state.flowAsc) list = list.slice().reverse();
+    const types = [["all","전체"],["update","근황"],["pray","기도"],
+                   ["meet","만남"],["heart","받은 마음"]];
     box.innerHTML = `
       ${isLeaderCard(s) ? "" : attendBlock(s.id, s.cellId)}
       ${state.shared.length ? `<div class="card" style="margin-bottom:12px;background:var(--rose-bg);border-color:#3A2226">
@@ -1134,9 +1169,18 @@ function renderSoulBody() {
       <input id="rec-search" placeholder="기록 안에서 찾기 (예: 이직, 어머니)" value="${esc(state.recKw)}" style="height:44px">
       <div class="seg" id="rec-type">${types.map(([k,l])=>
         `<button data-rty="${k}" class="${state.recType===k?"on":""}">${l}</button>`).join("")}</div>
-      <p class="hint" style="margin:10px 0 12px">${list.length}건${kw?` · '${esc(kw)}' 검색 결과`:""}</p>
-      <div class="list">${list.length ? list.map(r=>recCard(r,kw,false)).join("")
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin:10px 0 12px">
+        <p class="hint" style="margin:0">${list.length}건${kw?` · '${esc(kw)}' 검색 결과`:""}</p>
+        ${flowing && list.length>1
+          ? `<button class="btn-sm" id="btn-flow-order">${state.flowAsc?"오래된 것부터 ↑":"최근 것부터 ↓"}</button>`
+          : ""}
+      </div>
+      ${flowing && list.length
+        ? `<div class="flow">${list.map(r=>flowRow(r,kw)).join("")}</div>`
+        : ""}
+      <div class="list">${flowing ? "" : list.length ? list.map(r=>recCard(r,kw,false)).join("")
         : `<p class="muted">${kw?"찾는 말이 없어요."
+          : state.recType==="update"?"아직 적은 근황이 없어요.<br>셀모임에서 이름 옆 ▾ 를 눌러 적으시면 여기에 쌓여요."
           : mine?"아직 기록이 없어요. 아래 '만남 기록'으로 첫 기록을 남겨보세요."
           :"공유된 기록이 없어요. 담당 리더가 코치 공유로 올린 기록만 보여요."}</p>`}</div>`;
     const si = $("rec-search");
@@ -1146,6 +1190,8 @@ function renderSoulBody() {
       const b = ev.target.closest("[data-rty]"); if(!b) return;
       state.recType = b.dataset.rty; renderSoulBody();
     });
+    const fo = $("btn-flow-order");
+    if (fo) fo.onclick = () => { state.flowAsc = !state.flowAsc; renderSoulBody(); };
   }
 
   if (state.soulTab === "todo") {
@@ -2544,6 +2590,7 @@ function openMeeting(id, opts) {
     attendance:{}, reasons:{}, notes:{}, open:{} };
   state.meeting.back = o.back || null;
   state.meeting.open = state.meeting.open || {};
+  state.meeting.shots = (m && m.photos ? m.photos.slice() : []);
   const mine = !m || m.leaderUid===uid();
   $("meeting-title").textContent = m?fmtDate(m.date)+" 모임":"새 모임";
   $("m-cell").innerHTML = cells.map(c=>
@@ -2562,6 +2609,8 @@ function openMeeting(id, opts) {
   $("btn-all-present").hidden=!mine; $("btn-all-open").hidden=!mine;
   $("btn-order-meet").hidden=!mine;
   $("meeting-del").hidden=!(mine&&m);
+  $("m-shots").hidden = !mine && !state.meeting.shots.length;
+  renderMeetShots(mine);
   autoGrow($("m-note")); renderAttendance(mine); show("s-meeting");
 }
 $("m-cell").onchange=()=>{ state.meeting.cellId=$("m-cell").value; renderAttendance(true); };
@@ -2673,7 +2722,8 @@ $("btn-meeting-save").onclick=async()=>{
         }
       }
     }
-    await updateDoc(doc(db,"meetings",mid), { ...data, recRefs:refs });
+    const photos = await putMeetShots(mid, cellId);
+    await updateDoc(doc(db,"meetings",mid), { ...data, recRefs:refs, photos });
     await loadMeetings(); invalidate(); toast("저장했어요."); bump("meetingSave");
     if (mt.back === "cal") openCal(); else openMeet();
   } catch(e){ $("meeting-err").textContent=msgOf(e); }
@@ -3413,4 +3463,143 @@ $("hd-go").onclick = async () => {
     toast(`${name} 님에게 넘겼어요.`); openSouls();
   } catch (e) { $("hand-err").textContent = msgOf(e); }
   finally { $("hd-go").disabled = false; }
+};
+
+/* ── 셀모임 사진 ──
+   소그룹과 같은 방식입니다. 작은 사본은 모임에 붙이고,
+   큰 사진은 따로 두어 눌렀을 때만 불러옵니다.
+   다만 여럿이 같이 찍힌 사진이라 한 사람 카드가 아니라 '모임'에 붙입니다. */
+function renderMeetShots(mine) {
+  const shots = state.meeting.shots || [];
+  $("m-shots").innerHTML = shots.map((p,i)=>`
+    <div class="sh" style="background-image:url(${p.thumb})" data-mshot="${i}" role="button"
+      aria-label="사진 ${i+1} 크게 보기">
+      ${mine?`<button type="button" data-rmmshot="${i}" aria-label="사진 ${i+1} 빼기">×</button>`:""}
+    </div>`).join("")
+    + (mine && shots.length < MAX_SHOTS
+      ? `<button type="button" class="add" id="btn-add-mshot">＋ 사진<br>${shots.length}/${MAX_SHOTS}</button>`
+      : "");
+  const a = $("btn-add-mshot"); if (a) a.onclick = () => $("m-photo-input").click();
+}
+$("m-shots").addEventListener("click", (ev) => {
+  const rm = ev.target.closest("[data-rmmshot]");
+  if (rm) { ev.stopPropagation();
+    state.meeting.shots.splice(Number(rm.dataset.rmmshot), 1); renderMeetShots(true); return; }
+  const open = ev.target.closest("[data-mshot]");
+  if (open) { const p = state.meeting.shots[Number(open.dataset.mshot)];
+    if (p) showMeetPhoto(p); }
+});
+$("m-photo-input").onchange = async (ev) => {
+  const files = [...(ev.target.files||[])]; ev.target.value = "";
+  const room = MAX_SHOTS - state.meeting.shots.length;
+  if (!files.length) return;
+  if (files.length > room) toast(`${MAX_SHOTS}장까지만 넣을 수 있어요. 앞의 ${room}장만 넣을게요.`);
+  toast("사진을 줄이는 중이에요…");
+  for (const f of files.slice(0, room)) {
+    try {
+      const [big, small] = await Promise.all([
+        shrinkFit(f, PHOTO.shot, 900000),
+        shrinkFit(f, PHOTO.shotTh, 14000)
+      ]);
+      state.meeting.shots.push({ thumb: small, full: big, id: null });
+      renderMeetShots(true);
+    } catch (e) { toast(e.message || "사진 하나를 넣지 못했어요."); }
+  }
+};
+async function putMeetShots(meetingId, cellId) {
+  const out = [];
+  for (const p of (state.meeting.shots || [])) {
+    if (p.id) { out.push({ id:p.id, thumb:p.thumb }); continue; }
+    const ref = await addDoc(collection(db,"meetingPhotos"), {
+      meetingId, cellId, jinId: state.me.jinId, leaderUid: state.me.id,
+      data: p.full, by: uid(), createdAt: serverTimestamp()
+    });
+    out.push({ id: ref.id, thumb: p.thumb });
+  }
+  return out;
+}
+async function showMeetPhoto(p) {
+  let src = p.full;
+  if (!src && p.id) {
+    try { const d = await getDoc(doc(db,"meetingPhotos",p.id));
+      src = d.exists() ? d.data().data : null; }
+    catch (e) { toast(msgOf(e)); }
+  }
+  $("pv-img").src = src || p.thumb;
+  $("photo-view").showModal();
+}
+
+/* ── 흐름 한 줄 ──
+   카드 하나씩 띄우면 한 화면에 서너 건밖에 안 들어갑니다.
+   왼쪽 날짜 · 오른쪽 내용으로 빽빽하게 두면 열두어 줄이 들어가서
+   '어떻게 변해왔나'가 한눈에 읽힙니다. */
+function flowRow(r, kw) {
+  const cell = r.kind === "cell";
+  const done = r.type === "pray" && r.prayStatus === "answered";
+  const text = r.type === "pray" ? r.body : (r.update || r.body || "");
+  const p = String(r.date || "").split("-");
+  const when = p.length >= 3 && p[1] !== "00"
+    ? (p[0] === String(new Date().getFullYear()) || p[0] === "0000"
+        ? `${Number(p[1])}월 ${Number(p[2])}일`
+        : `${p[0].slice(2)}. ${Number(p[1])}.${Number(p[2])}`)
+    : fmtDate(r.date);
+  const days = r.type === "pray" && !done ? (daysSince(r.date) || 0) + 1 : null;
+  return `<div class="fr${cell?" cell":""}${done?" ok done":""}">
+    <span class="fd">${esc(when)}</span>
+    <span>
+      <span class="ft">${hl(text, kw)}</span>
+      <span class="fm">${[
+        cell ? "셀모임" : (r.type === "meet" ? kindName(r.kind) : ""),
+        done ? "응답됨" : (days !== null ? `${days}일째` : ""),
+        r.by !== uid() && r.byName ? esc(r.byName) : ""
+      ].filter(Boolean).join(" · ")}</span>
+    </span>
+  </div>`;
+}
+
+/* ── 오늘 같이 기도할 제목 한 장 ──
+   셀모임 끝날 때 다 같이 기도하는데, 지금은 제목이 사람별 카드에
+   흩어져 있어서 모으려면 카드를 여러 번 열어야 합니다. 한 장에 모읍니다. */
+$("btn-pray-sheet").onclick = async () => {
+  const cellId = $("m-cell").value || state.meeting.cellId;
+  const roster = state.souls.filter(s => s.cellId === cellId && !isLeaderCard(s));
+  if (!roster.length) { toast("이 셀에 등록된 영혼이 없어요."); return; }
+  toast("기도제목을 모으는 중이에요…");
+  const all = await loadAllRecords();
+  const open = all.filter(r => r.type === "pray" && r.prayStatus !== "answered");
+  const rows = roster.map(s => ({
+    s, items: open.filter(r => r.soulId === s.id)
+      .sort((a,b)=>String(a.date).localeCompare(String(b.date)))
+  }));
+  const withAny = rows.filter(r => r.items.length);
+  const cellNm = (state.cells.find(c=>c.id===cellId)||{}).name || "셀";
+
+  $("pray-sheet-title").textContent = `${cellNm} 기도제목`;
+  $("pray-sheet-sub").textContent = withAny.length
+    ? `${withAny.length}명 · ${open.filter(r=>roster.some(s=>s.id===r.soulId)).length}개`
+    : "아직 적어둔 기도제목이 없어요.";
+  $("pray-sheet-body").innerHTML = withAny.map(({s, items}) => `
+    <div class="row" style="flex-direction:column;align-items:stretch">
+      <div style="display:flex;align-items:center;gap:10px">
+        ${avatar(s, 30)}<p class="nm">${esc(s.name)}</p>
+      </div>
+      <div class="flow" style="margin-top:8px">${items.map(r=>`
+        <div class="fr">
+          <span class="fd">${(daysSince(r.date)||0)+1}일째</span>
+          <span><span class="ft">${esc(r.body)}</span></span>
+        </div>`).join("")}</div>
+    </div>`).join("")
+    || `<p class="muted">영혼 카드에서 기도제목을 적으시거나, 셀모임에서 이름 옆 ▾ 를
+        눌러 적으시면 여기에 모여요.</p>`;
+
+  /* 복사해서 단톡방에 올릴 수 있게 */
+  state.praySheetText = [`[${cellNm}] 기도제목 · ${fmtDate(todayStr(), true)}`, ""]
+    .concat(withAny.map(({s, items}) =>
+      `${s.name}\n` + items.map(r => `  - ${r.body}`).join("\n"))).join("\n");
+  $("dlg-pray-sheet").showModal();
+};
+$("ps-close").onclick = () => $("dlg-pray-sheet").close();
+$("ps-copy").onclick = async () => {
+  try { await navigator.clipboard.writeText(state.praySheetText || ""); toast("복사했어요."); }
+  catch { toast("복사가 안 되면 화면을 길게 눌러 복사해 주세요."); }
 };
