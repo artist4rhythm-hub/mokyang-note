@@ -292,6 +292,9 @@
     background:transparent;color:var(--dim);font-size:13px;cursor:pointer}
   .picks button.on{background:var(--rose-bg);color:var(--rose-tx);border-color:#3A2226;
     font-weight:500}
+  .picks button.add{border-style:dashed}
+  .picks button:disabled{opacity:.35;cursor:not-allowed}
+  .picks button.me{border-color:#3A3330}
 
   /* 모임 사진 */
   .shots{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
@@ -639,8 +642,31 @@
       <span style="width:44px"></span>
     </div>
     <div class="scroll pad">
-      <div class="field"><label>어떤 만남인가요</label>
-        <div class="seg" style="margin:0" id="log-kind"></div></div>
+      <div class="seg" style="margin:0 0 6px" id="log-mode" role="tablist">
+        <button type="button" data-mode="done">있었던 일 기록</button>
+        <button type="button" data-mode="plan">앞으로 예정</button>
+      </div>
+      <p class="hint" id="log-mode-hint" style="margin:0 0 16px"></p>
+
+      <div class="field"><label>어떤 모임인가요</label>
+        <div class="picks" style="margin:0" id="log-kind"></div></div>
+
+      <div id="log-train" hidden>
+        <div class="two">
+          <div class="field"><label for="log-course">어떤 과정</label><select id="log-course"></select></div>
+          <div class="field"><label for="log-sesno">몇 회차</label><select id="log-sesno"></select></div>
+        </div>
+        <div id="log-train-people">
+          <div class="field"><label>후원자 <span class="muted" style="font-weight:400">— 이끄는 사람</span></label>
+            <div class="picks" id="log-sponsor"></div>
+            <input id="log-sponsor-name" placeholder="다른 셀 사람이면 이름을 적어주세요" hidden style="margin-top:8px"></div>
+          <div class="field"><label>피후원자 <span class="muted" style="font-weight:400">— 배우는 사람 · 여러 명 가능</span></label>
+            <div class="picks" id="log-sponsee"></div></div>
+          <div class="picks" style="margin:-4px 0 14px">
+            <button type="button" class="me" id="log-train-me">나도 그 자리에 있었어요</button></div>
+        </div>
+        <p class="hint" id="log-train-hint" style="margin:-6px 0 16px"></p>
+      </div>
 
       <div class="field" id="log-soul-wrap"><label id="log-soul-label">누구를 만났나요</label>
         <div class="picks" id="log-picks"></div>
@@ -659,20 +685,23 @@
         <input id="log-place" placeholder="예) 카페, 집, 교회">
         <div class="quick" id="log-quick"></div></div>
 
-      <h3 class="sec-title">만나기 전 — 기도하며 받은 것</h3>
+      <div id="log-sec-before">
+      <h3 class="sec-title" id="log-before-title">만나기 전 — 기도하며 받은 것</h3>
       <div class="wide">
         <div class="field"><label for="log-bheart">하나님이 주신 마음</label>
           <textarea id="log-bheart" placeholder="만나기 전 기도할 때 어떤 마음을 주셨나요"></textarea></div>
         <div class="field"><label for="log-bword">주신 말씀</label>
           <textarea id="log-bword" placeholder="예) 빌립보서 1:6 — 착한 일을 시작하신 이가…"></textarea></div>
       </div>
+      </div>
 
-      <h3 class="sec-title">만나서</h3>
+      <div id="log-sec-after">
+      <h3 class="sec-title" id="log-during-title">만나서</h3>
       <div class="field"><label for="log-did">무엇을 했나요</label>
         <textarea id="log-did" placeholder="예) 밥 먹고 산책, 말씀 나눔, 함께 기도"></textarea></div>
       <div class="field"><label for="log-talked">어떤 이야기를 나눴나요</label>
         <textarea id="log-talked" placeholder="나눈 이야기를 편하게 적어주세요"></textarea></div>
-      <div class="field"><label for="log-dheart">만나면서 주신 마음</label>
+      <div class="field" id="log-dheart-wrap"><label for="log-dheart">만나면서 주신 마음</label>
         <textarea id="log-dheart" placeholder="대화 중에 느낀 것, 깨달은 것"></textarea></div>
 
       <h3 class="sec-title">그 친구는 지금</h3>
@@ -695,6 +724,7 @@
         <div class="shots" id="log-shots"></div>
         <input type="file" id="log-photo-input" accept="image/*" hidden multiple>
         <p class="hint">기록 하나에 3장까지. 얼굴 알아볼 수 있는 크기로 자동으로 줄여서 넣어요.</p></div>
+      </div>
       <div class="field"><label for="log-scope">공개 범위</label>
         <select id="log-scope">
           <option value="leader">담당 리더 — 나와 다음 담당자</option>
@@ -704,7 +734,6 @@
       <p class="err" id="log-err"></p>
     </div>
     <div class="savebar" style="display:flex;gap:8px">
-      <button class="btn-ghost" id="btn-log-plan" style="max-width:130px">예약으로</button>
       <button class="btn" id="btn-log-save">저장</button>
     </div>
   </section>
@@ -1167,6 +1196,9 @@
   <h3 id="train-title">훈련 기록</h3>
   <div class="field"><label for="tr-course">과정</label><select id="tr-course"></select>
     <p class="hint" id="tr-course-hint"></p></div>
+  <div class="field"><label for="tr-sponsor">후원자 <span class="muted" style="font-weight:400">— 이 과정을 이끄는 사람</span></label>
+    <select id="tr-sponsor"></select>
+    <input id="tr-sponsor-name" placeholder="이름을 적어주세요" hidden style="margin-top:8px"></div>
   <div class="two">
     <div class="field"><label for="tr-cohort">기수</label><input id="tr-cohort" placeholder="예) 12기"></div>
     <div class="field"><label for="tr-status">상태</label>
@@ -1296,8 +1328,8 @@
 <dialog id="dlg-mtype">
   <h3 id="mtype-title">모임 종류</h3>
   <div class="field"><label for="mt-name">이름</label>
-    <input id="mt-name" placeholder="예) 남자 모임, 새가족 환영, 심방">
-    <p class="hint">1:1 만남 · 소그룹 모임 · 셀모임은 기본으로 들어 있어요.</p></div>
+    <input id="mt-name" placeholder="예) 남자 모임, 새가족 환영, 심방, 셀원끼리 모임">
+    <p class="hint" id="mt-hint">1:1 만남 · 소그룹 모임 · 셀모임 후 · 훈련 모임은 기본으로 들어 있어요.</p></div>
   <p class="err" id="mtype-err"></p>
   <div class="dlg-btns">
     <button class="btn-ghost" id="mt-cancel">취소</button>
@@ -1309,12 +1341,13 @@
 <dialog id="dlg-calnew">
   <h3 id="calnew-title">이 날 기록 남기기</h3>
   <p class="muted" style="margin-bottom:14px" id="calnew-sub"></p>
-  <div class="field"><label for="cn-kind">무엇을 적을까요</label>
-    <select id="cn-kind">
-      <option value="one">1:1 만남</option>
-      <option value="small">소그룹 모임</option>
-      <option value="cell">셀모임 (출석 포함)</option>
-    </select></div>
+  <div class="field"><label>있었던 일인가요, 앞으로 있을 일인가요</label>
+    <div class="seg" style="margin:0" id="cn-mode">
+      <button type="button" data-cnmode="done">있었던 일</button>
+      <button type="button" data-cnmode="plan">앞으로 예정</button>
+    </div></div>
+  <div class="field"><label for="cn-kind">어떤 모임인가요</label>
+    <select id="cn-kind"></select></div>
   <div class="field" id="cn-soul-wrap"><label for="cn-soul">누구와</label>
     <select id="cn-soul"></select></div>
   <p class="err" id="calnew-err"></p>
