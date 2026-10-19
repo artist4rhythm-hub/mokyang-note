@@ -22,7 +22,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
 const APP_NAME = "목자의 삶";
-const APP_VERSION = "14.0 (2026-10-19)";
+const APP_VERSION = "15.0 (2026-10-19)";
 
 /* 사진 크기 — 얼굴을 알아볼 수 있는 선에서 가장 작게.
    얼굴 하나가 가로 80px은 되어야 알아보는데, 여럿이 한 줄로 선
@@ -569,6 +569,19 @@ async function loadRecords(soulId, canSeeAll) {
       .sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")));
   } catch (e) { state.records=[]; toast(msgOf(e)); }
 }
+/* 한 사람 카드의 기록 — 규칙이 허락하는 세 갈래(내가 쓴 것 · 담당 공개 · 코치 공유)로 나눠 읽습니다.
+   조건 없이 한 번에 읽으면 서버가 질의를 거절합니다. */
+async function fetchRecords(soulId, canSeeAll) {
+  const col = collection(db,"souls",soulId,"records");
+  const parts = canSeeAll
+    ? await Promise.all([
+        getDocs(query(col, where("by","==",uid()))),
+        getDocs(query(col, where("scope","==","leader"))),
+        getDocs(query(col, where("scope","==","coach")))])
+    : [await getDocs(query(col, where("scope","==","coach")))];
+  const seen = {};
+  return parts.flatMap(pack).filter(r => seen[r.id] ? false : (seen[r.id] = true));
+}
 /* 내 영혼들의 기록을 한꺼번에 (검색 · 캘린더용) */
 async function loadAllRecords(force) {
   if (state.allRecords && !force) return state.allRecords;
@@ -895,7 +908,10 @@ async function openSouls() {
   }
   show("s-loading");
   await loadOrg(); await loadSouls(); await loadMeetings();
+  if (canLead()) await loadSelfCard();
   renderFilter(); renderSouls();
+  /* 예전 얼굴 사진의 작은 사본 — 뒤에서 한 번 만들고, 생기면 목록을 다시 그립니다 */
+  backfillThumbs().then(n => { if (n && !$("s-souls").hidden) renderSouls(); });
   $("btn-soul-new").hidden = !canMakeSoul();
   $("btn-order-souls").hidden = !canMakeSoul() || state.souls.filter(isLeaderOf).length < 2;
   markSide("souls"); show("s-souls");
@@ -979,7 +995,7 @@ function renderSouls() {
     const a = myActivity(statsFrom("3"));
     $("list-souls").insertAdjacentHTML("afterbegin", `
       <div class="row" data-mine="1" style="cursor:pointer;border-color:#3A2226">
-        <span class="ava">${esc(initial(state.me.name))}</span>
+        ${meAvatar()}
         <div class="grow"><p class="nm">${esc(state.me.name||"나")}</p>
           <p class="sub">내 카드 · 셀모임 출석 ${a.marked?`${a.came}/${a.marked}`:"—"} · 최근 3개월 함께한 모임 ${a.met}번</p></div>
         <span class="chip rose">나 · 셀리더</span>
@@ -1071,6 +1087,11 @@ async function openSoul(soulId) {
   await loadRecords(soulId, isLeaderOf(s));
   await loadTrainings(soulId);
   state.shared = isLeaderCard(s) ? await loadShared(s.linkedUid) : [];
+  state.linkedSelf = null;
+  if (isLeaderCard(s) && s.linkedUid && state.me.role === "jinjang") {
+    try { const d = await getDoc(doc(db,"selfCards",s.linkedUid)); state.linkedSelf = d.exists() ? d.data() : null; }
+    catch { state.linkedSelf = null; }   // 본인이 '나만 보기'로 두면 규칙이 막습니다
+  }
   const photo = await loadPhoto(soulId);
 
   $("soul-ava").textContent = photo ? "" : initial(s.name);
@@ -1394,6 +1415,17 @@ function renderSoulBody() {
       :`<p class="muted">아직 적은 정보가 없어요.</p>`)
       + (mine?`<button class="btn-ghost" id="btn-edit-here" style="height:44px;font-size:13px;margin-top:12px;max-width:320px">프로필 수정</button>`:"");
     const e=$("btn-edit-here"); if(e) e.onclick=()=>openEdit(s.id);
+    /* 셀리더 카드라면, 그 셀리더가 스스로 적어 진장에게 열어둔 프로필도 같이 */
+    const ls = state.linkedSelf;
+    if (isLeaderCard(s) && ls) box.insertAdjacentHTML("afterbegin", `
+      <div class="card" style="margin-bottom:12px">
+        <div style="display:flex;align-items:center;gap:10px">
+          ${avatar({ name:s.name, thumb:ls.thumb }, 40)}
+          <div><h3 style="font-size:13px;font-weight:600">본인이 적은 프로필</h3>
+            <p class="muted" style="font-size:12px">${esc(s.name)} 님이 '내 카드'에 적고 진장에게 열어둔 것</p></div>
+        </div>
+        ${selfRows(ls)}
+      </div>`);
   }
 
   if (state.soulTab === "family") {
@@ -2719,6 +2751,7 @@ function openEdit(soulId) {
   $("edit-title").textContent = s?"프로필 수정":"영혼 추가";
   $("btn-del-soul").hidden = !s;
   $("btn-hand").hidden = !s;
+  $("btn-promote").hidden = !(s && isLeaderOf(s) && (s.kind||"member") === "member");
   document.querySelectorAll("#s-edit .fold").forEach(f=>f.open=false);
   $("e-status").innerHTML = Object.entries(STATUS).map(([k,v])=>`<option value="${k}">${v}</option>`).join("");
   const myCells = state.cells.filter(c=>c.jinId===state.me.jinId);
@@ -2909,6 +2942,7 @@ $("btn-save-soul").onclick=async()=>{
   finally { $("btn-save-soul").disabled=false; }
 };
 $("btn-hand").onclick = () => { state.editDirty=false; openHandDlg(state.editingId); };
+$("btn-promote").onclick = () => { state.editDirty=false; openPromoteDlg(state.editingId); };
 $("btn-del-soul").onclick=async()=>{
   if(!confirm("이 카드를 목록에서 보관할까요? 기록은 지워지지 않아요.")) return;
   try { await updateDoc(doc(db,"souls",state.editingId),{active:false});
@@ -3095,7 +3129,7 @@ function renderAttendance(mine) {
   const head = `<p class="muted" style="font-size:12px;grid-column:1/-1">셀리더 포함 ${roster.length+1}명 중 ${n}명 출석</p>`;
   const leadRow = `<div class="member lead">
       <div class="top">
-        <span class="ava" style="width:34px;height:34px;font-size:13px">${esc(initial(lname))}</span>
+        ${lk===uid() ? meAvatar(34) : `<span class="ava" style="width:34px;height:34px;font-size:13px">${esc(initial(lname))}</span>`}
         <div class="grow" style="flex-grow:1;min-width:0">
           <p class="nm">${esc(lname)} <span class="chip rose" style="font-size:10px;padding:1px 7px">셀리더${lk===uid()?" · 나":""}</span></p>
           ${lk===uid()?`<p class="sub" style="margin-top:2px">내 근황은 '내 카드'에 적어요</p>`:""}
@@ -3346,10 +3380,10 @@ $("btn-export-all").onclick=async()=>{
     const souls=[];
     for(const s of state.souls){
       const [recs,trains]=await Promise.all([
-        getDocs(collection(db,"souls",s.id,"records")),
+        fetchRecords(s.id, isLeaderOf(s)),
         getDocs(collection(db,"souls",s.id,"trainings"))
       ]);
-      souls.push({ ...s, records:pack(recs), trainings:pack(trains) });
+      souls.push({ ...s, records:recs, trainings:pack(trains) });
     }
     const backup={ 앱:APP_NAME, 버전:APP_VERSION, 만든날짜:todayStr(),
       만든사람:{이름:state.me.name,이메일:state.me.email,역할:ROLE[state.me.role]},
@@ -3748,7 +3782,7 @@ const myCol = () => collection(db, "myNotes", uid(), "notes");
 
 async function openMine() {
   show("s-loading");
-  if (canLead()) { await loadMeetings(); await loadAllRecords(); }
+  if (canLead()) { await loadMeetings(); await loadAllRecords(); await loadSelfCard(); }
   try { state.myNotes = pack(await getDocs(myCol()))
     .sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))); }
   catch (e) { state.myNotes = []; toast(msgOf(e)); }
@@ -3762,7 +3796,7 @@ function renderMine() {
     const a3 = myActivity(statsFrom("3")), all = myActivity(statsFrom("all"));
     $("mine-sum").innerHTML = `
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
-        <span class="ava" style="width:48px;height:48px;font-size:18px">${esc(initial(state.me.name))}</span>
+        ${meAvatar(48)}
         <div><p style="font-size:17px;font-weight:600">${esc(state.me.name||"나")}</p>
           <p class="muted" style="font-size:12px">셀리더${cell?` · ${esc(cell.name)}`:""}</p></div>
       </div>
@@ -3774,6 +3808,7 @@ function renderMine() {
       <p class="muted" style="font-size:12px;margin-top:8px">지금까지 셀모임 출석 ${all.marked?`${all.came}/${all.marked}`:"기록 전"}
         · 함께한 모임 ${all.met}번 — 셀모임 출석 체크의 '나' 줄과 내가 함께한 만남 기록에서 셉니다.</p>`;
   } else $("mine-sum").innerHTML = "";
+  renderMineProfile();
   const f = [["all","전체"],["heart","받은 마음"],["pray","기도제목"],["meet","만남 · 일지"]];
   $("mine-filter").innerHTML = f.map(([k,l])=>
     `<button data-mf="${k}" class="${state.mineFilter===k?"on":""}">${l}</button>`).join("");
@@ -3876,6 +3911,42 @@ const HAND = [
   { id:"fresh",   name:"지금부터",
     sub:"이름 · 연락처 · 셀만. 새 리더가 처음부터 관계를 맺어요" }
 ];
+/* 카드 넘기기의 실제 일 — '다른 리더에게 넘기기'와 '셀리더로 세우기'가 같이 씁니다 */
+async function doHandover(soulId, toUid, pick) {
+    /* 안 넘길 기록은 '나만 보기'로 바꿔둡니다. 그러면 적은 사람만 계속 보고
+       새 담당자는 못 봅니다. 지우는 게 아니라서 원래 리더는 그대로 갖고 있어요. */
+    if (pick !== "all") {
+      /* 규칙이 '내가 쓴 것'을 보장할 수 있게 질의에도 by 를 겁니다
+         (조건 없이 다 읽으려 하면 서버가 질의를 통째로 거절해요) */
+      const recs = pack(await getDocs(query(collection(db,"souls",soulId,"records"),
+        where("by","==",uid()))));
+      const hide = recs.filter(r => {
+        if (r.scope === "private") return false;          // 이미 나만 보기
+        if (r.by !== uid()) return false;                 // 내가 쓴 것만 바꿀 수 있음
+        if (pick === "fresh") return true;            // 지금부터 → 전부 숨김
+        if (r.type === "meet") return true;               // 요약만 → 지난 만남은 숨김
+        if (r.type === "heart") return true;              // 받은 마음도 숨김
+        if (r.type === "pray" && r.prayStatus === "answered") return true;
+        return false;                                     // 기도 중인 것은 넘김
+      });
+      for (const r of hide) {
+        await updateDoc(doc(db,"souls",soulId,"records",r.id), { scope:"private" });
+      }
+      /* 사진도 같이 가립니다 */
+      try {
+        const shots = pack(await getDocs(query(collection(db,"recordPhotos"),
+          where("soulId","==",soulId), where("by","==",uid()))));
+        const ids = new Set(hide.map(r=>r.id));
+        for (const p of shots.filter(p=>ids.has(p.recordId) && p.by===uid())) {
+          await updateDoc(doc(db,"recordPhotos",p.id), { scope:"private" });
+        }
+      } catch {}
+      if (pick === "fresh") {
+        await updateDoc(doc(db,"souls",soulId), { todos:[], prayOpen:0, prayTop:null });
+      }
+    }
+    await updateDoc(doc(db,"souls",soulId), { leaderUid: toUid });
+}
 const dlgHand = $("dlg-hand");
 let handSoulId = null, handPick = "summary";
 function openHandDlg(soulId) {
@@ -3919,36 +3990,8 @@ $("hd-go").onclick = async () => {
   if (!confirm(`${s.name} 카드를 ${name} 님에게 넘길까요?\n되돌릴 수 없어요.`)) return;
   $("hd-go").disabled = true;
   try {
-    /* 안 넘길 기록은 '나만 보기'로 바꿔둡니다. 그러면 적은 사람만 계속 보고
-       새 담당자는 못 봅니다. 지우는 게 아니라서 원래 리더는 그대로 갖고 있어요. */
-    if (handPick !== "all") {
-      const recs = pack(await getDocs(collection(db,"souls",handSoulId,"records")));
-      const hide = recs.filter(r => {
-        if (r.scope === "private") return false;          // 이미 나만 보기
-        if (r.by !== uid()) return false;                 // 내가 쓴 것만 바꿀 수 있음
-        if (handPick === "fresh") return true;            // 지금부터 → 전부 숨김
-        if (r.type === "meet") return true;               // 요약만 → 지난 만남은 숨김
-        if (r.type === "heart") return true;              // 받은 마음도 숨김
-        if (r.type === "pray" && r.prayStatus === "answered") return true;
-        return false;                                     // 기도 중인 것은 넘김
-      });
-      for (const r of hide) {
-        await updateDoc(doc(db,"souls",handSoulId,"records",r.id), { scope:"private" });
-      }
-      /* 사진도 같이 가립니다 */
-      try {
-        const shots = pack(await getDocs(query(collection(db,"recordPhotos"),
-          where("soulId","==",handSoulId))));
-        const ids = new Set(hide.map(r=>r.id));
-        for (const p of shots.filter(p=>ids.has(p.recordId) && p.by===uid())) {
-          await updateDoc(doc(db,"recordPhotos",p.id), { scope:"private" });
-        }
-      } catch {}
-      if (handPick === "fresh") {
-        await updateDoc(doc(db,"souls",handSoulId), { todos:[], prayOpen:0, prayTop:null });
-      }
-    }
-    await updateDoc(doc(db,"souls",handSoulId), { leaderUid: toUid });
+    await doHandover(handSoulId, toUid, handPick);
+
     await log("카드 인계", s.name, `${name}에게 · ${(HAND.find(h=>h.id===handPick)||{}).name}`);
     bump("handover");
     dlgHand.close(); invalidate(); await loadSouls(true);
@@ -4167,6 +4210,7 @@ const MB_SHOT = 0.25, MB_FACE = 0.04, FREE_MB = 1024;
 async function openPhotos() {
   show("s-loading"); markSide("photos");
   await loadOrg(); await loadSouls(); await loadMeetings(); await loadAllRecords();
+  await backfillThumbs();
   state.phCell = state.phCell || "all"; state.phTab = state.phTab || "all";
   renderPhotos(); show("s-photos");
 }
@@ -4400,3 +4444,186 @@ $("st-opts").addEventListener("click",(ev)=>{
 });
 $("stats-back").onclick = () => openMore();
 $("btn-go-stats").onclick = () => openStats();
+
+/* ════════ 내 프로필 (selfCards/{내 계정}) ════════
+   셀리더가 자기 자신에 대해 적는 기본 정보. 영혼 카드가 아닙니다.
+   - 나는 늘 볼 수 있고, '진장에게 보이기'면 같은 진 진장만 봅니다.
+   - 진장·코치가 나에 대해 적는 목양 카드와는 완전히 따로 — 그쪽은 나에게 안 보입니다. */
+async function loadSelfCard(force) {
+  if (state.selfCard !== undefined && !force) return state.selfCard;
+  try { const d = await getDoc(doc(db,"selfCards",uid())); state.selfCard = d.exists() ? d.data() : null; }
+  catch { state.selfCard = null; }
+  return state.selfCard;
+}
+const meAvatar = (px) => avatar({ name: state.me.name, thumb: state.selfCard && state.selfCard.thumb }, px);
+function selfRows(sc) {
+  const rows = [
+    ["생일", sc.birth ? fmtDate(sc.birth,true)+(sc.lunar?" (음력)":"") : ""], ["연락처", sc.phone],
+    ["교회 등록일", fmtDate(sc.registeredAt,true)], ["침례일", fmtDate(sc.baptizedAt,true)],
+    ["결혼기념일", fmtDate(sc.marriedAt,true)], ["직분", sc.position],
+    ["가족", sc.family], ["인생 말씀", sc.verse]
+  ].filter(([,v])=>v);
+  return rows.length
+    ? `<div style="display:grid;grid-template-columns:84px 1fr;gap:8px 12px;font-size:13px;margin-top:12px">${
+        rows.map(([k,v])=>`<span class="muted">${k}</span><span style="white-space:pre-wrap">${esc(v)}</span>`).join("")}</div>`
+    : `<p class="muted" style="margin-top:10px">아직 적은 게 없어요.</p>`;
+}
+function renderMineProfile() {
+  if (!canLead()) { $("mine-profile").innerHTML = ""; return; }
+  const sc = state.selfCard || {};
+  const filled = !!(sc.birth || sc.phone || sc.thumb || sc.position || sc.verse);
+  $("mine-profile").innerHTML = `
+    <div class="card" style="margin-top:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <h3 style="font-size:13px;font-weight:600">내 프로필</h3>
+        ${state.selfCard ? `<span class="chip ${sc.share==="private"?"lock":"rose"}">${sc.share==="private"?"나만 보기":"진장에게 보임"}</span>` : ""}
+      </div>
+      ${state.selfCard ? selfRows(sc) : `<p class="muted" style="margin-top:10px">사진 · 생일 · 연락처를 넣어두면 출석 명단과 영혼들 맨 위 '나' 줄에 쓰여요.
+        영혼 카드를 따로 만들지 않아도 됩니다.</p>`}
+      <button class="btn-sm" id="btn-self-edit" style="margin-top:12px">${filled?"프로필 수정":"프로필 채우기"}</button>
+    </div>`;
+  $("btn-self-edit").onclick = () => openSelfDlg();
+}
+const dlgSelf = $("dlg-self");
+let selfPhoto;   // undefined = 그대로, null = 빼기, {big,small} = 새 사진
+function openSelfDlg() {
+  const sc = state.selfCard || {};
+  selfPhoto = undefined;
+  const raw = (v) => v ? fmtRaw(v) : "";
+  $("sf-birth").value = raw(sc.birth); $("sf-lunar").checked = !!sc.lunar;
+  $("sf-phone").value = sc.phone || "";
+  $("sf-reg").value = raw(sc.registeredAt); $("sf-bap").value = raw(sc.baptizedAt);
+  $("sf-married").value = raw(sc.marriedAt); $("sf-position").value = sc.position || "";
+  $("sf-family").value = sc.family || ""; $("sf-verse").value = sc.verse || "";
+  $("sf-share").value = sc.share || "upline";
+  syncSelfAva(sc.photo || sc.thumb || "");
+  $("self-err").textContent = "";
+  dlgSelf.showModal();
+}
+function syncSelfAva(src) {
+  $("sf-ava").style.backgroundImage = src ? `url(${src})` : "";
+  $("sf-ava").textContent = src ? "" : initial(state.me.name);
+}
+$("sf-photo").onclick = () => $("sf-photo-input").click();
+$("sf-photo-rm").onclick = () => { selfPhoto = null; syncSelfAva(""); };
+$("sf-photo-input").onchange = async (ev) => {
+  const f = ev.target.files && ev.target.files[0]; ev.target.value = ""; if (!f) return;
+  try {
+    const [big, small] = await Promise.all([ shrinkFit(f, PHOTO.face, 300000), shrinkFit(f, PHOTO.faceTh, 12000) ]);
+    selfPhoto = { big, small }; syncSelfAva(big);
+  } catch (e) { $("self-err").textContent = e.message || "사진을 넣지 못했어요."; }
+};
+$("sf-cancel").onclick = () => dlgSelf.close();
+$("sf-save").onclick = async () => {
+  const dates = {};
+  for (const [id,key,label] of [["sf-birth","birth","생일"],["sf-reg","registeredAt","교회 등록일"],
+                                ["sf-bap","baptizedAt","침례일"],["sf-married","marriedAt","결혼기념일"]]) {
+    const v = parseDateLoose($(id).value);
+    if (v === null) { $("self-err").textContent = `${label} 형식을 확인해 주세요. 3-5 또는 1985-3-5 처럼 적어주세요.`; return; }
+    dates[key] = v;
+  }
+  const old = state.selfCard || {};
+  const data = { name: state.me.name || "", jinId: state.me.jinId === undefined ? null : state.me.jinId,
+    share: $("sf-share").value, lunar: $("sf-lunar").checked, phone: $("sf-phone").value.trim(),
+    position: $("sf-position").value.trim(), family: $("sf-family").value.trim(),
+    verse: $("sf-verse").value.trim(), ...dates,
+    thumb: selfPhoto === undefined ? (old.thumb||"") : selfPhoto ? selfPhoto.small : "",
+    photo: selfPhoto === undefined ? (old.photo||"") : selfPhoto ? selfPhoto.big : "",
+    updatedAt: serverTimestamp() };
+  $("sf-save").disabled = true;
+  try {
+    await setDoc(doc(db,"selfCards",uid()), data);
+    state.selfCard = data; dlgSelf.close(); toast("내 프로필을 저장했어요.");
+    renderMine();
+  } catch (e) { $("self-err").textContent = msgOf(e); }
+  finally { $("sf-save").disabled = false; }
+};
+
+/* ════════ 셀리더로 세우기 ════════
+   셀원이 셀리더가 되면, 그 사람의 영혼 카드를 버리지 않고 그 사람 계정과 잇습니다.
+   잇는 순간부터 그 사람 본인은 이 카드를 어떤 경로로도 못 엽니다(규칙의 linkedUid).
+   그 다음에 카드를 진장에게 넘길지, 지난 기록을 얼마나 넘길지 고릅니다. */
+const dlgPm = $("dlg-promote");
+let pmSoulId = null, pmPick = "summary";
+function openPromoteDlg(soulId) {
+  const s = state.souls.find(x=>x.id===soulId); if (!s) return;
+  pmSoulId = soulId; pmPick = "summary";
+  $("pm-sub").textContent = `${s.name} 님의 영혼 카드를 그분의 계정과 이어서 '셀리더 목양 카드'로 바꿉니다. 지난 기록은 지워지지 않아요.`;
+  const accs = (state.members||[]).filter(m => m.id !== uid() && m.active !== false && m.role !== "super");
+  $("pm-acc").innerHTML = `<option value="">— 골라주세요 —</option>`
+    + accs.map(m=>`<option value="${m.id}">${esc(m.name)} · ${esc(m.email||"")}</option>`).join("");
+  const same = accs.filter(m => (m.name||"").trim() === (s.name||"").trim());
+  if (same.length === 1) $("pm-acc").value = same[0].id;
+  $("pm-acc-hint").textContent = accs.length
+    ? "이름과 구글 이메일을 꼭 확인하세요. 다른 사람과 이으면, 정작 그분은 막히지 않아요."
+    : "아직 가입한 계정이 없어요. 먼저 그분을 초대하고(홈 → 관리 → 리더 초대하기) 그분이 구글로 로그인해 초대를 수락한 뒤 여기서 고르세요.";
+  const cells = state.cells.filter(c => c.jinId === state.me.jinId && c.active !== false);
+  $("pm-cell").innerHTML = `<option value="">아직 안 정함</option>`
+    + cells.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join("");
+  const heads = (state.members||[]).filter(m => m.role === "jinjang" && m.active !== false && m.id !== uid());
+  $("pm-to").innerHTML = `<option value="${uid()}">나 — 지금처럼 내가 맡기</option>`
+    + heads.map(m=>`<option value="${m.id}">${esc(m.name)} · 진장에게 넘기기</option>`).join("");
+  syncPm(); $("pm-err").textContent = "";
+  dlgPm.showModal();
+}
+function syncPm() {
+  const away = $("pm-to").value !== uid();
+  $("pm-scope-wrap").hidden = !away;
+  $("pm-scope").innerHTML = HAND.map(h=>`
+    <div class="row" data-pm="${h.id}" style="cursor:pointer;${pmPick===h.id?"border-color:var(--brand)":""}">
+      <span style="width:18px;height:18px;border-radius:999px;flex-shrink:0;border:2px solid ${
+        pmPick===h.id?"var(--brand)":"var(--line)"};background:${pmPick===h.id?"var(--brand)":"transparent"}"></span>
+      <div class="grow"><p class="nm">${h.name}</p><p class="sub" style="white-space:normal">${h.sub}</p></div>
+    </div>`).join("");
+}
+$("pm-to").onchange = syncPm;
+$("pm-scope").addEventListener("click",(ev)=>{
+  const b = ev.target.closest("[data-pm]"); if (!b) return; pmPick = b.dataset.pm; syncPm();
+});
+$("pm-cancel").onclick = () => dlgPm.close();
+$("pm-go").onclick = async () => {
+  const s = state.souls.find(x=>x.id===pmSoulId);
+  const acc = $("pm-acc").value, to = $("pm-to").value;
+  if (!s) return;
+  if (!acc) { $("pm-err").textContent = "그분의 계정을 골라주세요."; return; }
+  if (acc === uid()) { $("pm-err").textContent = "내 계정과는 이을 수 없어요."; return; }
+  if (to === acc) { $("pm-err").textContent = "본인에게 자기 카드를 맡길 수는 없어요."; return; }
+  const m = (state.members||[]).find(x=>x.id===acc) || {};
+  if (!confirm(`${s.name} 카드를 ${m.name||""} (${m.email||""}) 계정과 이을까요?\n이 순간부터 그분은 이 카드를 볼 수 없어요.`)) return;
+  $("pm-go").disabled = true;
+  try {
+    /* 먼저 잇고(본인 차단이 바로 걸리도록), 그 다음에 넘깁니다 */
+    await updateDoc(doc(db,"souls",s.id), {
+      kind:"leader", cellId:null, ofCellId: $("pm-cell").value || null, linkedUid: acc });
+    if (to !== uid()) await doHandover(s.id, to, pmPick);
+    await log("셀리더로 세우기", s.name, `${m.name||""} 계정과 연결${to!==uid()?" · 진장에게 넘김":""}`);
+    bump("promote");
+    dlgPm.close(); invalidate(); await loadSouls(true);
+    toast(`${s.name} 님을 셀리더로 세웠어요.`); openSouls();
+  } catch (e) { $("pm-err").textContent = msgOf(e); }
+  finally { $("pm-go").disabled = false; }
+};
+
+/* ════════ 예전에 올린 얼굴 사진의 작은 사본 만들기 ════════
+   목록 · 사진 모아보기에 쓰는 작은 사본은 8단계부터 저장했습니다.
+   그 전에 올린 얼굴 사진은 큰 사진만 있어서 카드 안에서는 보이는데 목록에서는 안 보였어요.
+   한 번만 돌면서 작은 사본을 만들어 둡니다(사진 없는 카드엔 빈 값을 적어 다시 안 봄). */
+async function backfillThumbs() {
+  if (state.thumbFixed) return 0;
+  state.thumbFixed = true;
+  const todo = state.souls.filter(s => isLeaderOf(s) && s.thumb === undefined);
+  let made = 0;
+  for (const s of todo) {
+    try {
+      const full = await loadPhoto(s.id);
+      let th = "";
+      if (full) {
+        const blob = await (await fetch(full)).blob();
+        th = await shrinkFit(new File([blob], "face.jpg", { type: blob.type || "image/jpeg" }), PHOTO.faceTh, 12000);
+      }
+      await updateDoc(doc(db,"souls",s.id), { thumb: th });
+      s.thumb = th; if (th) made++;
+    } catch {}
+  }
+  return made;
+}

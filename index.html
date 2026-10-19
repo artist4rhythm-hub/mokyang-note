@@ -912,6 +912,7 @@
       </details>
 
       <p class="err" id="edit-err"></p>
+      <button class="btn-ghost" id="btn-promote" style="margin-top:10px;height:44px;font-size:13px;max-width:320px" hidden>셀리더로 세우기 · 계정 연결</button>
       <button class="btn-ghost" id="btn-hand" style="margin-top:10px;height:44px;font-size:13px;max-width:320px" hidden>다른 리더에게 넘기기</button>
       <button class="btn-ghost" id="btn-del-soul" style="margin-top:10px;height:44px;font-size:13px;max-width:320px" hidden>이 영혼 카드 보관하기</button>
     </div>
@@ -1008,6 +1009,7 @@
     </div>
     <div class="scroll pad">
       <div id="mine-sum"></div>
+      <div id="mine-profile"></div>
       <div class="card" style="background:var(--lock-bg);border-color:#2E2727;margin-top:14px">
         <p style="font-size:13px;line-height:1.8;color:#CFC5C3">
           여기는 <b>내가 나에 대해</b> 적는 곳이에요. 기본은 나만 보고,
@@ -1360,6 +1362,70 @@
 </dialog>
 
 <!-- 내 기록 쓰기 -->
+<dialog id="dlg-self">
+  <h3>내 프로필</h3>
+  <p class="muted" style="margin-bottom:12px">셀리더인 나에 대한 기본 정보예요. 출석 명단 · 영혼들 맨 위 '나' 줄에 쓰입니다.</p>
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+    <span class="ava lg" id="sf-ava" style="background-size:cover;background-position:center"></span>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button type="button" class="btn-sm" id="sf-photo">사진 고르기</button>
+      <button type="button" class="btn-sm danger" id="sf-photo-rm">사진 빼기</button>
+    </div>
+    <input type="file" id="sf-photo-input" accept="image/*" hidden>
+  </div>
+  <div class="two">
+    <div class="field"><label for="sf-birth">생일</label><input id="sf-birth" placeholder="예) 1985-3-5 또는 3-5"></div>
+    <div class="field"><label for="sf-phone">연락처</label><input id="sf-phone" inputmode="tel" placeholder="010-0000-0000"></div>
+  </div>
+  <label class="check" style="margin:-6px 0 12px"><input type="checkbox" id="sf-lunar"> 음력 생일</label>
+  <div class="two">
+    <div class="field"><label for="sf-reg">교회 등록일</label><input id="sf-reg" placeholder="예) 2015-3-1"></div>
+    <div class="field"><label for="sf-bap">침례일</label><input id="sf-bap" placeholder="예) 2016-5-19"></div>
+  </div>
+  <div class="two">
+    <div class="field"><label for="sf-position">직분</label><input id="sf-position" placeholder="예) 집사"></div>
+    <div class="field"><label for="sf-married">결혼기념일</label><input id="sf-married" placeholder="예) 2014-10-11"></div>
+  </div>
+  <div class="field"><label for="sf-family">가족</label><input id="sf-family" placeholder="예) 아내 ○○, 딸 ○○(7)"></div>
+  <div class="field"><label for="sf-verse">인생 말씀</label><input id="sf-verse" placeholder="예) 빌립보서 4:13"></div>
+  <div class="field"><label for="sf-share">누가 보나요</label>
+    <select id="sf-share">
+      <option value="upline">진장에게 보이기 — 진장이 나를 챙길 때 참고</option>
+      <option value="private">나만 보기</option>
+    </select>
+    <p class="hint">진장·코치가 나에 대해 적는 목양 기록과는 따로입니다. 그쪽은 나에게 보이지 않아요.</p></div>
+  <p class="err" id="self-err"></p>
+  <div class="dlg-btns">
+    <button class="btn-ghost" id="sf-cancel">취소</button>
+    <button class="btn" id="sf-save">저장</button>
+  </div>
+</dialog>
+
+<dialog id="dlg-promote">
+  <h3>셀리더로 세우기</h3>
+  <p class="muted" id="pm-sub" style="margin-bottom:12px"></p>
+  <div class="field"><label for="pm-acc">그 사람의 계정</label>
+    <select id="pm-acc"></select>
+    <p class="hint" id="pm-acc-hint"></p></div>
+  <div class="field"><label for="pm-cell">맡을 셀</label><select id="pm-cell"></select></div>
+  <div class="field"><label for="pm-to">이 카드(목양 카드)는 누가 맡나요</label>
+    <select id="pm-to"></select>
+    <p class="hint">셀리더를 돌보는 건 보통 진장의 몫이에요. 진장이 아직 없으면 지금처럼 내가 맡아요.</p></div>
+  <div id="pm-scope-wrap" hidden>
+    <label style="font-size:13px;display:block;margin-bottom:8px">지금까지 적은 기록은</label>
+    <div class="list" id="pm-scope"></div>
+  </div>
+  <div class="card" style="background:var(--lock-bg);border-color:#2E2727;margin-top:12px">
+    <p style="font-size:12px;line-height:1.7;color:#CFC5C3">저장하는 순간부터 <b>그 사람 본인은 이 카드를 어떤 경로로도 못 엽니다.</b>
+      지난 기록이 그 사람에게 보이는 일은 없어요. 셀 출석 명단에서는 빠지고, 이제 자기 셀에서 '나'로 출석합니다.</p>
+  </div>
+  <p class="err" id="pm-err"></p>
+  <div class="dlg-btns">
+    <button class="btn-ghost" id="pm-cancel">취소</button>
+    <button class="btn" id="pm-go">셀리더로 세우기</button>
+  </div>
+</dialog>
+
 <dialog id="dlg-mine">
   <h3 id="mine-title">내 기록</h3>
   <div class="field"><label>무엇에 대해</label>
