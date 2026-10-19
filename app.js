@@ -18,11 +18,11 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
 import {
   getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc,
-  collection, addDoc, getDocs, query, where, serverTimestamp
+  collection, addDoc, getDocs, query, where, serverTimestamp, onSnapshot
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
 const APP_NAME = "목자의 삶";
-const APP_VERSION = "15.0 (2026-10-19)";
+const APP_VERSION = "16.0 (2026-10-19)";
 
 /* 사진 크기 — 얼굴을 알아볼 수 있는 선에서 가장 작게.
    얼굴 하나가 가로 80px은 되어야 알아보는데, 여럿이 한 줄로 선
@@ -59,7 +59,7 @@ const $ = (id) => document.getElementById(id);
 const SCREENS = ["s-loading","s-login","s-verify","s-setup","s-accept","s-pending",
                  "s-home","s-souls","s-cal","s-meet","s-meeting","s-log","s-soul",
                  "s-edit","s-train","s-search","s-mine","s-usage","s-more","s-manage",
-                 "s-photos","s-stats"];
+                 "s-photos","s-stats","s-inbox"];
 const show = (id) => {
   SCREENS.forEach(s => $(s).hidden = (s !== id));
   if (id !== "s-loading" && typeof bump === "function") bump(id.replace(/^s-/, ""), "screen");
@@ -346,7 +346,8 @@ ICON.photos = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" strok
 /* 폰 아래 탭은 다섯 칸이 한계라 그대로 두고, 넓은 화면 왼쪽 목록에만 더 둡니다.
    폰에서는 같은 것들이 '더보기' 안에 있어요. */
 const NAV = [["home","홈"],["souls","영혼들"],["cal","캘린더"],["meet","셀모임"],["more","더보기"]];
-const SIDE = [["home","홈"],["souls","영혼들"],["cal","캘린더"],["meet","셀모임"],
+ICON.inbox = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16.5V11a6 6 0 1 1 12 0v5.5l1.5 2H4.5z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/></svg>`;
+const SIDE = [["home","홈"],["inbox","소식"],["souls","영혼들"],["cal","캘린더"],["meet","셀모임"],
   ["train","훈련 현황"],["stats","활동 통계"],["photos","사진 모아보기"],["more","더보기"]];
 function renderNav() {
   document.querySelectorAll("[data-nav]").forEach(nav => {
@@ -373,6 +374,7 @@ document.addEventListener("click", (ev) => {
   else if (t === "train") openTrainBoard();
   else if (t === "stats") openStats();
   else if (t === "photos") openPhotos();
+  else if (t === "inbox") openInbox();
 });
 
 /* ════════ 로그인 ════════ */
@@ -667,6 +669,7 @@ function absentStreak(soulId, cellId) {
 /* ════════ 홈 ════════ */
 async function openHome() {
   const me = state.me;
+  startLive(); renderVerCard(); checkVersion(); noteUpdated();
   const now = new Date(), days = ["일","월","화","수","목","금","토"];
   $("home-date").textContent = `${now.getMonth()+1}월 ${now.getDate()}일 ${days[now.getDay()]}요일`;
   let title = APP_NAME;
@@ -720,6 +723,8 @@ async function openHome() {
   }
   $("btn-manage").hidden = !(me.role==="super" || me.role==="jinjang");
   markSide("home"); show("s-home");
+  /* 기기 알림을 눌러 앱이 새로 열렸으면 바로 소식함으로 */
+  if (state.openInboxOnStart) { state.openInboxOnStart = false; openInbox(); }
 }
 /* ── 곧 만날 사람 ──
    앱이 알림을 못 보내니(서버가 없어서), 앱을 열었을 때 눈에 띄게 둡니다.
@@ -1182,6 +1187,7 @@ function recCard(r, kw, showSoul) {
       ${r.type==="heart"?`<span class="chip">${r.who==="soul"?"이 친구가 받은 은혜":"내가 받은 마음"}</span>`:""}
       ${dur?`<span class="chip">${dur}</span>`:""}
       ${r.meetingId?`<span class="chip">셀모임에서</span>`:""}
+      ${r.scope==="coach" && !showSoul?`<button class="btn-sm" data-cmt="${r.id}">댓글</button>`:""}
       ${r.by===uid()&&!showSoul?`
         ${r.planned?`<button class="btn-sm" data-editrec="${r.id}" data-rtype="meet" data-fill="1">만났어요 — 기록 채우기</button>`:""}
         ${r.type==="pray"&&r.prayStatus!=="answered"?`<button class="btn-sm" data-answer="${r.id}">응답됐어요</button>`:""}
@@ -1479,6 +1485,8 @@ $("soul-body").addEventListener("click", async (ev) => {
     } catch (e) { toast(msgOf(e)); }
     return;
   }
+  const cm = ev.target.closest("[data-cmt]");
+  if (cm) { const r = state.records.find(x=>x.id===cm.dataset.cmt); if (r) openComments(recTarget(s, r)); return; }
   const er = ev.target.closest("[data-editrec]");
   if (er) {
     if (er.dataset.rtype === "meet") openLog(s.id, er.dataset.editrec, { fill: er.dataset.fill === "1" });
@@ -3102,6 +3110,13 @@ function openMeeting(id, opts) {
   $("m-shots").hidden = !mine && !state.meeting.shots.length;
   renderMeetShots(mine);
   autoGrow($("m-note")); renderAttendance(mine); show("s-meeting");
+  /* 저장된 모임이면 댓글 — 이 모임을 볼 수 있는 사람(셀리더 · 담당 코치 · 진장)이 같이 봅니다 */
+  $("btn-m-cmt").hidden = !m;
+  $("btn-m-cmt").textContent = "댓글";
+  if (m) loadComments(meetTarget(m)).then(rows => {
+    if (state.meeting && state.meeting.id === m.id)
+      $("btn-m-cmt").textContent = rows.length ? `댓글 ${rows.length}개` : "댓글 남기기";
+  }).catch(()=>{});
 }
 $("m-cell").onchange=()=>{ state.meeting.cellId=$("m-cell").value; renderAttendance(true); };
 $("btn-all-present").onclick=()=>{
@@ -4627,3 +4642,395 @@ async function backfillThumbs() {
   }
   return made;
 }
+
+/* ════════ 버전 기록 · 새 버전 알림 ════════
+   올릴 때마다 version.json 도 같이 올립니다. 앱은 열 때 · 다시 볼 때 · 10분마다
+   그 파일만 살짝 확인해서(아주 작은 파일), 지금 버전보다 새것이면 위에 알림을 띄웁니다. */
+const CHANGELOG = [
+  { v:"16.0", d:"2026-10-19", items:[
+    "셀리더 · 코치 · 진장끼리 쪽지",
+    "셀모임과 '코치 공유' 기록에 댓글",
+    "소식함 — 어디에 댓글이 달렸는지 · 안 읽은 수 표시",
+    "알림 설정 — 받을 알림 고르기 · 앱이 열려 있을 때 기기 알림",
+    "홈에서 버전 기록 보기 · 새 버전이 올라오면 위에 알림",
+    "새로 올린 파일이 새로고침 한 번으로 바로 반영" ] },
+  { v:"15.0", d:"2026-10-19", items:[
+    "내 카드에 내 프로필 (사진 · 생일 · 연락처 등)",
+    "셀원을 셀리더로 세우기 — 구글 계정 잇기",
+    "예전에 올린 얼굴 사진도 목록 · 사진 모아보기에",
+    "카드 넘기기 · 전체 백업이 실제 서버에서 막히던 문제 고침" ] },
+  { v:"14.0", d:"2026-10-19", items:[
+    "1:1 — 셀원 둘의 1:1도 기록",
+    "셀모임 출석에 셀리더 본인",
+    "영혼들 맨 위 '나' — 내 카드",
+    "캘린더 창에서는 종류만, 사람은 다음 화면에서 여러 명" ] },
+  { v:"13.0", d:"2026-10-19", items:[
+    "캘린더에서 기록 바로 수정",
+    "왼쪽 목록에 훈련 현황 · 활동 통계 · 사진 모아보기",
+    "모임 종류 설정 (순서 · 숨기기 · 이름)",
+    "함께한 모임 사진은 한 번만 저장",
+    "보안: 맡은 셀은 스스로 못 바꿈 · 코치는 같은 진 안에서만" ] },
+  { v:"12.0", d:"2026-10-18", items:[
+    "훈련 모임 — 후원자 · 피후원자 · 회차 자동 체크",
+    "내가 안 간 모임도 기록",
+    "예정 입력 (있었던 일 / 앞으로 예정)",
+    "캘린더에 함께한 모임 한 줄로" ] },
+  { v:"11.0", d:"2026-10-16", items:[
+    "셀모임 사진", "근황 · 기도를 흐름으로 보기", "기도제목 모아보기", "새가족 등록 몇 주차" ] },
+  { v:"10.0", d:"2026-10-13", items:[
+    "셀리더 · 코치 목양 카드 (그 사람 본인은 못 봄)", "카드 넘기기 (지난 기록 범위 고르기)",
+    "내 기록", "캘린더 알림 시간" ] }
+];
+const verOf = (v) => String(v||"").split(" ")[0];
+function cmpVer(a, b) {
+  const x = verOf(a).split(".").map(Number), y = verOf(b).split(".").map(Number);
+  for (let i = 0; i < Math.max(x.length, y.length); i++) {
+    const d = (x[i]||0) - (y[i]||0); if (d) return d > 0 ? 1 : -1;
+  }
+  return 0;
+}
+async function checkVersion() {
+  try {
+    const r = await fetch("./version.json?t=" + Date.now(), { cache: "no-store" });
+    if (!r.ok) return;
+    const j = await r.json();
+    state.latest = j;
+    if (cmpVer(j.version, APP_VERSION) > 0 && !state.updLater) {
+      $("upd-ver").textContent = verOf(j.version); $("upd-bar").hidden = false;
+    }
+    renderVerCard();
+  } catch {}
+}
+$("upd-go").onclick = async () => {
+  $("upd-go").textContent = "받는 중…";
+  try { const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration();
+        if (reg) await reg.update(); } catch {}
+  location.reload();
+};
+$("upd-later").onclick = () => { $("upd-bar").hidden = true; state.updLater = true; };
+document.addEventListener("visibilitychange", () => { if (!document.hidden && state.me) checkVersion(); });
+setInterval(() => { if (!document.hidden && state.me) checkVersion(); }, 10 * 60 * 1000);
+function renderVerCard() {
+  if (!$("ver-now")) return;
+  $("ver-now").textContent = `버전 ${verOf(APP_VERSION)} · ${(APP_VERSION.match(/\((.*)\)/)||[])[1]||""}`;
+  const L = state.latest;
+  $("ver-state").textContent = !L ? "바뀐 것 보기"
+    : cmpVer(L.version, APP_VERSION) > 0 ? `새 버전 ${verOf(L.version)}이 있어요 — 눌러서 새로고침`
+    : "최신 버전이에요 · 바뀐 것 보기";
+  $("ver-state").style.color = L && cmpVer(L.version, APP_VERSION) > 0 ? "var(--rose-tx)" : "";
+}
+$("btn-ver").onclick = () => {
+  const L = state.latest;
+  if (L && cmpVer(L.version, APP_VERSION) > 0) { $("upd-go").click(); return; }
+  $("ver-sub").textContent = `지금 쓰는 버전: ${APP_VERSION}`;
+  $("ver-list").innerHTML = CHANGELOG.map(c => `
+    <div class="cmt">
+      <p class="h"><span><b style="color:var(--text)">${c.v}</b> · ${c.d}</span>${
+        verOf(APP_VERSION)===c.v?`<span class="chip rose" style="font-size:10px">지금 이 버전</span>`:""}</p>
+      <ul style="margin:6px 0 0 18px;font-size:13px;line-height:1.7">${c.items.map(i=>`<li>${esc(i)}</li>`).join("")}</ul>
+    </div>`).join("")
+    + `<p class="muted" style="font-size:12px;margin-top:10px">그 전 (1~9단계): 영혼 카드 · 셀모임 출석 · 만남 기록 · 훈련 현황 · 캘린더 · 넓은 화면 · 사진 · 사용 현황</p>`;
+  $("dlg-ver").showModal();
+};
+$("ver-close").onclick = () => $("dlg-ver").close();
+/* 새 버전으로 바뀐 뒤 처음 열면 한 번 알려줍니다 */
+function noteUpdated() {
+  let seen = null;
+  try { seen = localStorage.getItem("mokja-seen-ver"); } catch {}
+  if (seen && cmpVer(APP_VERSION, seen) > 0) toast(`${verOf(APP_VERSION)} 버전으로 업데이트됐어요. 홈 맨 아래에서 바뀐 것을 볼 수 있어요.`);
+  try { localStorage.setItem("mokja-seen-ver", APP_VERSION); } catch {}
+}
+
+/* ════════ 댓글 ════════
+   셀모임 — 그 모임을 볼 수 있는 사람(셀리더 · 담당 코치 · 진장)
+   기록   — '코치 공유'로 둔 기록만. 그 기록을 볼 수 있는 사람만 (본인 차단 그대로)
+   보안 규칙이 같은 조건으로 막으므로, 앱 화면을 우회해도 안 보입니다. */
+const fmtAgo = (ms) => {
+  if (!ms) return "";
+  const m = Math.floor((Date.now() - ms) / 60000);
+  if (m < 1) return "방금"; if (m < 60) return `${m}분 전`;
+  const h = Math.floor(m / 60); if (h < 24) return `${h}시간 전`;
+  const d = new Date(ms); return `${d.getMonth()+1}월 ${d.getDate()}일`;
+};
+const cellNameOf = (id) => (state.cells.find(c=>c.id===id)||{}).name || "";
+function meetTarget(m) {
+  return { kind:"meeting", id:m.id, owner:m.leaderUid,
+    title:`${fmtDate(m.date)} ${cellNameOf(m.cellId)} 셀모임`,
+    who:"이 셀모임을 볼 수 있는 사람 — 셀리더 · 담당 코치 · 진장 — 이 같이 봅니다." };
+}
+function recTarget(s, r) {
+  return { kind:"record", soulId:s.id, recId:r.id, owner:r.by,
+    title:`${s.name} · ${r.type==="meet" ? meetLabel(r) : (RTYPE[r.type]||"기록")} (${fmtDate(r.date)})`,
+    who:"'코치 공유' 기록이라 담당 셀리더 · 담당 코치 · 진장이 같이 봅니다. 카드 주인 본인에게는 보이지 않아요." };
+}
+const cmtCol = (t) => t.kind === "meeting"
+  ? collection(db,"meetings",t.id,"comments")
+  : collection(db,"souls",t.soulId,"records",t.recId,"comments");
+async function loadComments(t) {
+  return pack(await getDocs(cmtCol(t))).sort((a,b)=>(a.atMs||0)-(b.atMs||0));
+}
+const dlgCmt = $("dlg-cmt");
+async function openComments(t) {
+  state.cmt = t; state.cmtRows = [];
+  $("cmt-title").textContent = t.title; $("cmt-who").textContent = t.who;
+  $("cmt-body").value = ""; $("cmt-err").textContent = "";
+  $("cmt-list").innerHTML = `<p class="muted">불러오는 중…</p>`;
+  if (!dlgCmt.open) dlgCmt.showModal();
+  try { state.cmtRows = await loadComments(t); renderComments(); }
+  catch (e) { $("cmt-list").innerHTML = `<p class="err">${esc(msgOf(e))}</p>`; }
+}
+function renderComments() {
+  $("cmt-list").innerHTML = state.cmtRows.map(c => `
+    <div class="cmt">
+      <p class="h"><span><b style="color:var(--text)">${esc(c.byName||"")}</b> · ${fmtAgo(c.atMs)}</span>
+        ${c.by===uid()?`<button class="btn-sm danger" data-delcmt="${c.id}" style="height:26px;font-size:11px">지우기</button>`:""}</p>
+      <p class="b">${esc(c.body)}</p>
+    </div>`).join("") || `<p class="muted">아직 댓글이 없어요. 첫 댓글을 남겨보세요.</p>`;
+  $("cmt-list").scrollTop = 1e6;
+}
+$("cmt-list").addEventListener("click", async (ev) => {
+  const d = ev.target.closest("[data-delcmt]"); if (!d) return;
+  if (!confirm("이 댓글을 지울까요?")) return;
+  try { await deleteDoc(doc(cmtCol(state.cmt), d.dataset.delcmt));
+        state.cmtRows = state.cmtRows.filter(c=>c.id!==d.dataset.delcmt); renderComments(); }
+  catch (e) { $("cmt-err").textContent = msgOf(e); }
+});
+$("cmt-close").onclick = () => { dlgCmt.close(); syncMeetCmtBtn(); };
+function syncMeetCmtBtn() {
+  if (state.cmt && state.cmt.kind === "meeting" && state.meeting && state.meeting.id === state.cmt.id)
+    $("btn-m-cmt").textContent = state.cmtRows.length ? `댓글 ${state.cmtRows.length}개` : "댓글 남기기";
+}
+$("btn-m-cmt").onclick = () => {
+  const m = state.meetings.find(x=>x.id===(state.meeting||{}).id); if (m) openComments(meetTarget(m));
+};
+$("cmt-send").onclick = async () => {
+  const t = state.cmt, body = $("cmt-body").value.trim();
+  if (!body) { $("cmt-err").textContent = "내용을 적어주세요."; return; }
+  if (body.length > 2000) { $("cmt-err").textContent = "2000자까지 적을 수 있어요."; return; }
+  $("cmt-send").disabled = true; $("cmt-err").textContent = "";
+  try {
+    const row = { by:uid(), byName:state.me.name||"", body, atMs:Date.now(), at:serverTimestamp() };
+    const ref = await addDoc(cmtCol(t), row);
+    state.cmtRows.push({ id:ref.id, ...row }); renderComments(); $("cmt-body").value = "";
+    /* 알릴 사람 — 이 모임 · 기록의 주인과 지금까지 댓글을 단 사람들 (나는 빼고) */
+    const to = new Set([t.owner, ...state.cmtRows.map(c=>c.by)]); to.delete(uid());
+    const where_ = t.kind === "meeting" ? { kind:"meeting", id:t.id } : { kind:"record", soulId:t.soulId, recId:t.recId };
+    for (const u of to) {
+      if (!u || !(state.members||[]).some(m=>m.id===u)) continue;   // 같은 진 사람에게만
+      try { await addDoc(collection(db,"notices"), { to:u, from:uid(), fromName:state.me.name||"",
+        kind:"comment", target:where_, title:t.title, snippet:body.slice(0,80),
+        atMs:Date.now(), at:serverTimestamp(), read:false }); } catch {}
+    }
+    bump("comment");
+  } catch (e) { $("cmt-err").textContent = msgOf(e); }
+  finally { $("cmt-send").disabled = false; }
+};
+
+/* ════════ 쪽지 ════════
+   같은 진의 셀리더 · 코치 · 진장끼리. 보낸 사람과 받는 사람 둘만 읽습니다. */
+async function loadMessages() {
+  const col = collection(db,"messages");
+  const [a, b] = await Promise.all([
+    getDocs(query(col, where("to","==",uid()))),
+    getDocs(query(col, where("from","==",uid())))]);
+  const seen = {};
+  state.msgs = [...pack(a), ...pack(b)].filter(m => seen[m.id] ? false : (seen[m.id] = true))
+    .sort((x,y)=>(x.atMs||0)-(y.atMs||0));
+  return state.msgs;
+}
+const memberName = (id) => ((state.members||[]).find(m=>m.id===id)||{}).name || "";
+const dmPeople = () => (state.members||[]).filter(m => m.id !== uid() && m.active !== false
+  && m.jinId === state.me.jinId);
+const dlgTh = $("dlg-thread");
+function openThread(other) {
+  state.thWith = other || null;
+  $("th-pick-wrap").hidden = !!other;
+  if (!other) {
+    $("th-pick").innerHTML = `<option value="">— 골라주세요 —</option>` + dmPeople().map(m=>
+      `<option value="${m.id}">${esc(m.name)} · ${ROLE[m.role]||m.role}</option>`).join("");
+  }
+  $("th-title").textContent = other ? `${memberName(other) || "쪽지"} 님과 쪽지` : "새 쪽지";
+  $("th-body").value = ""; $("th-err").textContent = "";
+  renderThread();
+  if (!dlgTh.open) dlgTh.showModal();
+  markThreadRead();
+}
+function renderThread() {
+  const o = state.thWith;
+  const list = o ? (state.msgs||[]).filter(m => (m.from===o && m.to===uid()) || (m.from===uid() && m.to===o)) : [];
+  $("th-list").innerHTML = list.map(m => `<div class="bub ${m.from===uid()?"me":"them"}">${esc(m.body)}
+      <span class="t">${fmtAgo(m.atMs)}${m.from===uid() && m.read ? " · 읽음" : ""}</span></div>`).join("")
+    || (o ? `<p class="muted">아직 주고받은 쪽지가 없어요.</p>` : "");
+  $("th-list").scrollTop = 1e6;
+}
+async function markThreadRead() {
+  const o = state.thWith; if (!o) return;
+  for (const m of (state.msgs||[]).filter(m => m.from===o && m.to===uid() && !m.read)) {
+    try { await updateDoc(doc(db,"messages",m.id), { read:true }); m.read = true; } catch {}
+  }
+}
+$("th-pick").onchange = () => { state.thWith = $("th-pick").value || null; renderThread(); };
+$("th-close").onclick = () => { dlgTh.close(); if (!$("s-inbox").hidden) renderInbox(); };
+$("th-send").onclick = async () => {
+  const to = state.thWith, body = $("th-body").value.trim();
+  if (!to) { $("th-err").textContent = "받는 사람을 골라주세요."; return; }
+  if (!body) { $("th-err").textContent = "내용을 적어주세요."; return; }
+  if (body.length > 2000) { $("th-err").textContent = "2000자까지 적을 수 있어요."; return; }
+  $("th-send").disabled = true; $("th-err").textContent = "";
+  try {
+    const row = { from:uid(), to, fromName:state.me.name||"", toName:memberName(to), body,
+      atMs:Date.now(), at:serverTimestamp(), read:false };
+    const ref = await addDoc(collection(db,"messages"), row);
+    (state.msgs = state.msgs || []).push({ id:ref.id, ...row });
+    $("th-body").value = ""; $("th-pick-wrap").hidden = true;
+    $("th-title").textContent = `${memberName(to)} 님과 쪽지`;
+    renderThread(); bump("dm");
+  } catch (e) { $("th-err").textContent = msgOf(e); }
+  finally { $("th-send").disabled = false; }
+};
+
+/* ════════ 소식함 ════════ */
+async function openInbox(tab) {
+  show("s-loading"); markSide("inbox");
+  await loadOrg();
+  state.ibTab = tab || state.ibTab || "notice";
+  try {
+    const rows = pack(await getDocs(query(collection(db,"notices"), where("to","==",uid()))));
+    /* 읽은 지 오래된 알림은 정리합니다 (60일) */
+    const old = Date.now() - 60*86400000;
+    for (const n of rows.filter(n => n.read && (n.atMs||0) < old)) { try { await deleteDoc(doc(db,"notices",n.id)); } catch {} }
+    state.notices = rows.filter(n => !(n.read && (n.atMs||0) < old)).sort((a,b)=>(b.atMs||0)-(a.atMs||0));
+  } catch (e) { state.notices = []; toast(msgOf(e)); }
+  try { await loadMessages(); } catch (e) { state.msgs = []; toast(msgOf(e)); }
+  renderInbox(); show("s-inbox");
+}
+function renderInbox() {
+  const T = state.ibTab, un1 = (state.notices||[]).filter(n=>!n.read).length;
+  const un2 = (state.msgs||[]).filter(m=>m.to===uid() && !m.read).length;
+  $("ib-n1").textContent = un1 ? `· ${un1}` : ""; $("ib-n2").textContent = un2 ? `· ${un2}` : "";
+  $("inbox-tabs").querySelectorAll("[data-ib]").forEach(b=>b.classList.toggle("on", b.dataset.ib===T));
+  if (T === "notice") {
+    $("inbox-acts").innerHTML = un1 ? `<button class="btn-sm" id="ib-allread">모두 읽음</button>` : "";
+    $("inbox-list").innerHTML = (state.notices||[]).map(n => `
+      <div class="row" data-notice="${n.id}" style="cursor:pointer;align-items:flex-start">
+        ${n.read ? `<span style="width:8px"></span>` : `<span class="dot" style="margin-top:7px"></span>`}
+        <div class="grow"><p class="nm" style="white-space:normal">${esc(n.fromName||"")} 님이 <b>${esc(n.title||"")}</b>에 댓글을 남겼어요</p>
+          <p class="sub" style="white-space:normal;margin-top:4px">“${esc(n.snippet||"")}” · ${fmtAgo(n.atMs)}</p></div>
+      </div>`).join("") || `<p class="muted">아직 소식이 없어요. 내 셀모임이나 '코치 공유' 기록에 댓글이 달리면 여기 모여요.</p>`;
+  } else {
+    $("inbox-acts").innerHTML = `<button class="btn-sm" id="ib-newdm">＋ 새 쪽지</button>`;
+    const by = {};
+    (state.msgs||[]).forEach(m => { const o = m.from===uid() ? m.to : m.from;
+      (by[o] = by[o] || { o, last:null, un:0 }); by[o].last = m;
+      if (m.to===uid() && !m.read) by[o].un++; });
+    const convs = Object.values(by).sort((a,b)=>(b.last.atMs||0)-(a.last.atMs||0));
+    $("inbox-list").innerHTML = convs.map(c => `
+      <div class="row" data-dmwith="${c.o}" style="cursor:pointer">
+        <span class="ava">${esc(initial(memberName(c.o) || c.last.fromName))}</span>
+        <div class="grow"><p class="nm">${esc(memberName(c.o) || (c.last.from===c.o ? c.last.fromName : c.last.toName) || "")}</p>
+          <p class="sub">${c.last.from===uid()?"나: ":""}${esc(c.last.body.slice(0,40))} · ${fmtAgo(c.last.atMs)}</p></div>
+        ${c.un ? `<span class="chip rose">${c.un}</span>` : ""}
+      </div>`).join("") || `<p class="muted">주고받은 쪽지가 없어요. 같은 진의 셀리더 · 코치 · 진장에게 보낼 수 있어요.</p>`;
+  }
+  const ar = $("ib-allread"); if (ar) ar.onclick = async () => {
+    for (const n of state.notices.filter(n=>!n.read)) { try { await updateDoc(doc(db,"notices",n.id), { read:true }); n.read = true; } catch {} }
+    renderInbox();
+  };
+  const nd = $("ib-newdm"); if (nd) nd.onclick = () => openThread(null);
+}
+$("inbox-tabs").addEventListener("click",(ev)=>{
+  const b = ev.target.closest("[data-ib]"); if (!b) return; state.ibTab = b.dataset.ib; renderInbox();
+});
+$("inbox-list").addEventListener("click", async (ev) => {
+  const d = ev.target.closest("[data-dmwith]");
+  if (d) { openThread(d.dataset.dmwith); return; }
+  const r = ev.target.closest("[data-notice]"); if (!r) return;
+  const n = (state.notices||[]).find(x=>x.id===r.dataset.notice); if (!n) return;
+  if (!n.read) { try { await updateDoc(doc(db,"notices",n.id), { read:true }); n.read = true; } catch {} }
+  await goToNotice(n);
+});
+/* 알림을 누르면 — 그 모임 · 기록을 열고 댓글 창까지 */
+async function goToNotice(n) {
+  const t = n.target || {};
+  if (t.kind === "meeting") {
+    await loadMeetings(true);
+    const m = state.meetings.find(x=>x.id===t.id);
+    if (!m) { toast("지금은 볼 수 없는 모임이에요."); return; }
+    openMeeting(m.id); openComments(meetTarget(m));
+  } else if (t.kind === "record") {
+    await loadSouls();
+    const s = state.souls.find(x=>x.id===t.soulId);
+    if (!s) { toast("지금은 볼 수 없는 기록이에요."); return; }
+    await openSoul(s.id);
+    const rec = state.records.find(x=>x.id===t.recId);
+    if (!rec) { toast("지금은 볼 수 없는 기록이에요."); return; }
+    openComments(recTarget(s, rec));
+  }
+}
+$("inbox-back").onclick = () => openHome();
+$("btn-bell").onclick = () => openInbox();
+
+/* ════════ 알림 설정 · 안 읽은 수 ════════
+   새 소식은 앱이 열려 있는 동안 실시간으로 받습니다(읽지 않은 것만 지켜봄 — 읽기 횟수가 적어요). */
+const notifyPrefs = () => ({ comment:true, dm:true, device:false, ...((state.me && state.me.notifyPrefs) || {}) });
+function startLive() {
+  if (state.liveOn || !state.me) return;
+  state.liveOn = true;
+  const watch = (col, kind) => onSnapshot(
+    query(collection(db,col), where("to","==",uid()), where("read","==",false)),
+    (snap) => {
+      const rows = pack(snap), prev = state["live_"+kind];
+      state["live_"+kind] = rows;
+      if (prev) rows.filter(r => !prev.some(p=>p.id===r.id)).forEach(r => alertNew(kind, r));
+      renderBadges();
+    }, () => {});
+  try { watch("notices","notice"); watch("messages","dm"); } catch {}
+}
+function renderBadges() {
+  const n = (state.live_notice||[]).length + (state.live_dm||[]).length;
+  const b = $("bdg-home"); if (b) { b.hidden = !n; b.textContent = n > 99 ? "99+" : String(n); }
+  const side = $("side-nav").querySelector('[data-side="inbox"]');
+  if (side) {
+    let s = side.querySelector(".bdg");
+    if (!s) { s = document.createElement("span"); s.className = "bdg"; side.appendChild(s); }
+    s.hidden = !n; s.textContent = n > 99 ? "99+" : String(n);
+  }
+}
+function alertNew(kind, r) {
+  const P = notifyPrefs();
+  if ((kind === "notice" && !P.comment) || (kind === "dm" && !P.dm)) return;
+  const title = kind === "dm" ? `${r.fromName||""} 님의 쪽지` : `${r.fromName||""} 님이 댓글을 남겼어요`;
+  const body = kind === "dm" ? (r.body||"").slice(0,80) : `${r.title||""} — ${r.snippet||""}`;
+  toast(`${title} · ${body.slice(0,40)}`);
+  if (P.device && document.hidden && "Notification" in window && Notification.permission === "granted") {
+    (navigator.serviceWorker ? navigator.serviceWorker.getRegistration() : Promise.resolve(null))
+      .then(reg => reg ? reg.showNotification(title, { body, tag:"mokja-"+r.id, icon:"./icons/icon-192.png" })
+                       : new Notification(title, { body }))
+      .catch(()=>{});
+  }
+}
+if (navigator.serviceWorker) navigator.serviceWorker.addEventListener("message", (ev) => {
+  if (ev.data && ev.data.type === "open-inbox" && state.me) openInbox();
+});
+if (location.hash === "#inbox") state.openInboxOnStart = true;
+const dlgNt = $("dlg-notify");
+$("btn-notify-set").onclick = () => {
+  const P = notifyPrefs();
+  $("nt-comment").checked = P.comment; $("nt-dm").checked = P.dm; $("nt-device").checked = P.device;
+  $("nt-err").textContent = "";
+  if (!("Notification" in window)) { $("nt-device").disabled = true;
+    $("nt-device-hint").textContent = "이 브라우저는 기기 알림을 지원하지 않아요. 아이폰은 홈 화면에 추가한 앱에서만 돼요."; }
+  dlgNt.showModal();
+};
+$("nt-cancel").onclick = () => dlgNt.close();
+$("nt-save").onclick = async () => {
+  const p = { comment:$("nt-comment").checked, dm:$("nt-dm").checked, device:$("nt-device").checked };
+  if (p.device && "Notification" in window && Notification.permission !== "granted") {
+    try { const r = await Notification.requestPermission();
+      if (r !== "granted") { p.device = false; $("nt-err").textContent = "기기 알림이 허용되지 않았어요. 브라우저 설정에서 허용한 뒤 다시 켜주세요."; } }
+    catch { p.device = false; }
+  }
+  try { await updateDoc(doc(db,"users",state.me.id), { notifyPrefs: p }); state.me.notifyPrefs = p;
+        if (!$("nt-err").textContent) { dlgNt.close(); toast("알림 설정을 저장했어요."); } }
+  catch (e) { $("nt-err").textContent = msgOf(e); }
+};

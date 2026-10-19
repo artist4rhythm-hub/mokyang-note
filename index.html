@@ -296,6 +296,34 @@
   .picks button:disabled{opacity:.35;cursor:not-allowed}
   .picks button.me{border-color:#3A3330}
 
+  /* 새 버전 알림 막대 */
+  #upd-bar{position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:60;display:flex;
+    align-items:center;gap:8px;padding:10px 12px 10px 16px;border-radius:14px;background:#2A1E20;
+    border:1px solid #4A2A30;color:var(--text);font-size:13px;box-shadow:0 6px 24px rgba(0,0,0,.45);
+    width:min(440px, calc(100vw - 32px))}
+  #upd-bar[hidden]{display:none}
+  #upd-bar span{flex:1;min-width:0;line-height:1.4}
+  #upd-bar button{border:none;border-radius:10px;padding:8px 12px;font-size:13px;cursor:pointer;
+    white-space:nowrap;flex-shrink:0}
+  #upd-later{padding:8px 6px !important}
+  #upd-go{background:var(--brand);color:#fff;font-weight:600}
+  #upd-later{background:transparent;color:var(--dim)}
+  /* 안 읽은 수 */
+  .bdg{position:absolute;top:4px;right:2px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;
+    background:var(--brand);color:#fff;font-size:11px;font-weight:600;line-height:18px;text-align:center}
+  .bdg[hidden]{display:none}
+  #side-nav .bdg{position:static;margin-left:auto}
+  /* 댓글 · 쪽지 */
+  .cmt{padding:10px 0;border-bottom:1px solid var(--line)}
+  .cmt:last-child{border-bottom:none}
+  .cmt .h{font-size:12px;color:var(--dim);display:flex;justify-content:space-between;gap:8px}
+  .cmt .b{font-size:14px;margin-top:4px;white-space:pre-wrap;word-break:break-word}
+  .bub{max-width:82%;padding:9px 12px;border-radius:14px;font-size:14px;white-space:pre-wrap;word-break:break-word}
+  .bub.them{align-self:flex-start;background:var(--surface2)}
+  .bub.me{align-self:flex-end;background:var(--rose-bg);color:var(--rose-tx)}
+  .bub .t{display:block;font-size:10px;color:var(--dim);margin-top:4px}
+  .dot{width:8px;height:8px;border-radius:999px;background:var(--brand);flex-shrink:0}
+
   /* 사진 모아보기 */
   .gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:6px;margin-top:8px}
   .gal button{aspect-ratio:1;border:none;padding:0;border-radius:10px;cursor:pointer;
@@ -424,6 +452,13 @@
 
 <div id="app">
 
+  <!-- 새 버전 알림 -->
+  <div id="upd-bar" hidden role="status">
+    <span>새 버전 <b id="upd-ver"></b>이 올라왔어요</span>
+    <button type="button" id="upd-go">지금 새로고침</button>
+    <button type="button" id="upd-later" aria-label="나중에">나중에</button>
+  </div>
+
   <section class="screen" id="s-loading">
     <div class="center" style="align-items:center"><p class="muted">불러오는 중…</p></div>
   </section>
@@ -516,9 +551,14 @@
         <p class="muted" id="home-date" style="font-size:12px"></p>
         <h1 style="font-size:21px;font-weight:600;margin-top:4px" id="home-title">—</h1>
       </div>
+      <div style="display:flex;align-items:center;gap:2px">
+      <button class="icon-btn" id="btn-bell" aria-label="소식 — 쪽지 · 댓글" style="position:relative">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16.5V11a6 6 0 1 1 12 0v5.5l1.5 2H4.5z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/></svg><span class="bdg" id="bdg-home" hidden></span>
+      </button>
       <button class="icon-btn" id="btn-quick-add" aria-label="빠른 기록">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
       </button>
+      </div>
     </div>
     <div class="scroll pad">
       <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">
@@ -533,6 +573,11 @@
         <div><div id="home-todo"></div><div id="home-anniv"></div></div>
       </div>
       <button class="btn-ghost" id="btn-manage" style="margin-top:16px;max-width:320px" hidden>리더 관리</button>
+      <button type="button" class="row" id="btn-ver" style="margin-top:16px;width:100%;text-align:left;cursor:pointer;max-width:520px">
+        <span class="grow"><span class="nm" style="display:block" id="ver-now">버전</span>
+          <span class="sub" style="display:block" id="ver-state">바뀐 것 보기</span></span>
+        <span class="muted" style="font-size:12px">기록 ›</span>
+      </button>
     </div>
     <nav class="tabbar" data-nav="home"></nav>
   </section>
@@ -654,6 +699,7 @@
         <input id="m-visitor" placeholder="이름을 적어주세요 (여러 명이면 쉼표로)"></div>
       <div class="field"><label for="m-note">모임 메모</label>
         <textarea id="m-note" placeholder="모임 전체에 대한 메모"></textarea></div>
+      <button type="button" class="btn-ghost" id="btn-m-cmt" style="margin-top:10px;height:44px;font-size:13px;max-width:320px" hidden>댓글</button>
       <p class="err" id="meeting-err"></p>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn-sm" id="btn-report">셀 보고서 문구 만들기</button>
@@ -917,6 +963,23 @@
       <button class="btn-ghost" id="btn-del-soul" style="margin-top:10px;height:44px;font-size:13px;max-width:320px" hidden>이 영혼 카드 보관하기</button>
     </div>
     <div class="savebar"><button class="btn" id="btn-save-soul">저장</button></div>
+  </section>
+
+  <!-- 소식함 — 쪽지 · 댓글 알림 -->
+  <section class="screen" id="s-inbox" hidden>
+    <div class="topbar">
+      <button class="icon-btn" id="inbox-back" aria-label="뒤로"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5m6-6-6 6 6 6"/></svg></button>
+      <h2 style="font-size:17px;font-weight:600">소식</h2>
+      <button class="btn-sm" id="btn-notify-set">알림 설정</button>
+    </div>
+    <div class="scroll pad">
+      <div class="seg" style="margin:0" id="inbox-tabs">
+        <button type="button" data-ib="notice">댓글 알림 <span id="ib-n1"></span></button>
+        <button type="button" data-ib="dm">쪽지 <span id="ib-n2"></span></button>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:12px" id="inbox-acts"></div>
+      <div class="list" id="inbox-list" style="margin-top:12px"></div>
+    </div>
   </section>
 
   <!-- 사진 모아보기 -->
@@ -1362,6 +1425,53 @@
 </dialog>
 
 <!-- 내 기록 쓰기 -->
+<dialog id="dlg-ver">
+  <h3>버전 기록</h3>
+  <p class="muted" id="ver-sub" style="margin-bottom:12px"></p>
+  <div id="ver-list" style="max-height:60vh;overflow:auto"></div>
+  <div class="dlg-btns"><button class="btn" id="ver-close">닫기</button></div>
+</dialog>
+
+<dialog id="dlg-cmt">
+  <h3 id="cmt-title">댓글</h3>
+  <p class="muted" id="cmt-who" style="margin-bottom:12px;font-size:12px"></p>
+  <div id="cmt-list" style="max-height:46vh;overflow:auto"></div>
+  <div class="field" style="margin-top:12px"><textarea id="cmt-body" placeholder="댓글을 남겨요" style="min-height:70px"></textarea></div>
+  <p class="err" id="cmt-err"></p>
+  <div class="dlg-btns">
+    <button class="btn-ghost" id="cmt-close">닫기</button>
+    <button class="btn" id="cmt-send">남기기</button>
+  </div>
+</dialog>
+
+<dialog id="dlg-thread">
+  <h3 id="th-title">쪽지</h3>
+  <div class="field" id="th-pick-wrap" hidden><label for="th-pick">누구에게</label><select id="th-pick"></select></div>
+  <div id="th-list" style="max-height:50vh;overflow:auto;display:flex;flex-direction:column;gap:8px"></div>
+  <div class="field" style="margin-top:12px"><textarea id="th-body" placeholder="쪽지를 적어요" style="min-height:70px"></textarea></div>
+  <p class="hint" style="margin:-6px 0 8px">쪽지는 보낸 사람과 받는 사람 둘만 봅니다. 영혼 이름 · 사정을 적을 땐 꼭 필요한 만큼만요.</p>
+  <p class="err" id="th-err"></p>
+  <div class="dlg-btns">
+    <button class="btn-ghost" id="th-close">닫기</button>
+    <button class="btn" id="th-send">보내기</button>
+  </div>
+</dialog>
+
+<dialog id="dlg-notify">
+  <h3>알림 설정</h3>
+  <p class="muted" style="margin-bottom:12px">끄면 알림이 뜨지 않고 소식함에만 쌓여요. 안 읽은 수는 그대로 보여요.</p>
+  <label class="check" style="margin-bottom:12px"><input type="checkbox" id="nt-comment"> 내 모임 · 기록에 댓글이 달리면 알림</label>
+  <label class="check" style="margin-bottom:12px"><input type="checkbox" id="nt-dm"> 쪽지가 오면 알림</label>
+  <label class="check" style="margin-bottom:6px"><input type="checkbox" id="nt-device"> 이 기기 알림으로도 띄우기</label>
+  <p class="hint" id="nt-device-hint" style="margin-bottom:12px">앱(이 창)이 열려 있거나 뒤에 켜져 있을 때 폰 · 컴퓨터 알림으로 보여줘요.
+    앱을 완전히 닫았을 때 오는 알림은 유료 요금제(Blaze)로 바꾼 뒤에 붙일 수 있어요.</p>
+  <p class="err" id="nt-err"></p>
+  <div class="dlg-btns">
+    <button class="btn-ghost" id="nt-cancel">취소</button>
+    <button class="btn" id="nt-save">저장</button>
+  </div>
+</dialog>
+
 <dialog id="dlg-self">
   <h3>내 프로필</h3>
   <p class="muted" style="margin-bottom:12px">셀리더인 나에 대한 기본 정보예요. 출석 명단 · 영혼들 맨 위 '나' 줄에 쓰입니다.</p>
