@@ -22,7 +22,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
 const APP_NAME = "목자의 삶";
-const APP_VERSION = "12.0 (2026-10-18)";
+const APP_VERSION = "13.0 (2026-10-19)";
 
 /* 사진 크기 — 얼굴을 알아볼 수 있는 선에서 가장 작게.
    얼굴 하나가 가로 80px은 되어야 알아보는데, 여럿이 한 줄로 선
@@ -58,7 +58,8 @@ if ("serviceWorker" in navigator) {
 const $ = (id) => document.getElementById(id);
 const SCREENS = ["s-loading","s-login","s-verify","s-setup","s-accept","s-pending",
                  "s-home","s-souls","s-cal","s-meet","s-meeting","s-log","s-soul",
-                 "s-edit","s-train","s-search","s-mine","s-usage","s-more","s-manage"];
+                 "s-edit","s-train","s-search","s-mine","s-usage","s-more","s-manage",
+                 "s-photos","s-stats"];
 const show = (id) => {
   SCREENS.forEach(s => $(s).hidden = (s !== id));
   if (id !== "s-loading" && typeof bump === "function") bump(id.replace(/^s-/, ""), "screen");
@@ -93,10 +94,21 @@ const BASE_KINDS = [
   /* 훈련 모임 — 새로운 삶 · 제자의 삶처럼 후원자와 피후원자가 회차로 만나는 것 */
   { id:"train", name:"훈련 모임",    solo:false, order:4 }
 ];
-/* 교회 공통 종류 + 내가 직접 만든 종류 (남이 만든 개인 종류는 안 보임) */
-const kindList = () => [...BASE_KINDS,
-    ...state.meetTypes.filter(t => !t.ownerUid || t.ownerUid === uid())]
-  .sort((a,b)=>(a.order||99)-(b.order||99));
+/* 교회 공통 종류 + 내가 직접 만든 종류 (남이 만든 개인 종류는 안 보임).
+   순서와 숨기기는 사람마다 따로 — 내 계정(users)에 kindPrefs 로 둡니다. */
+const kindPrefs = () => (state.me && state.me.kindPrefs) || { hidden:[], order:[] };
+const kindList = () => {
+  const ord = kindPrefs().order || [];
+  const at = (id) => { const i = ord.indexOf(id); return i < 0 ? 999 : i; };
+  return [...BASE_KINDS, ...state.meetTypes.filter(t => !t.ownerUid || t.ownerUid === uid())]
+    .sort((a,b)=> (at(a.id) - at(b.id)) || ((a.order||99) - (b.order||99)));
+};
+/* 고를 때 보이는 것 — 숨긴 건 빼되, 지금 고쳐 쓰는 기록의 종류는 남겨둡니다 */
+const kindsShown = (keep) => {
+  const hid = kindPrefs().hidden || [];
+  const list = kindList().filter(k => !hid.includes(k.id) || k.id === keep);
+  return list.length ? list : [BASE_KINDS[0]];
+};
 const kindOf = (id) => kindList().find(k => k.id === id) || BASE_KINDS[0];
 const kindName = (id) => (kindList().find(k => k.id === id) || {}).name || "만남";
 /* 기록에 붙는 이름 — 훈련 모임이면 '새로운 삶 3회차' 처럼 */
@@ -328,13 +340,20 @@ const ICON = {
   meet:`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="16" rx="2.5"/><path d="m8 12.5 2.6 2.6L16.5 9.5"/></svg>`,
   more:`<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>`
 };
+ICON.train = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V9m5 10V5m5 14v-7m5 7V8"/></svg>`;
+ICON.stats = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 6.5h9M4 12h14M4 17.5h6"/></svg>`;
+ICON.photos = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5.5" width="17" height="14" rx="2.5"/><circle cx="9" cy="11" r="1.8"/><path d="m20.5 16-4.5-4.5-7.5 8"/></svg>`;
+/* 폰 아래 탭은 다섯 칸이 한계라 그대로 두고, 넓은 화면 왼쪽 목록에만 더 둡니다.
+   폰에서는 같은 것들이 '더보기' 안에 있어요. */
 const NAV = [["home","홈"],["souls","영혼들"],["cal","캘린더"],["meet","셀모임"],["more","더보기"]];
+const SIDE = [["home","홈"],["souls","영혼들"],["cal","캘린더"],["meet","셀모임"],
+  ["train","훈련 현황"],["stats","활동 통계"],["photos","사진 모아보기"],["more","더보기"]];
 function renderNav() {
   document.querySelectorAll("[data-nav]").forEach(nav => {
     nav.innerHTML = NAV.map(([k,label]) =>
       `<button data-tab="${k}" class="${nav.dataset.nav === k ? "on" : ""}">${ICON[k]}${label}</button>`).join("");
   });
-  $("side-nav").innerHTML = NAV.map(([k,label]) =>
+  $("side-nav").innerHTML = SIDE.map(([k,label]) =>
     `<button data-tab="${k}" data-side="${k}">${ICON[k]}${label}</button>`).join("");
 }
 renderNav();
@@ -351,6 +370,9 @@ document.addEventListener("click", (ev) => {
   else if (t === "cal") openCal();
   else if (t === "meet") openMeet();
   else if (t === "more") openMore();
+  else if (t === "train") openTrainBoard();
+  else if (t === "stats") openStats();
+  else if (t === "photos") openPhotos();
 });
 
 /* ════════ 로그인 ════════ */
@@ -502,7 +524,9 @@ async function loadSouls(force) {
   try {
     if (canLead()) push(pack(await getDocs(query(col, where("leaderUid","==",me.id)))));
     if (me.role === "coach") {
-      const res = await Promise.all((me.cellIds||[]).map(cid => getDocs(query(col, where("cellId","==",cid)))));
+      /* 규칙이 '같은 진'까지 확인하므로 질의에도 진을 함께 겁니다 */
+      const res = await Promise.all((me.cellIds||[]).map(cid =>
+        getDocs(query(col, where("cellId","==",cid), where("jinId","==",me.jinId)))));
       res.forEach(r => push(pack(r)));
     }
     if (me.role === "jinjang") push(pack(await getDocs(query(col, where("jinId","==",me.jinId)))));
@@ -518,7 +542,9 @@ async function loadMeetings(force) {
   try {
     if (canLead()) push(pack(await getDocs(query(col, where("leaderUid","==",me.id)))));
     if (me.role === "coach") {
-      const res = await Promise.all((me.cellIds||[]).map(cid => getDocs(query(col, where("cellId","==",cid)))));
+      /* 규칙이 '같은 진'까지 확인하므로 질의에도 진을 함께 겁니다 */
+      const res = await Promise.all((me.cellIds||[]).map(cid =>
+        getDocs(query(col, where("cellId","==",cid), where("jinId","==",me.jinId)))));
       res.forEach(r => push(pack(r)));
     }
     if (me.role === "jinjang") push(pack(await getDocs(query(col, where("jinId","==",me.jinId)))));
@@ -1365,7 +1391,16 @@ $("soul-body").addEventListener("click", async (ev) => {
   if (del) {
     if (!confirm("이 기록을 지울까요? 되돌릴 수 없어요.")) return;
     try {
+      const gone = state.records.find(x=>x.id===del.dataset.delrec);
       await deleteDoc(doc(db,"souls",s.id,"records",del.dataset.delrec));
+      /* 사진은 다른 사람 카드의 같은 모임 기록이 아직 쓰고 있으면 남겨둡니다 */
+      if (gone && (gone.photos||[]).some(p=>p.id)) {
+        const all = await loadAllRecords(true);
+        for (const p of gone.photos) {
+          if (!p.id || all.some(r=>(r.photos||[]).some(q=>q.id===p.id))) continue;
+          try { await deleteDoc(doc(db,"recordPhotos",p.id)); } catch {}
+        }
+      }
       await loadRecords(s.id,true); await syncPraySummary(); invalidate();
       renderSoulBody(); updateSummary(); toast("지웠어요.");
     } catch (e) { toast(msgOf(e)); }
@@ -1432,7 +1467,10 @@ function openLog(soulId, recId, opts) {
   const o = opts || {};
   const mine = state.souls.filter(isLeaderOf);
   if (!mine.length) { toast("먼저 영혼 카드를 하나 만들어 주세요."); return; }
-  const rec = recId ? state.records.find(r=>r.id===recId) : null;
+  /* 영혼 카드에서 왔으면 그 카드의 기록에서, 캘린더에서 왔으면 모아둔 기록에서 찾습니다 */
+  const rec = !recId ? null : (state.records.find(r=>r.id===recId)
+    || (state.allRecords||[]).find(r=>r.id===recId && r.soulId===soulId) || null);
+  if (recId && !rec) { toast("그 기록을 찾지 못했어요. 영혼 카드에서 열어주세요."); return; }
   const first = soulId || (state.soul&&isLeaderOf(state.soul)?state.soul.id:mine[0].id);
   /* 앞날을 고르고 들어오면 처음부터 '예정'으로 */
   const future = !!(o.date && o.date > todayStr());
@@ -1508,9 +1546,10 @@ function openLog(soulId, recId, opts) {
   /* 훈련 회차를 맞춰 주려면 각 사람의 훈련 이력이 필요합니다 (캐시돼 있으면 바로) */
   loadAllTrainings().then(()=>{ if (state.log===L && L.kind==="train") syncTrain(true); });
 }
-const kindChips = () => kindList().map(k=>
+const kindChips = () => kindsShown(state.log && state.log.kind).map(k=>
     `<button type="button" data-k="${k.id}">${esc(k.name)}</button>`).join("")
-  + `<button type="button" class="add" data-addk="1">＋ 새 종류</button>`;
+  + `<button type="button" class="add" data-addk="1">＋ 새 종류</button>`
+  + `<button type="button" class="add" data-kset="1" aria-label="모임 종류 설정">⚙ 설정</button>`;
 $("btn-log-new").onclick = () => openLog(state.soul.id, null);
 $("log-back").onclick = () => {
   if (state.log && state.log.back === "cal") { openCal(); return; }
@@ -1553,6 +1592,10 @@ function syncLogMode() {
   if (L.kind === "train") syncTrain();
 }
 $("log-kind").addEventListener("click",(ev)=>{
+  if (ev.target.closest("[data-kset]")) {
+    openKindsDlg(() => { $("log-kind").innerHTML = kindChips(); syncLogKind(); });
+    return;
+  }
   if (ev.target.closest("[data-addk]")) {
     openMtypeDlg(null, (newId) => {
       $("log-kind").innerHTML = kindChips();
@@ -1823,7 +1866,7 @@ async function saveLog() {
         const sibs = all.filter(r => r.groupId === L.groupId && r.by === uid() && r.type === "meet"
           && !(r.soulId === soulId && r.id === L.recId));
         for (const r of sibs) {
-          await updateDoc(doc(db,"souls",r.soulId,"records",r.id), base);
+          await updateDoc(doc(db,"souls",r.soulId,"records",r.id), { ...base, photos });
           touched.push(r.soulId);
         }
       }
@@ -1909,6 +1952,9 @@ async function putShots(soulId, recId, scope) {
       soulId, recordId: recId, scope, data: p.full,
       by: uid(), createdAt: serverTimestamp()
     });
+    /* 여러 명이 함께한 모임이면 같은 사진을 사람마다 또 올리지 않고 한 장을 같이 씁니다.
+       (예전에는 셋이 만나 세 장을 올리면 아홉 장이 저장됐어요) */
+    p.id = ref.id;
     out.push({ id: ref.id, thumb: p.thumb });
   }
   return out;
@@ -2254,7 +2300,7 @@ async function moveCourse(courseId, dir) {
 
 /* ════════ 훈련 현황 ════════ */
 async function openTrainBoard() {
-  show("s-loading");
+  show("s-loading"); markSide("train");
   await loadOrg(); await loadSouls();
   const all = await loadAllTrainings();
   const latest = {};
@@ -2390,7 +2436,8 @@ function calEvents() {
   });
   /* 여러 명이 함께한 모임은 사람마다 한 줄씩이 아니라 한 줄로 묶습니다 */
   const groups = {}, trainKeys = new Set();
-  (state.allRecords||[]).filter(r=>r.type==="meet").forEach(r=>{
+  /* 셀모임 때 적은 근황은 그 셀모임 줄이 이미 있으니 따로 띄우지 않습니다 */
+  (state.allRecords||[]).filter(r=>r.type==="meet" && !r.meetingId).forEach(r=>{
     if (r.kind === "train" && r.courseId)
       trainKeys.add(`${r.soulId}|${r.courseId}|${r.sessionNo}`);
     if (r.groupId && groups[r.groupId]) { groups[r.groupId].names.push(r.soulName); return; }
@@ -2462,6 +2509,9 @@ function renderCalDay() {
         <p class="sub">${[fmtSpan(e.time,e.timeEnd),e.place,e.sub]
           .filter(Boolean).map(esc).join(" · ")||"&nbsp;"}</p></div>
       <button class="btn-sm" data-gcal="${i}">캘린더에</button>
+      ${e.r && e.r.by===uid() && e.r.planned
+        ?`<button class="btn-sm" data-calrec="${e.r.soulId}|${e.r.id}|fill">만났어요</button>`:""}
+      ${e.r && e.r.by===uid()?`<button class="btn-sm" data-calrec="${e.r.soulId}|${e.r.id}">수정</button>`:""}
       ${e.soulId?`<button class="btn-sm" data-gosoul4="${e.soulId}">카드</button>`:""}
       ${e.id?`<button class="btn-sm" data-gomeet="${e.id}">열기</button>`:""}
     </div>`).join("")
@@ -2488,6 +2538,9 @@ $("cal-day-list").addEventListener("click",(ev)=>{
     const e = list[Number(g.dataset.gcal)]; if(e) window.open(gcalUrl(e),"_blank");
     return;
   }
+  const er=ev.target.closest("[data-calrec]");
+  if (er) { const [sid, rid, how] = er.dataset.calrec.split("|");
+    openLog(sid, rid, { back:"cal", fill: how === "fill" }); return; }
   const s=ev.target.closest("[data-gosoul4]"); if(s){ openSoul(s.dataset.gosoul4); return; }
   const m=ev.target.closest("[data-gomeet]"); if(m){ openMeeting(m.dataset.gomeet); return; }
 });
@@ -2536,12 +2589,22 @@ $("btn-cal-add").onclick = () => {
   state.cnPlan = ds > todayStr();
   $("cn-soul").innerHTML = mine.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join("")
     || `<option value="">아직 영혼이 없어요</option>`;
-  /* 직접 만든 종류까지 모두 — '셀모임 후' 는 셀모임(출석)과 겹치지 않게 값만 따로 */
-  $("cn-kind").innerHTML = `<option value="cell">셀모임 (출석 포함)</option>`
-    + kindList().map(k=>`<option value="${k.id==="cell"?"after":k.id}">${esc(k.name)}</option>`).join("");
-  $("cn-kind").value = "one";
+  fillCnKinds("one");
   syncCalNew(); $("calnew-err").textContent = "";
   dlgCalNew.showModal();
+};
+/* 직접 만든 종류까지 — 숨긴 건 빼고 내가 정한 순서대로.
+   '셀모임 후' 는 셀모임(출석)과 겹치지 않게 값만 따로 둡니다. */
+function fillCnKinds(want) {
+  const shown = kindsShown();
+  $("cn-kind").innerHTML = `<option value="cell">셀모임 (출석 포함)</option>`
+    + shown.map(k=>`<option value="${k.id==="cell"?"after":k.id}">${esc(k.name)}</option>`).join("");
+  const vals = [...$("cn-kind").options].map(o=>o.value);
+  $("cn-kind").value = vals.includes(want) ? want : (vals[1] || "cell");
+}
+$("cn-kinds").onclick = () => {
+  const cur = $("cn-kind").value;
+  openKindsDlg(() => { fillCnKinds(cur); syncCalNew(); });
 };
 function syncCalNew() {
   const k = $("cn-kind").value, ds = state.calPick || todayStr(), P = state.cnPlan;
@@ -3955,3 +4018,303 @@ $("ps-copy").onclick = async () => {
   try { await navigator.clipboard.writeText(state.praySheetText || ""); toast("복사했어요."); }
   catch { toast("복사가 안 되면 화면을 길게 눌러 복사해 주세요."); }
 };
+
+/* ════════ 모임 종류 설정 ════════
+   기록할 때 뜨는 종류를 사람마다 고릅니다 — 순서와 숨기기.
+   교회 공통 종류의 이름은 수퍼·진장이, 내가 만든 종류는 내가 고칩니다. */
+const dlgKinds = $("dlg-kinds");
+let kindsAfter = null;
+function openKindsDlg(after) {
+  kindsAfter = after || null; $("kinds-err").textContent = "";
+  renderKinds(); dlgKinds.showModal();
+}
+function renderKinds() {
+  const list = kindList(), hid = kindPrefs().hidden || [];
+  $("kinds-list").innerHTML = list.map((k,i)=>{
+    const base = BASE_KINDS.some(b=>b.id===k.id);
+    const t = state.meetTypes.find(x=>x.id===k.id);
+    const canEdit = !!t && ((t.ownerUid && t.ownerUid===uid()) || (!t.ownerUid && sharesTypes()));
+    const off = hid.includes(k.id);
+    return `<div class="row">
+      <div class="grow${off?" off":""}"><p class="nm">${esc(k.name)}</p>
+        <p class="sub">${base?"기본":t&&t.ownerUid?"나만 쓰는 종류":"교회 공통"}${off?" · 숨김":""}</p></div>
+      <div style="display:flex;gap:4px;flex-shrink:0">
+        <button class="btn-sm" data-kmv="${k.id}|-1" aria-label="${esc(k.name)} 위로" style="width:36px;padding:0"${i===0?" disabled":""}>↑</button>
+        <button class="btn-sm" data-kmv="${k.id}|1" aria-label="${esc(k.name)} 아래로" style="width:36px;padding:0"${i===list.length-1?" disabled":""}>↓</button>
+        ${canEdit?`<button class="btn-sm" data-kren="${k.id}">이름</button>`:""}
+        <button class="btn-sm" data-khide="${k.id}">${off?"보이기":"숨기기"}</button>
+      </div></div>`;
+  }).join("");
+}
+async function saveKindPrefs(p) {
+  state.me.kindPrefs = p;
+  try { await updateDoc(doc(db,"users",state.me.id), { kindPrefs: p }); }
+  catch (e) { $("kinds-err").textContent = msgOf(e); }
+}
+$("kinds-list").addEventListener("click", async (ev) => {
+  const mv = ev.target.closest("[data-kmv]");
+  if (mv) {
+    const [id, d] = mv.dataset.kmv.split("|"), order = kindList().map(k=>k.id);
+    const i = order.indexOf(id), j = i + Number(d);
+    if (j < 0 || j >= order.length) return;
+    [order[i], order[j]] = [order[j], order[i]];
+    renderKinds();  // 바로 바뀐 것처럼 보이게 먼저 그리고
+    await saveKindPrefs({ ...kindPrefs(), order }); renderKinds();
+    return;
+  }
+  const hd = ev.target.closest("[data-khide]");
+  if (hd) {
+    const id = hd.dataset.khide, hid = (kindPrefs().hidden||[]).slice();
+    const next = hid.includes(id) ? hid.filter(x=>x!==id) : [...hid, id];
+    if (kindList().every(k => next.includes(k.id))) {
+      $("kinds-err").textContent = "하나는 남겨둬야 해요."; return; }
+    $("kinds-err").textContent = "";
+    await saveKindPrefs({ ...kindPrefs(), hidden: next }); renderKinds();
+    return;
+  }
+  const rn = ev.target.closest("[data-kren]");
+  if (rn) openMtypeDlg(rn.dataset.kren, () => renderKinds());
+});
+$("kinds-add").onclick = () => openMtypeDlg(null, () => renderKinds());
+$("kinds-close").onclick = () => {
+  dlgKinds.close();
+  if (kindsAfter) { const f = kindsAfter; kindsAfter = null; f(); }
+};
+$("btn-go-kinds").onclick = () => openKindsDlg(null);
+
+/* ════════ 사진 모아보기 ════════
+   목록에 보이는 작은 사본은 영혼 카드 · 셀모임 · 기록 안에 이미 들어 있어서
+   이 화면을 여는 데 따로 읽기가 들지 않습니다. 눌렀을 때만 큰 사진을 읽어요. */
+const cellOfSoul = (s) => isLeaderCard(s) ? s.ofCellId : s.cellId;
+const MB_SHOT = 0.25, MB_FACE = 0.04, FREE_MB = 1024;
+async function openPhotos() {
+  show("s-loading"); markSide("photos");
+  await loadOrg(); await loadSouls(); await loadMeetings(); await loadAllRecords();
+  state.phCell = state.phCell || "all"; state.phTab = state.phTab || "all";
+  renderPhotos(); show("s-photos");
+}
+function photoSets(cellId) {
+  const inCell = (cid) => cellId === "all" || cid === cellId;
+  const faces = state.souls.filter(s => s.thumb && inCell(cellOfSoul(s)));
+  const cellShots = state.meetings.filter(m => inCell(m.cellId) && (m.photos||[]).length)
+    .sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  /* 여러 명이 함께한 모임은 한 번만 — 같은 사진을 사람 수만큼 보여주지 않게 */
+  const seenG = {}, seenP = new Set(), meets = [];
+  (state.allRecords||[]).filter(r => r.type==="meet" && (r.photos||[]).length).forEach(r=>{
+    const so = state.souls.find(x=>x.id===r.soulId);
+    if (!so || !inCell(cellOfSoul(so))) return;
+    if (r.groupId && seenG[r.groupId]) { seenG[r.groupId].names.push(r.soulName); return; }
+    const photos = r.photos.filter(p => !p.id || !seenP.has(p.id));
+    photos.forEach(p => p.id && seenP.add(p.id));
+    if (!photos.length) return;
+    const g = { r, names:[r.soulName], photos };
+    if (r.groupId) seenG[r.groupId] = g;
+    meets.push(g);
+  });
+  meets.sort((a,b)=>String(b.r.date).localeCompare(String(a.r.date)));
+  const nCell = cellShots.reduce((n,m)=>n+m.photos.length,0);
+  const nMeet = meets.reduce((n,g)=>n+g.photos.length,0);
+  return { faces, cellShots, meets, nCell, nMeet };
+}
+function renderPhotos() {
+  const ids = [...new Set([...state.souls.map(cellOfSoul), ...state.meetings.map(m=>m.cellId)]
+    .filter(Boolean))];
+  const cells = ids.map(id=>state.cells.find(c=>c.id===id)).filter(Boolean);
+  if (state.phCell !== "all" && !ids.includes(state.phCell)) state.phCell = "all";
+  $("ph-cells").innerHTML = `<button type="button" data-phc="all">전체</button>`
+    + cells.map(c=>`<button type="button" data-phc="${c.id}">${esc(c.name)}</button>`).join("");
+  /* .seg 는 display:flex 라 hidden 이 안 먹어요 — 직접 숨깁니다 */
+  $("ph-cells").style.display = cells.length < 2 ? "none" : "";
+  $("ph-cells").querySelectorAll("[data-phc]").forEach(b=>b.classList.toggle("on", b.dataset.phc===state.phCell));
+  $("ph-tabs").querySelectorAll("[data-pht]").forEach(b=>b.classList.toggle("on", b.dataset.pht===state.phTab));
+
+  const S = photoSets(state.phCell), all = photoSets("all");
+  const usedMB = all.faces.length*MB_FACE + (all.nCell + all.nMeet)*MB_SHOT;
+  const pct = Math.min(100, usedMB / FREE_MB * 100);
+  $("ph-sum").innerHTML = `
+    <div class="tiles" style="margin-top:14px">
+      ${tile("얼굴", S.faces.length+"장")}${tile("셀모임", S.nCell+"장")}${tile("만남 · 모임", S.nMeet+"장")}
+    </div>
+    <p class="muted" style="font-size:12px;margin-top:10px">사진 저장 공간 (추정) 약 ${usedMB<10?usedMB.toFixed(1):Math.round(usedMB)}MB
+      · 무료 한도 1,024MB의 ${pct<1?pct.toFixed(1):Math.round(pct)}% — 모임 사진은 대략 4,000장까지 들어가요.
+      내가 볼 수 있는 사진 기준이에요.</p>`;
+
+  const T = state.phTab, parts = [];
+  if ((T==="all"||T==="face") && S.faces.length) parts.push(`
+    <div class="gset"><p class="gh"><span>얼굴 사진</span><span>${S.faces.length}명</span></p>
+      <div class="faces">${S.faces.map(s=>`<button type="button" data-face="${s.id}"
+        aria-label="${esc(s.name)} 얼굴 크게 보기">${avatar(s,60)}<span>${esc(s.name)}</span></button>`).join("")}</div></div>`);
+  if ((T==="all"||T==="cell")) S.cellShots.forEach(m=>{
+    const c = state.cells.find(x=>x.id===m.cellId);
+    parts.push(`<div class="gset"><p class="gh"><span>${fmtDate(m.date,true)} · ${esc(c?c.name:"")} 셀모임${
+      m.topic?" · "+esc(m.topic):""}</span><span>${m.photos.length}장</span></p>
+      <div class="gal">${m.photos.map((p,i)=>`<button type="button" data-mph="${m.id}|${i}"
+        style="background-image:url(${p.thumb})" aria-label="셀모임 사진 ${i+1} 크게 보기"></button>`).join("")}</div></div>`);
+  });
+  if ((T==="all"||T==="meet")) S.meets.forEach(g=>{
+    parts.push(`<div class="gset"><p class="gh"><span>${fmtDate(g.r.date,true)} · ${esc(meetLabel(g.r))} · ${
+      esc(g.names.join(", "))}</span><span>${g.photos.length}장</span></p>
+      <div class="gal">${g.photos.map((p,i)=>`<button type="button" data-rph="${g.r.soulId}|${g.r.id}|${i}"
+        style="background-image:url(${p.thumb})" aria-label="모임 사진 ${i+1} 크게 보기"></button>`).join("")}</div></div>`);
+  });
+  $("ph-body").innerHTML = parts.join("")
+    || `<p class="muted" style="margin-top:18px">아직 사진이 없어요. 영혼 카드 · 셀모임 · 만남 기록에서 사진을 넣으면 여기 모여요.</p>`;
+}
+$("ph-cells").addEventListener("click",(ev)=>{
+  const b = ev.target.closest("[data-phc]"); if (!b) return;
+  state.phCell = b.dataset.phc; renderPhotos();
+});
+$("ph-tabs").addEventListener("click",(ev)=>{
+  const b = ev.target.closest("[data-pht]"); if (!b) return;
+  state.phTab = b.dataset.pht; renderPhotos();
+});
+$("ph-body").addEventListener("click", async (ev)=>{
+  const f = ev.target.closest("[data-face]");
+  if (f) {
+    const s = state.souls.find(x=>x.id===f.dataset.face);
+    const big = await loadPhoto(f.dataset.face);
+    $("pv-img").src = big || (s&&s.thumb) || ""; $("photo-view").showModal(); return;
+  }
+  const m = ev.target.closest("[data-mph]");
+  if (m) { const [mid,i] = m.dataset.mph.split("|");
+    const mt = state.meetings.find(x=>x.id===mid);
+    if (mt && mt.photos[Number(i)]) showMeetPhoto(mt.photos[Number(i)]); return; }
+  const r = ev.target.closest("[data-rph]");
+  if (r) { const [sid,rid,i] = r.dataset.rph.split("|");
+    const rec = (state.allRecords||[]).find(x=>x.id===rid && x.soulId===sid);
+    if (rec && rec.photos[Number(i)]) showPhoto(rec.photos[Number(i)]); }
+});
+$("photos-back").onclick = () => openMore();
+$("btn-go-photos").onclick = () => openPhotos();
+
+/* ════════ 활동 통계 ════════
+   '느낌'이 아니라 숫자로 — 누구를 얼마나 만났는지, 모임이 몇 번 있었는지.
+   색 네 가지는 검증한 순서 그대로 고정합니다: 셀모임 · 훈련 · 1:1 · 그 밖의 모임. */
+const SCAT = [
+  ["cell",  "셀모임 출석", "var(--c-cell)"],
+  ["train", "훈련",        "var(--c-train)"],
+  ["one",   "1:1",         "var(--c-one)"],
+  ["etc",   "그 밖의 모임", "var(--c-etc)"]
+];
+const catOf = (r) => r.kind === "train" ? "train" : r.kind === "one" ? "one" : "etc";
+async function openStats() {
+  show("s-loading"); markSide("stats");
+  await loadOrg(); await loadSouls(); await loadMeetings(); await loadAllRecords();
+  state.st = state.st || { per:"3", cell:"all", withCell:true, away:false };
+  renderStats(); show("s-stats");
+}
+function statsFrom(per) {
+  if (per === "all") return "0000-00-00";
+  const d = new Date();
+  if (per === "y") return `${d.getFullYear()}-01-01`;
+  d.setMonth(d.getMonth() - Number(per)); return ymd(d);
+}
+function renderStats() {
+  const S = state.st, from = statsFrom(S.per), to = todayStr();
+  const inP = (d) => !!d && d >= from && d <= to;
+  $("st-period").querySelectorAll("[data-per]").forEach(b=>b.classList.toggle("on", b.dataset.per===S.per));
+  const ids = [...new Set(state.souls.map(cellOfSoul).filter(Boolean))];
+  const cells = ids.map(id=>state.cells.find(c=>c.id===id)).filter(Boolean);
+  if (S.cell !== "all" && !ids.includes(S.cell)) S.cell = "all";
+  $("st-cells").innerHTML = `<button type="button" data-stc="all">전체</button>`
+    + cells.map(c=>`<button type="button" data-stc="${c.id}">${esc(c.name)}</button>`).join("");
+  $("st-cells").style.display = cells.length < 2 ? "none" : "";
+  $("st-cells").querySelectorAll("[data-stc]").forEach(b=>b.classList.toggle("on", b.dataset.stc===S.cell));
+  $("st-opts").querySelector('[data-opt="cell"]').classList.toggle("on", S.withCell);
+  $("st-opts").querySelector('[data-opt="away"]').classList.toggle("on", S.away);
+
+  const inCell = (cid) => S.cell === "all" || cid === S.cell;
+  const souls = state.souls.filter(s => inCell(cellOfSoul(s)));
+  const soulIds = new Set(souls.map(s=>s.id));
+  const meets = state.meetings.filter(m => inCell(m.cellId) && inP(m.date));
+  /* 예정은 빼고, '나 없이'는 고른 경우만 */
+  /* 셀모임 때 적은 근황(meetingId)은 셀모임 출석으로 이미 세었으니 빼고 */
+  const recs = (state.allRecords||[]).filter(r => r.type==="meet" && !r.planned && !r.meetingId && inP(r.date)
+    && soulIds.has(r.soulId) && (S.away || !r.away));
+  const uniq = {}; recs.forEach(r => { const k = r.groupId || r.id; if (!uniq[k]) uniq[k] = r; });
+  const once = Object.values(uniq);
+
+  /* ── 모임 횟수 ── */
+  const nCell = meets.length, nOther = once.length;
+  let marked = 0, came = 0;
+  meets.forEach(m => Object.entries(m.attendance||{}).forEach(([sid,v]) => {
+    if (!soulIds.has(sid)) return; marked++; if (v !== "absent") came++; }));
+  const nOne = once.filter(r=>r.kind==="one").length;
+  $("st-tiles").innerHTML = `
+    <div class="tiles" style="margin-top:14px;grid-template-columns:repeat(2,minmax(0,1fr))">
+      ${tile("모든 모임 · 셀모임 포함", (nCell+nOther)+"회")}
+      ${tile("셀모임 빼고", nOther+"회")}
+      ${tile("셀모임 · 평균 출석", `${nCell}회 · ${marked?Math.round(came/marked*100)+"%":"—"}`)}
+      ${tile("1:1 만남", nOne+"회")}
+    </div>`;
+
+  /* ── 종류별 ── */
+  const kinds = {};
+  once.forEach(r => {
+    const key = r.kind==="train" ? "train|"+(r.courseId||"") : r.kind;
+    const label = r.kind==="train" ? `훈련 · ${r.courseName||"과정"}` : (kindOf(r.kind).id===r.kind ? kindName(r.kind) : (r.kindLabel||"모임"));
+    (kinds[key] = kinds[key] || { label, cat:catOf(r), n:0 }).n++;
+  });
+  let krows = Object.values(kinds).sort((a,b)=>b.n-a.n);
+  if (S.withCell) krows = [{ label:"셀모임", cat:"cell", n:nCell }, ...krows];
+  const kmax = Math.max(1, ...krows.map(k=>k.n));
+  const col = (c) => SCAT.find(x=>x[0]===c)[2];
+  $("st-kinds").innerHTML = `
+    <div class="card" style="margin-top:14px">
+      <h3 style="font-size:13px;font-weight:600">종류별 모임 횟수</h3>
+      <p class="muted" style="font-size:12px;margin-top:4px">여러 명이 함께한 모임은 한 번으로 셉니다.</p>
+      <div style="margin-top:10px">${krows.length ? krows.map(k=>`
+        <div class="kbar" title="${esc(k.label)} ${k.n}회"><span>${esc(k.label)}</span>
+          <div><div class="t" style="width:${Math.max(1, k.n/kmax*100)}%;background:${col(k.cat)}"></div></div>
+          <span style="text-align:right;font-variant-numeric:tabular-nums">${k.n}</span></div>`).join("")
+        : `<p class="muted">이 기간에는 기록이 없어요.</p>`}</div>
+    </div>`;
+
+  /* ── 사람별 ── */
+  const rows = souls.map(s => {
+    const c = { cell:0, train:0, one:0, etc:0 };
+    if (S.withCell) c.cell = meets.filter(m => {
+      const v = (m.attendance||{})[s.id]; return v === "present" || v === "online"; }).length;
+    recs.filter(r=>r.soulId===s.id).forEach(r => c[catOf(r)]++);
+    return { s, c, total: c.cell + c.train + c.one + c.etc };
+  }).sort((a,b)=> b.total - a.total || String(a.s.name).localeCompare(String(b.s.name)));
+  const max = Math.max(1, ...rows.map(x=>x.total));
+  const avg = rows.length ? rows.reduce((n,x)=>n+x.total,0) / rows.length : 0;
+  const low = rows.filter(x => x.total === 0 || (avg > 0 && x.total <= avg * 0.5));
+  const used = SCAT.filter(([k]) => k !== "cell" || S.withCell);
+  $("st-people").innerHTML = `
+    <div class="card" style="margin-top:14px">
+      <h3 style="font-size:13px;font-weight:600">누구를 얼마나 만났나</h3>
+      <p class="muted" style="font-size:12px;margin-top:4px">${S.away
+        ? "나 없이 모인 것까지 셉니다 — 그 사람의 활동량이에요."
+        : "내가 직접 함께한 것만 셉니다 — 내가 만난 횟수예요."} 평균 ${avg.toFixed(1)}회.</p>
+      ${low.length ? `<p style="font-size:13px;margin-top:10px;color:var(--warn-tx)">이 기간에 적게 만난 사람 — ${
+        low.slice().reverse().slice(0,5).map(x=>`${esc(x.s.name)} ${x.total}회`).join(", ")}</p>` : ""}
+      <div class="legend" style="margin-top:12px">${used.map(([k,l,c])=>
+        `<span><i style="background:${c};border:none"></i>${l}</span>`).join("")}</div>
+      <div style="margin-top:6px">${rows.map(x=>{
+        const segs = used.filter(([k])=>x.c[k]>0).map(([k,l,c])=>
+          `<i style="flex:${x.c[k]};background:${c}" title="${l} ${x.c[k]}회"></i>`).join("");
+        const n = daysSince(x.s.lastMetAt);
+        return `<div class="srow" title="${esc(x.s.name)} — ${used.map(([k,l])=>`${l} ${x.c[k]}`).join(" · ")}">
+          <span class="who">${avatar(x.s,24)}<span>${esc(x.s.name)}</span></span>
+          <div>${x.total ? `<div class="hbar" style="width:${x.total/max*100}%">${segs}</div>`
+            : `<span class="chip warn" style="font-size:11px">한 번도 없음</span>`}</div>
+          <span class="n">${x.total}</span>
+          <span class="det">${used.filter(([k])=>x.c[k]).map(([k,l])=>`${l} ${x.c[k]}`).join(" · ") || "—"}${
+            n!==null?` · 마지막 만남 ${n===0?"오늘":n+"일 전"}`:""}</span>
+        </div>`; }).join("") || `<p class="muted">영혼 카드가 없어요.</p>`}</div>
+    </div>`;
+}
+$("st-period").addEventListener("click",(ev)=>{
+  const b = ev.target.closest("[data-per]"); if (!b) return; state.st.per = b.dataset.per; renderStats(); });
+$("st-cells").addEventListener("click",(ev)=>{
+  const b = ev.target.closest("[data-stc]"); if (!b) return; state.st.cell = b.dataset.stc; renderStats(); });
+$("st-opts").addEventListener("click",(ev)=>{
+  const b = ev.target.closest("[data-opt]"); if (!b) return;
+  if (b.dataset.opt === "cell") state.st.withCell = !state.st.withCell;
+  else state.st.away = !state.st.away;
+  renderStats();
+});
+$("stats-back").onclick = () => openMore();
+$("btn-go-stats").onclick = () => openStats();
