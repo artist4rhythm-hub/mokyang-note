@@ -245,7 +245,7 @@
   .chart .xaxis span{flex:1 1 0;min-width:0;max-width:46px;text-align:center;font-size:10px;
     color:var(--dim);overflow:hidden;white-space:nowrap}
   .hbars{display:flex;flex-direction:column;gap:9px;margin-top:12px;max-width:600px}
-  .hbars .hb{display:grid;grid-template-columns:72px 1fr 42px;align-items:center;gap:10px}
+  .hbars .hb{display:grid;grid-template-columns:96px 1fr 42px;align-items:center;gap:10px}
   .hbars .hb .who{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .hbars .hb .track{height:9px;border-radius:999px;background:#2A2424;overflow:hidden}
   .hbars .hb .track i{display:block;height:100%;background:var(--brand);border-radius:999px;
@@ -1273,13 +1273,26 @@
   <h3>리더 초대</h3>
   <div class="field"><label for="iv-name">이름</label><input id="iv-name" placeholder="예) 김서연"></div>
   <div class="field"><label for="iv-email">이메일</label><input id="iv-email" type="email" placeholder="초대받을 구글 계정 주소"></div>
-  <div class="field"><label for="iv-role">역할</label><select id="iv-role"></select></div>
+  <div class="field"><label for="iv-role">역할</label><select id="iv-role"></select>
+    <p class="hint" id="iv-role-hint"></p></div>
   <div class="field" id="iv-jin-wrap" hidden><label for="iv-jin">진</label><select id="iv-jin"></select></div>
   <div class="field" id="iv-cell-wrap"><label for="iv-cell">셀</label><select id="iv-cell"></select></div>
   <p class="err" id="invite-err"></p>
   <div class="dlg-btns">
     <button class="btn-ghost" id="iv-cancel">취소</button>
     <button class="btn" id="iv-send">초대 보내기</button>
+  </div>
+</dialog>
+
+<!-- 코치가 자기 셀도 맡기 -->
+<dialog id="dlg-lead">
+  <h3>자기 셀도 맡기</h3>
+  <p class="muted" style="margin-bottom:12px" id="ld-sub"></p>
+  <div class="field"><label for="ld-cell">맡을 셀</label><select id="ld-cell"></select></div>
+  <p class="err" id="ld-err"></p>
+  <div class="dlg-btns">
+    <button class="btn-ghost" id="ld-cancel">취소</button>
+    <button class="btn" id="ld-save">저장</button>
   </div>
 </dialog>
 

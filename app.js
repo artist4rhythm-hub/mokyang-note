@@ -22,7 +22,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
 const APP_NAME = "목자의 삶";
-const APP_VERSION = "16.0 (2026-10-19)";
+const APP_VERSION = "17.0 (2026-10-23)";
 
 /* 사진 크기 — 얼굴을 알아볼 수 있는 선에서 가장 작게.
    얼굴 하나가 가로 80px은 되어야 알아보는데, 여럿이 한 줄로 선
@@ -482,7 +482,8 @@ $("btn-accept").onclick = async () => {
   try {
     await setDoc(doc(db, "users", u.uid), {
       name, email, role: state.invite.role, jinId: state.invite.jinId,
-      cellId: state.invite.cellId || null, cellIds:[], isLeader:false,
+      cellId: state.invite.cellId || null, cellIds: state.invite.cellIds || [],
+      isLeader: !!state.invite.isLeader,
       active:true, createdAt: serverTimestamp()
     });
     await updateDoc(doc(db, "invites", email),
@@ -3033,9 +3034,22 @@ function renderMeetChart() {
   const axis = recent.map((m,i)=>
     `<span>${(!keep || keep.has(i)) ? short(m.date) : ""}</span>`).join("");
 
-  const souls = state.souls.filter(s=>s.cellId && cellMeetings(s.cellId).length);
-  const people = souls.map(s=>({ s, rate: attendRate(attKey(s), attCell(s)) }))
-    .filter(x=>x.rate!==null).sort((a,b)=>a.rate-b.rate);
+  /* 셀원 + (진장이 보면) 셀리더 목양 카드 — 셀리더 출석은 계정 ID로 셉니다 */
+  const souls = state.souls.filter(s=>attCell(s) && cellMeetings(attCell(s)).length);
+  const sortLow = state.meetSort === "low";
+  let people = souls.map(s=>({ s, rate: attendRate(attKey(s), attCell(s)) }))
+    .filter(x=>x.rate!==null);
+  /* 기본은 셀리더가 정한 순서(영혼들 '순서'와 같음), 셀리더 카드는 맨 위 */
+  if (sortLow) people.sort((a,b)=>a.rate-b.rate);
+  else people.sort((a,b)=>(isLeaderCard(b.s)?1:0)-(isLeaderCard(a.s)?1:0));
+  /* 나(셀리더) — 내 셀모임에서 내 출석 */
+  const myMs = state.meetings.filter(m=>m.leaderUid===uid() && (m.attendance||{})[uid()]);
+  const myRate = canLead() && myMs.length
+    ? Math.round(myMs.filter(m=>m.attendance[uid()]!=="absent").length/myMs.length*100) : null;
+  if (myRate !== null) {
+    const me = { s:{ id:"__me", name:(state.me.name||"나") }, rate:myRate, me:true };
+    if (sortLow) { people.push(me); people.sort((a,b)=>a.rate-b.rate); } else people.unshift(me);
+  }
 
   box.innerHTML = `
     <div class="card" style="margin-top:14px">
@@ -3058,11 +3072,18 @@ function renderMeetChart() {
     <div class="card" style="margin-top:10px">
       <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px">
         <h3 style="font-size:13px;font-weight:600">사람별 출석률</h3>
-        <span class="muted" style="font-size:12px">낮은 사람부터</span>
+        <span style="display:flex;gap:6px;align-items:center">
+          <span class="seg" style="margin:0" id="meet-sort">
+            <button type="button" data-ms="seq" class="${sortLow?"":"on"}" style="padding:6px 10px;font-size:12px">정한 순서</button>
+            <button type="button" data-ms="low" class="${sortLow?"on":""}" style="padding:6px 10px;font-size:12px">낮은 순</button>
+          </span>
+          ${canLead()?`<button type="button" class="btn-sm" id="btn-meet-order">순서 정하기</button>`:""}
+        </span>
       </div>
-      <div class="hbars">${people.map(({s,rate})=>`
-        <div class="hb${rate<60?" low":""}" data-gosoul5="${s.id}" style="cursor:pointer">
-          <span class="who">${esc(s.name)}</span>
+      <div class="hbars">${people.map(({s,rate,me})=>`
+        <div class="hb${rate<60?" low":""}" ${me?`data-gomine="1"`:`data-gosoul5="${s.id}"`} style="cursor:pointer">
+          <span class="who">${esc(s.name)}${me?` <span class="chip rose" style="font-size:10px;padding:1px 6px">나</span>`
+            : isLeaderCard(s)?` <span class="chip" style="font-size:10px;padding:1px 6px">셀리더</span>`:""}</span>
           <span class="track"><i style="width:${Math.max(rate,2)}%"></i></span>
           <span class="pct">${rate}%</span>
         </div>`).join("")}</div>
@@ -3071,6 +3092,10 @@ function renderMeetChart() {
     </div>` : ""}`;
 }
 $("meet-chart").addEventListener("click",(ev)=>{
+  const so = ev.target.closest("[data-ms]");
+  if (so) { state.meetSort = so.dataset.ms; renderMeetChart(); return; }
+  if (ev.target.closest("#btn-meet-order")) { openOrderDlg(null, () => renderMeetChart()); return; }
+  if (ev.target.closest("[data-gomine]")) { openMine(); return; }
   const b = ev.target.closest("[data-gosoul5]"); if(!b) return; openSoul(b.dataset.gosoul5);
 });
 $("btn-meet-new").onclick=()=>openMeeting(null);
@@ -3428,7 +3453,7 @@ async function openManage() {
   }
   $("list-members").innerHTML = state.members.map(m=>{
     const where1 = m.role==="leader"?cellName(m.cellId)
-      : m.role==="coach"?`담당 셀 ${(m.cellIds||[]).length}개`
+      : m.role==="coach"?`${m.isLeader?`맡은 셀 ${cellName(m.cellId)||"미정"} · `:""}담당 셀 ${(m.cellIds||[]).length}개`
       : jinName(m.jinId)+(m.isLeader?" · 셀 겸직":"");
     const canEdit = m.id!==state.me.id && m.role!=="super" && (isSuper||state.me.role==="jinjang");
     const roleOptions=(isSuper?["jinjang","coach","leader"]:["coach","leader"])
@@ -3437,12 +3462,14 @@ async function openManage() {
       <div style="display:flex;align-items:center;gap:10px">
         <div class="grow"><p class="nm">${esc(m.name)} ${m.active?"":"· 중지됨"}</p>
           <p class="sub">${esc(m.email)}</p></div>
-        <span class="chip ${m.role==="super"?"":"rose"}">${ROLE[m.role]||m.role}</span>
+        <span class="chip ${m.role==="super"?"":"rose"}">${m.role==="coach"&&m.isLeader?"셀리더 + 코치":(ROLE[m.role]||m.role)}</span>
       </div>
       ${where1?`<p class="sub" style="margin-top:6px">${esc(where1)}</p>`:""}
       ${canEdit?`<div class="acts">
         <select class="btn-sm" data-act="role" data-uid="${m.id}" style="width:auto;padding:0 10px">${roleOptions}</select>
-        ${m.role==="coach"?`<button class="btn-sm" data-act="cells" data-uid="${m.id}">담당 셀</button>`:""}
+        ${m.role==="leader"?`<button class="btn-sm" data-act="lead" data-uid="${m.id}">맡은 셀 바꾸기</button>`:""}
+        ${m.role==="coach"?`<button class="btn-sm" data-act="cells" data-uid="${m.id}">담당 셀</button>
+          <button class="btn-sm" data-act="lead" data-uid="${m.id}">${m.isLeader?"맡은 셀":"자기 셀도 맡기"}</button>`:""}
         <button class="btn-sm" data-act="pwreset" data-email="${esc(m.email)}">비번 재설정 메일</button>
         <button class="btn-sm ${m.active?"danger":""}" data-act="toggle" data-uid="${m.id}" data-on="${m.active}">${m.active?"사용 중지":"다시 사용"}</button>
       </div>`:""}
@@ -3528,6 +3555,7 @@ $("s-manage").addEventListener("click",async(ev)=>{
     catch(e){ toast(msgOf(e)); }
   }
   if(act==="cells") openCellsDlg(el.dataset.uid);
+  if(act==="lead") openLeadDlg(el.dataset.uid);
   if(act==="tedit") openMtypeDlg(el.dataset.tid);
   if(act==="thide"){
     if(!confirm("이 모임 종류를 목록에서 숨길까요? 이미 적은 기록은 그대로 남아요.")) return;
@@ -3541,7 +3569,11 @@ $("s-manage").addEventListener("click",async(ev)=>{
 });
 $("s-manage").addEventListener("change",async(ev)=>{
   const el=ev.target.closest('[data-act="role"]'); if(!el) return;
-  try{ await updateDoc(doc(db,"users",el.dataset.uid),{role:el.value});
+  /* 셀리더를 코치로 바꿔도 자기 셀은 계속 맡도록(셀 겸직을 켭니다) */
+  const tm=state.members.find(x=>x.id===el.dataset.uid)||{};
+  const patch={role:el.value};
+  if(el.value==="coach" && tm.role==="leader") patch.isLeader=true;
+  try{ await updateDoc(doc(db,"users",el.dataset.uid),patch);
     await log("역할 변경",el.dataset.uid,el.value); toast("역할을 바꿨어요."); openManage(); }
   catch(e){ toast(msgOf(e)); openManage(); }
 });
@@ -3592,8 +3624,13 @@ const dlg=$("dlg-invite");
 $("btn-invite-open").onclick=()=>{
   const isSuper=state.me.role==="super";
   $("iv-name").value=""; $("iv-email").value=""; $("invite-err").textContent="";
-  $("iv-role").innerHTML=(isSuper?["jinjang","coach","leader"]:["coach","leader"])
-    .map(r=>`<option value="${r}">${ROLE[r]}</option>`).join("");
+  /* 우리 교회는 셀리더 중 한두 명이 코치를 겸합니다 — 그래서 '셀리더 + 코치'를 따로 둡니다 */
+  $("iv-role").innerHTML=[
+      ...(isSuper?[["jinjang","진장"]]:[]),
+      ["leader","셀리더"], ["coachleader","셀리더 + 코치 (자기 셀도 맡고 다른 셀도 돌봄)"],
+      ["coach","코치만 (셀은 안 맡음)"]]
+    .map(([v,l])=>`<option value="${v}">${l}</option>`).join("");
+  $("iv-role").value="leader";
   $("iv-jin-wrap").hidden=!isSuper;
   $("iv-jin").innerHTML=state.jins.map(j=>`<option value="${j.id}">${esc(j.name)}</option>`).join("");
   fillInviteCells(); $("iv-role").onchange=syncRole; $("iv-jin").onchange=fillInviteCells;
@@ -3605,13 +3642,25 @@ function fillInviteCells() {
   $("iv-cell").innerHTML=list.length?list.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join("")
     :`<option value="">셀 없음 (나중에 지정)</option>`;
 }
-function syncRole(){ $("iv-cell-wrap").hidden=$("iv-role").value!=="leader"; }
+const ROLEHINT = {
+  jinjang:"진 전체를 봅니다. 셀리더 · 코치를 초대하고, 셀리더 목양 카드를 씁니다.",
+  leader:"자기 셀의 영혼 카드 · 셀모임 · 만남을 기록합니다.",
+  coachleader:"자기 셀도 맡고, 진장이 정해준 담당 셀의 '코치 공유' 기록도 봅니다. 담당 셀은 가입 뒤 '담당 셀'에서 정해요.",
+  coach:"셀은 맡지 않고, 진장이 정해준 담당 셀만 돌봅니다."
+};
+function syncRole(){
+  const v=$("iv-role").value;
+  $("iv-cell-wrap").hidden=!(v==="leader"||v==="coachleader");
+  $("iv-role-hint").textContent=ROLEHINT[v]||"";
+}
 $("iv-cancel").onclick=()=>dlg.close();
 $("iv-send").onclick=async()=>{
   const name=$("iv-name").value.trim(), email=$("iv-email").value.trim().toLowerCase();
-  const role=$("iv-role").value;
+  const pick=$("iv-role").value;
+  const role=pick==="coachleader"?"coach":pick;
+  const isLeader=pick==="coachleader";
   const jinId=state.me.role==="super"?$("iv-jin").value:state.me.jinId;
-  const cellId=role==="leader"?($("iv-cell").value||null):null;
+  const cellId=(pick==="leader"||pick==="coachleader")?($("iv-cell").value||null):null;
   $("invite-err").textContent="";
   if(!name||!email){ $("invite-err").textContent="이름과 이메일을 적어주세요."; return; }
   if(!email.includes("@")){ $("invite-err").textContent="이메일 형식을 확인해 주세요."; return; }
@@ -3621,7 +3670,7 @@ $("iv-send").onclick=async()=>{
     const exist=await getDoc(doc(db,"invites",email));
     if(exist.exists()&&exist.data().status==="accepted"){
       $("invite-err").textContent="이미 가입한 사람이에요."; return; }
-    await setDoc(doc(db,"invites",email),{ email,name,role,jinId,cellId,status:"pending",
+    await setDoc(doc(db,"invites",email),{ email,name,role,jinId,cellId,isLeader,cellIds:[],status:"pending",
       invitedBy:state.me.id, invitedAt:serverTimestamp() });
     await log("초대",email,role);
     dlg.close(); toast("초대했어요. 그분이 같은 이메일로 로그인하면 바로 들어와요."); openManage();
@@ -4647,6 +4696,12 @@ async function backfillThumbs() {
    올릴 때마다 version.json 도 같이 올립니다. 앱은 열 때 · 다시 볼 때 · 10분마다
    그 파일만 살짝 확인해서(아주 작은 파일), 지금 버전보다 새것이면 위에 알림을 띄웁니다. */
 const CHANGELOG = [
+  { v:"17.0", d:"2026-10-23", items:[
+    "셀모임 사람별 출석률에 셀리더 본인('나')도",
+    "사람별 출석률을 셀리더가 정한 순서로 (낮은 순으로도 볼 수 있음)",
+    "초대할 때 '셀리더 + 코치' — 자기 셀도 맡고 다른 셀도 돌보는 역할",
+    "리더 관리에서 코치에게 자기 셀 맡기기 · 셀리더 맡은 셀 바꾸기",
+    "보안: 가입할 때 담당 셀 · 셀 겸직은 초대장에 적힌 그대로만" ] },
   { v:"16.0", d:"2026-10-19", items:[
     "셀리더 · 코치 · 진장끼리 쪽지",
     "셀모임과 '코치 공유' 기록에 댓글",
@@ -5033,4 +5088,30 @@ $("nt-save").onclick = async () => {
   try { await updateDoc(doc(db,"users",state.me.id), { notifyPrefs: p }); state.me.notifyPrefs = p;
         if (!$("nt-err").textContent) { dlgNt.close(); toast("알림 설정을 저장했어요."); } }
   catch (e) { $("nt-err").textContent = msgOf(e); }
+};
+
+/* ════════ 코치가 자기 셀도 맡기 (셀리더 + 코치) ════════ */
+const dlgLead=$("dlg-lead");
+let leadTargetUid=null;
+function openLeadDlg(targetUid) {
+  leadTargetUid=targetUid;
+  const m=state.members.find(x=>x.id===targetUid)||{};
+  const isLeaderRole = m.role==="leader";
+  $("ld-sub").textContent = isLeaderRole
+    ? `${m.name||""} 님이 맡을 셀을 바꿉니다. 이미 만든 영혼 카드는 그대로 그분 담당이에요 (옮기려면 카드에서 '다른 리더에게 넘기기').`
+    : `${m.name||""} 님이 담당 셀을 돌보면서 자기 셀도 맡게 합니다. 셀 출석 · 영혼 카드를 직접 기록할 수 있어요.`;
+  const cells=state.cells.filter(c=>c.jinId===m.jinId && c.active!==false);
+  $("ld-cell").innerHTML=(isLeaderRole?"":`<option value="">셀은 안 맡음 (코치만)</option>`)
+    + cells.map(c=>`<option value="${c.id}"${(isLeaderRole||m.isLeader)&&m.cellId===c.id?" selected":""}>${esc(c.name)}</option>`).join("");
+  $("ld-err").textContent=""; dlgLead.showModal();
+}
+$("ld-cancel").onclick=()=>dlgLead.close();
+$("ld-save").onclick=async()=>{
+  const cellId=$("ld-cell").value||null;
+  const m=state.members.find(x=>x.id===leadTargetUid)||{};
+  const patch = m.role==="leader" ? { cellId } : { isLeader:!!cellId, cellId };
+  try{ await updateDoc(doc(db,"users",leadTargetUid),patch);
+    await log(cellId?"코치 셀 겸직":"코치 셀 겸직 해제",leadTargetUid,cellId||"");
+    dlgLead.close(); await loadOrg(true); toast("저장했어요."); openManage(); }
+  catch(e){ $("ld-err").textContent=msgOf(e); }
 };
