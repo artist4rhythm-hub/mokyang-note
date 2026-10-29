@@ -26,6 +26,8 @@
     color-scheme: dark;
   }
   *{box-sizing:border-box}
+  /* display:flex 를 준 버튼 · 줄도 hidden 이면 확실히 숨깁니다 */
+  [hidden]{display:none !important}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
     font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif;-webkit-text-size-adjust:100%}
   body{display:flex;justify-content:center;min-height:100vh;min-height:100dvh}
@@ -439,6 +441,17 @@
     textarea{min-height:110px}
   }
   @media (max-width:879px){ .only-wide{display:none !important} }
+  /* 18단계 — 명부 · 셀 관리 */
+  .dgh{display:flex;align-items:baseline;justify-content:space-between;gap:8px;
+    font-size:12px;color:var(--dim);margin:18px 2px 8px}
+  .dgh b{color:var(--text);font-size:13px;font-weight:600}
+  .kv{display:grid;grid-template-columns:92px 1fr;gap:8px 12px;font-size:13px;margin-top:14px}
+  .kv span:nth-child(odd){color:var(--dim)}
+  .ckl label{display:flex;align-items:center;gap:10px;margin:0;padding:10px 12px;
+    border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--text);
+    font-size:14px;cursor:pointer}
+  .ckl input{width:20px;height:20px;accent-color:var(--action);flex-shrink:0}
+  .ckl{display:flex;flex-direction:column;gap:6px;max-height:42vh;overflow-y:auto}
 </style>
 </head>
 <body>
@@ -565,6 +578,7 @@
         <span class="chip" id="home-role">—</span>
         <span class="chip" id="home-where"></span>
       </div>
+      <div id="home-hand"></div>
       <div class="tiles" id="home-tiles"></div>
       <div id="home-soon"></div>
       <div id="home-absent"></div>
@@ -572,7 +586,11 @@
         <div id="home-pray"></div>
         <div><div id="home-todo"></div><div id="home-anniv"></div></div>
       </div>
-      <button class="btn-ghost" id="btn-manage" style="margin-top:16px;max-width:320px" hidden>리더 관리</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;max-width:520px">
+        <button class="btn-ghost" id="btn-manage" style="flex:1 1 150px" hidden>리더 관리</button>
+        <button class="btn-ghost" id="btn-home-cellmgr" style="flex:1 1 150px" hidden>셀 관리</button>
+        <button class="btn-ghost" id="btn-home-dir" style="flex:1 1 150px">교회 명부</button>
+      </div>
       <button type="button" class="row" id="btn-ver" style="margin-top:16px;width:100%;text-align:left;cursor:pointer;max-width:520px">
         <span class="grow"><span class="nm" style="display:block" id="ver-now">버전</span>
           <span class="sub" style="display:block" id="ver-state">바뀐 것 보기</span></span>
@@ -1128,6 +1146,16 @@
         <div>
           <h3 class="sec-title">보기</h3>
           <div class="list">
+            <button class="row" id="btn-go-dir" style="text-align:left;cursor:pointer;width:100%">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3.5" width="14" height="17" rx="2"/><circle cx="12" cy="10" r="2.6"/><path d="M8.5 16.5a3.5 3.5 0 0 1 7 0"/></svg>
+              <span class="grow"><span class="nm" style="display:block">교회 명부</span>
+                <span class="sub" style="display:block">우리 진 사람 찾기 · 셀 · 역할 · 연락처</span></span>
+            </button>
+            <button class="row" id="btn-go-cellmgr" style="text-align:left;cursor:pointer;width:100%" hidden>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="2.5"/><circle cx="17" cy="7" r="2.5"/><circle cx="12" cy="17" r="2.5"/><path d="M8.7 8.9 11 15M15.3 8.9 13 15"/></svg>
+              <span class="grow"><span class="nm" style="display:block">셀 관리</span>
+                <span class="sub" style="display:block">담당 셀리더 바꾸기 · 분가 · 멤버 옮기기</span></span>
+            </button>
             <button class="row" id="btn-go-train" style="text-align:left;cursor:pointer;width:100%">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V9m5 10V5m5 14v-7m5 7V8"/></svg>
               <span class="grow"><span class="nm" style="display:block">훈련 현황 한눈에</span>
@@ -1213,6 +1241,45 @@
     <nav class="tabbar" data-nav="more"></nav>
   </section>
 
+  <!-- 교회 명부 -->
+  <section class="screen" id="s-dir" hidden>
+    <div class="topbar">
+      <h1 style="font-size:21px;font-weight:600;padding-left:6px">교회 명부</h1>
+      <div style="display:flex;align-items:center;gap:4px">
+        <button class="btn-sm" id="btn-dir-cellmgr" hidden>셀 관리</button>
+        <button class="icon-btn" id="btn-dir-new" aria-label="명부에 새 사람 등록" hidden><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+      </div>
+    </div>
+    <div class="pad">
+      <input id="dir-search" placeholder="이름 · 연락처로 찾기" style="height:44px">
+      <div class="seg" id="dir-cells"></div>
+      <div class="picks" id="dir-roles"></div>
+    </div>
+    <div class="scroll pad" style="padding-top:10px">
+      <p class="hint" id="dir-count" style="margin:0"></p>
+      <div id="dir-list"></div>
+      <p class="hint" style="margin-top:18px">명부에는 이름 · 사진 · 셀 · 역할 · 연락처 · 생일(월 · 일) · 교회 등록일 · 침례 · 직분 · 수료한 훈련만 있어요.
+        목양 내용(상태 · 메모 · 기도제목 · 만남 기록)은 맡은 사람만 봅니다.</p>
+    </div>
+    <nav class="tabbar" data-nav="dir"></nav>
+  </section>
+
+  <!-- 셀 관리 -->
+  <section class="screen" id="s-cellmgr" hidden>
+    <div class="topbar">
+      <button class="icon-btn" id="cellmgr-back" aria-label="뒤로"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5m6-6-6 6 6 6"/></svg></button>
+      <h2 style="font-size:17px;font-weight:600">셀 관리</h2>
+      <button class="btn-sm" id="btn-cm-new">＋ 새 셀</button>
+    </div>
+    <div class="scroll pad">
+      <div id="cm-pending"></div>
+      <div class="list" id="cm-list" style="margin-top:14px"></div>
+      <p class="hint" style="margin-top:16px">셀 이름은 그대로 두고 담당 셀리더만 바꿀 수 있어요.
+        목양 카드는 지금 맡은 셀리더가 앱을 열어 '얼마나 넘길지'(전부 · 요약만 · 지금부터)를 골라 넘깁니다.
+        지난 셀모임 출석은 원래 셀에 그대로 남아요.</p>
+    </div>
+  </section>
+
   <!-- 리더 관리 -->
   <section class="screen" id="s-manage" hidden>
     <div class="topbar">
@@ -1244,7 +1311,7 @@
         <div>
           <h3 class="sec-title">셀</h3>
           <div class="list" id="list-cells"></div>
-          <button class="btn-ghost" id="btn-cell-add" style="margin-top:8px;height:44px;font-size:13px">셀 추가</button>
+          <button class="btn-ghost" id="btn-cell-add" style="margin-top:8px;height:44px;font-size:13px">셀 관리 열기 — 담당 바꾸기 · 분가 · 옮기기</button>
         </div>
         <div>
           <h3 class="sec-title">훈련 과정</h3>
@@ -1268,9 +1335,146 @@
   <div id="toast"></div>
 </div>
 
+<!-- 명부 카드 보기 -->
+<dialog id="dlg-member">
+  <div style="display:flex;align-items:center;gap:12px">
+    <span class="ava" id="mb-ava" style="width:56px;height:56px;font-size:20px;flex-shrink:0"></span>
+    <div style="min-width:0">
+      <h3 id="mb-name" style="margin:0"></h3>
+      <div id="mb-chips" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"></div>
+    </div>
+  </div>
+  <div id="mb-contact" style="margin-top:14px"></div>
+  <div id="mb-rows"></div>
+  <p class="hint" id="mb-note" style="margin-top:12px"></p>
+  <div class="acts" id="mb-acts" style="margin-top:14px"></div>
+  <p class="err" id="mb-err"></p>
+  <div class="dlg-btns"><button class="btn-ghost" id="mb-close">닫기</button></div>
+</dialog>
+
+<!-- 명부 등록 · 고치기 -->
+<dialog id="dlg-medit">
+  <h3 id="md-title">명부에 등록</h3>
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+    <span class="ava" id="md-ava" style="width:52px;height:52px;font-size:18px;flex-shrink:0"></span>
+    <button type="button" class="btn-sm" id="md-photo">사진</button>
+    <button type="button" class="btn-sm" id="md-photo-rm">빼기</button>
+    <input type="file" id="md-photo-input" accept="image/*" hidden>
+  </div>
+  <div class="field"><label for="md-name">이름</label><input id="md-name" placeholder="예) 김서연"></div>
+  <div class="field" id="md-cell-wrap"><label for="md-cell">셀</label><select id="md-cell"></select></div>
+  <div class="field"><label for="md-phone">연락처</label><input id="md-phone" inputmode="tel" placeholder="010-0000-0000"></div>
+  <div class="two">
+    <div class="field"><label for="md-gender">성별</label>
+      <select id="md-gender"><option value="">—</option><option>남</option><option>여</option></select></div>
+    <div class="field"><label for="md-birth">생일 (월-일)</label><input id="md-birth" placeholder="예) 3-5"></div>
+  </div>
+  <label class="check" style="margin:-6px 0 14px"><input type="checkbox" id="md-lunar"> 음력</label>
+  <div class="field"><label for="md-position">직분</label><input id="md-position" placeholder="예) 집사"></div>
+  <div class="two">
+    <div class="field"><label for="md-reg">교회 등록일</label><input id="md-reg" placeholder="예) 2024-3-10"></div>
+    <div class="field"><label for="md-bap">침례일</label><input id="md-bap" placeholder="예) 2024-5-19"></div>
+  </div>
+  <p class="hint" id="md-hint"></p>
+  <p class="err" id="md-err"></p>
+  <div class="dlg-btns">
+    <button class="btn-ghost" id="md-cancel">취소</button>
+    <button class="btn" id="md-save">저장</button>
+  </div>
+</dialog>
+
+<!-- 멤버 셀 옮기기 -->
+<dialog id="dlg-move">
+  <h3>다른 셀로 옮기기</h3>
+  <p class="muted" id="mv-sub" style="margin-bottom:12px"></p>
+  <div class="field"><label for="mv-cell">옮길 셀</label><select id="mv-cell"></select></div>
+  <p class="hint" id="mv-hint"></p>
+  <p class="err" id="mv-err"></p>
+  <div class="dlg-btns">
+    <button class="btn-ghost" id="mv-cancel">취소</button>
+    <button class="btn" id="mv-save">옮기기</button>
+  </div>
+</dialog>
+
+<!-- 역할 주기 -->
+<dialog id="dlg-role">
+  <h3>역할 주기</h3>
+  <p class="muted" id="rl-sub" style="margin-bottom:12px"></p>
+  <div class="field"><label for="rl-role">역할</label><select id="rl-role"></select>
+    <p class="hint" id="rl-role-hint"></p></div>
+  <div class="field" id="rl-cell-wrap"><label for="rl-cell">맡을 셀</label><select id="rl-cell"></select></div>
+  <div class="field" id="rl-email-wrap"><label for="rl-email">구글 이메일</label>
+    <input id="rl-email" type="email" placeholder="그분이 로그인할 구글 계정">
+    <p class="hint">이 이메일로 초대가 걸리고, 그 순간부터 이분은 자기 목양 카드를 어떤 경로로도 못 봐요.</p></div>
+  <p class="err" id="rl-err"></p>
+  <div class="dlg-btns">
+    <button class="btn-ghost" id="rl-cancel">취소</button>
+    <button class="btn" id="rl-save">저장</button>
+  </div>
+</dialog>
+
+<!-- 셀 담당 바꾸기 -->
+<dialog id="dlg-cl">
+  <h3>담당 셀리더 바꾸기</h3>
+  <p class="muted" id="cl-sub" style="margin-bottom:12px"></p>
+  <div class="field"><label for="cl-to">새 담당</label><select id="cl-to"></select></div>
+  <p class="hint" id="cl-hint"></p>
+  <p class="err" id="cl-err"></p>
+  <div class="dlg-btns">
+    <button class="btn-ghost" id="cl-cancel">취소</button>
+    <button class="btn" id="cl-save">바꾸기</button>
+  </div>
+</dialog>
+
+<!-- 새 셀 · 분가 -->
+<dialog id="dlg-split">
+  <h3 id="sp-title">분가 — 새 셀 만들기</h3>
+  <p class="muted" id="sp-sub" style="margin-bottom:12px"></p>
+  <div class="field"><label for="sp-name">새 셀 이름</label><input id="sp-name" placeholder="예) 요셉 셀"></div>
+  <div class="field"><label for="sp-leader">담당 셀리더</label><select id="sp-leader"></select></div>
+  <div class="field" id="sp-members-wrap"><label>새 셀로 옮길 사람</label><div class="ckl" id="sp-members"></div></div>
+  <p class="hint" id="sp-hint"></p>
+  <p class="err" id="sp-err"></p>
+  <div class="dlg-btns">
+    <button class="btn-ghost" id="sp-cancel">취소</button>
+    <button class="btn" id="sp-save">만들기</button>
+  </div>
+</dialog>
+
+<!-- 같은 사람 — 계정 있는 명부 카드와 잇기 -->
+<dialog id="dlg-link">
+  <h3>계정 있는 분과 잇기</h3>
+  <p class="muted" id="lk-sub" style="margin-bottom:12px"></p>
+  <div class="field"><label for="lk-acc">같은 분의 계정</label><select id="lk-acc"></select></div>
+  <p class="hint">이으면 이 명부 카드는 그분 계정의 명부 카드로 합쳐지고, 목양 카드에는 그 계정으로 본인 차단이 걸려요. 되돌릴 수 없어요.</p>
+  <p class="err" id="lk-err"></p>
+  <div class="dlg-btns">
+    <button class="btn-ghost" id="lk-cancel">취소</button>
+    <button class="btn" id="lk-save">잇기</button>
+  </div>
+</dialog>
+
+<!-- 인계 요청 처리 (지금 카드를 맡은 셀리더) -->
+<dialog id="dlg-hrun">
+  <h3>목양 카드 넘기기</h3>
+  <p class="muted" id="hr-sub" style="margin-bottom:12px"></p>
+  <div class="list" id="hr-names" style="margin-bottom:12px"></div>
+  <p style="font-size:13px;margin-bottom:8px">지난 기록은 어디까지 넘길까요?</p>
+  <div class="list" id="hr-scope"></div>
+  <div id="hr-lead-wrap" style="margin-top:12px"></div>
+  <p class="hint">'나만 보기'로 적은 것은 어느 쪽을 골라도 넘어가지 않고 나만 계속 봐요.</p>
+  <p class="err" id="hr-err"></p>
+  <div class="dlg-btns">
+    <button class="btn-ghost" id="hr-later">나중에</button>
+    <button class="btn" id="hr-go">넘기기</button>
+  </div>
+</dialog>
+
 <!-- 초대 -->
 <dialog id="dlg-invite">
   <h3>리더 초대</h3>
+  <div class="field"><label for="iv-member">명부에서 고르기</label><select id="iv-member"></select>
+    <p class="hint">명부에 이미 있는 분이면 꼭 골라주세요. 그분 목양 카드에 '본인 차단'이 초대하는 순간부터 걸려요.</p></div>
   <div class="field"><label for="iv-name">이름</label><input id="iv-name" placeholder="예) 김서연"></div>
   <div class="field"><label for="iv-email">이메일</label><input id="iv-email" type="email" placeholder="초대받을 구글 계정 주소"></div>
   <div class="field"><label for="iv-role">역할</label><select id="iv-role"></select>
