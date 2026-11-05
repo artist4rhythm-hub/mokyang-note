@@ -24,7 +24,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
 const APP_NAME = "목자의 삶";
-const APP_VERSION = "18.0 (2026-10-28)";
+const APP_VERSION = "20.0 (2026-11-05)";
 
 /* 사진 크기 — 얼굴을 알아볼 수 있는 선에서 가장 작게.
    얼굴 하나가 가로 80px은 되어야 알아보는데, 여럿이 한 줄로 선
@@ -61,7 +61,7 @@ const $ = (id) => document.getElementById(id);
 const SCREENS = ["s-loading","s-login","s-verify","s-setup","s-accept","s-pending",
                  "s-home","s-souls","s-cal","s-meet","s-meeting","s-log","s-soul",
                  "s-edit","s-train","s-search","s-mine","s-usage","s-more","s-manage",
-                 "s-photos","s-stats","s-inbox","s-dir","s-cellmgr"];
+                 "s-photos","s-stats","s-inbox","s-dir","s-cellmgr","s-org"];
 const show = (id) => {
   SCREENS.forEach(s => $(s).hidden = (s !== id));
   if (id !== "s-loading" && typeof bump === "function") bump(id.replace(/^s-/, ""), "screen");
@@ -351,8 +351,9 @@ ICON.photos = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" strok
 const NAV = [["home","홈"],["souls","영혼들"],["cal","캘린더"],["meet","셀모임"],["more","더보기"]];
 ICON.inbox = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16.5V11a6 6 0 1 1 12 0v5.5l1.5 2H4.5z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/></svg>`;
 ICON.dir = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3.5" width="14" height="17" rx="2"/><circle cx="12" cy="10" r="2.6"/><path d="M8.5 16.5a3.5 3.5 0 0 1 7 0"/></svg>`;
+ICON.health = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 12h4l2-4.5 4 9 2-4.5h5"/></svg>`;
 const SIDE = [["home","홈"],["inbox","소식"],["souls","영혼들"],["dir","교회 명부"],["cal","캘린더"],["meet","셀모임"],
-  ["train","훈련 현황"],["stats","활동 통계"],["photos","사진 모아보기"],["more","더보기"]];
+  ["health","셀 건강"],["train","훈련 현황"],["stats","활동 통계"],["photos","사진 모아보기"],["more","더보기"]];
 function renderNav() {
   document.querySelectorAll("[data-nav]").forEach(nav => {
     nav.innerHTML = NAV.map(([k,label]) =>
@@ -380,6 +381,7 @@ document.addEventListener("click", (ev) => {
   else if (t === "photos") openPhotos();
   else if (t === "inbox") openInbox();
   else if (t === "dir") openDir();
+  else if (t === "health") openHealth();
 });
 
 /* ════════ 로그인 ════════ */
@@ -617,40 +619,36 @@ async function fetchRecords(soulId, canSeeAll) {
   return parts.flatMap(pack).filter(r => seen[r.id] ? false : (seen[r.id] = true));
 }
 /* 내 영혼들의 기록을 한꺼번에 (검색 · 캘린더용) */
+/* 19단계 — 예전에는 영혼 한 명씩 차례로 읽어서(한 명 끝나야 다음 사람) 영혼이 늘수록
+   홈이 늦게 떴습니다. 이제 모든 영혼을 한꺼번에 요청하고, 이미 읽는 중이면 그걸 같이 기다립니다. */
 async function loadAllRecords(force) {
   if (state.allRecords && !force) return state.allRecords;
-  const out = [];
-  for (const s of state.souls) {
-    try {
-      const col = collection(db,"souls",s.id,"records");
-      let rows = [];
-      if (isLeaderOf(s)) {
-        const [a,b,c] = await Promise.all([
-          getDocs(query(col, where("by","==",uid()))),
-          getDocs(query(col, where("scope","==","leader"))),
-          getDocs(query(col, where("scope","==","coach")))
-        ]);
-        rows = [...pack(a), ...pack(b), ...pack(c)];
-      } else rows = pack(await getDocs(query(col, where("scope","==","coach"))));
-      const seen = {};
-      rows.filter(r => seen[r.id] ? false : (seen[r.id]=true))
-        .forEach(r => out.push({ ...r, soulId:s.id, soulName:s.name }));
-    } catch {}
-  }
-  state.allRecords = out.sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")));
-  return state.allRecords;
+  if (state.recP && !force) return state.recP;
+  const souls = state.souls.slice();
+  state.recP = (async () => {
+    const parts = await Promise.all(souls.map(async (s) => {
+      try {
+        const rows = await fetchRecords(s.id, isLeaderOf(s));
+        return rows.map(r => ({ ...r, soulId:s.id, soulName:s.name }));
+      } catch { return []; }
+    }));
+    state.allRecords = parts.flat().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")));
+    return state.allRecords;
+  })();
+  try { return await state.recP; } finally { state.recP = null; }
 }
 async function loadAllTrainings(force) {
   if (state.allTrainings && !force) return state.allTrainings;
-  const out = [];
-  for (const s of state.souls) {
-    try {
-      const rows = pack(await getDocs(collection(db,"souls",s.id,"trainings")));
-      rows.forEach(t => out.push({ ...t, soulId:s.id, soulName:s.name }));
-    } catch {}
-  }
-  state.allTrainings = out;
-  return out;
+  if (state.trP && !force) return state.trP;
+  const souls = state.souls.slice();
+  state.trP = (async () => {
+    const parts = await Promise.all(souls.map(s =>
+      getDocs(collection(db,"souls",s.id,"trainings"))
+        .then(r => pack(r).map(t => ({ ...t, soulId:s.id, soulName:s.name }))).catch(() => [])));
+    state.allTrainings = parts.flat();
+    return state.allTrainings;
+  })();
+  try { return await state.trP; } finally { state.trP = null; }
 }
 async function loadTrainings(soulId) {
   const rank = { ongoing:0, planned:1, done:2, dropped:3 };
@@ -672,7 +670,7 @@ async function loadPhoto(soulId) {
    반대로 그냥 화면만 옮길 때는 다시 읽지 않습니다 — 읽기 횟수가
    하루 한도에 닿는 가장 큰 이유가 이것이었어요. */
 const invalidate = () => {
-  state.allRecords = null; state.allTrainings = null;
+  state.allRecords = null; state.allTrainings = null; state.recP = null; state.trP = null;
   state.soulsAt = 0; state.meetingsAt = 0;
 };
 
@@ -698,74 +696,67 @@ function absentStreak(soulId, cellId) {
   return n;
 }
 
-/* ════════ 홈 ════════ */
+/* ════════ 홈 — 20단계 '전시실' ════════
+   위에서부터: 오늘의 전시(기도할 영혼 · 코치는 셀 보고) → 오늘 챙길 사람 → 전시실(방 타일) → 관리 서랍.
+   자주 쓰는 것은 방으로 크게, 가끔 쓰는 것은 서랍에 넣었습니다. */
 async function openHome() {
   const me = state.me;
   startLive(); renderVerCard(); checkVersion(); noteUpdated();
   const now = new Date(), days = ["일","월","화","수","목","금","토"];
   $("home-date").textContent = `${now.getMonth()+1}월 ${now.getDate()}일 ${days[now.getDay()]}요일`;
-  let title = APP_NAME;
-  try { const org = await getDoc(doc(db,"org","main")); if (org.exists()) title = org.data().name; } catch {}
-  $("home-title").textContent = title;
-  $("home-role").textContent = ROLE[me.role] || me.role;
-
-  await loadOrg();
+  /* 19단계 — 홈은 '조직 · 영혼 · 셀모임'만 기다리고 바로 보여줍니다.
+     기록(곧 만날 사람 · 1:1) · 명부 정리 · 인계 요청은 홈이 뜬 뒤 뒤에서 채웁니다. */
   const sees = canLead() || me.role === "coach" || me.role === "jinjang";
-  if (sees) { await loadSouls(); await loadMeetings(); } else { state.souls=[]; state.meetings=[]; }
-  /* 18단계 — 명부로 옮겨오기 · 내 셀 새 사람 카드 만들기 · 인계 요청 */
-  await ensureDirectory();
-  await loadHandovers();
-  renderHomeHand();
+  const [orgSnap] = await Promise.all([
+    state.orgName ? Promise.resolve(null) : getDoc(doc(db,"org","main")).catch(() => null),
+    loadOrg(), sees ? loadMeetings() : Promise.resolve()
+  ]);
+  if (orgSnap && orgSnap.exists()) state.orgName = orgSnap.data().name;
+  $("home-title").textContent = state.orgName || APP_NAME;
+  $("home-role").textContent = ROLE[me.role] || me.role;
+  if (sees) await loadSouls(); else { state.souls=[]; state.meetings=[]; }
 
   const jin = state.jins.find(j=>j.id===me.jinId);
   const cell = state.cells.find(c=>c.id===me.cellId);
   const where1 = (me.role==="super" && !me.isLeader) ? "전체" : (cell?cell.name:(jin?jin.name:""));
   $("home-where").textContent = where1; $("home-where").hidden = !where1;
   $("side-who").innerHTML = `${esc(me.name||"")}<br>${esc(ROLE[me.role]||"")}${where1?" · "+esc(where1):""}`;
-
-  const pendingN = state.invites.filter(i=>i.status==="pending").length;
-  const todos = openTodos(), annivs = upcomingAnnivs();
-  const absentees = state.souls.filter(s=>isLeaderOf(s) && absentStreak(attKey(s),attCell(s))>=2);
   $("btn-quick-add").hidden = !canLead();
 
-  if (canLead()) {
-    const mine = state.souls.filter(isLeaderOf);
-    const recent = state.meetings.slice(0,6);
-    const rate = recent.length ? Math.round(recent.reduce((sum,m)=>{
-      const v = Object.values(m.attendance||{});
-      return sum + (v.length ? v.filter(x=>x!=="absent").length/v.length : 0);
-    },0)/recent.length*100) : null;
-    $("home-tiles").innerHTML = tile("영혼", mine.length+"명")
-      + tile("이번 주 기념일", annivs.length+"명") + tile("챙길 일", todos.length+"건")
-      + tile("최근 출석률", rate===null?"—":rate+"%")
-      + tile("셀모임", state.meetings.length+"회")
-      + tile("기도 중", mine.reduce((n,s)=>n+(s.prayOpen||0),0)+"개");
-    await loadAllRecords();
-    renderSoon(); renderAbsent(absentees); renderPray(); renderTodos(todos); renderAnnivs(annivs);
-  } else if (me.role==="coach" || me.role==="jinjang") {
-    $("home-tiles").innerHTML = tile("영혼", state.souls.length+"명")
-      + tile("셀", state.cells.length+"개") + tile("구성원", state.members.length+"명");
-    $("home-soon").innerHTML = ""; $("home-absent").innerHTML = "";
-    $("home-pray").innerHTML = card("맡겨진 셀을 살펴보세요",
-      "영혼들 탭에서 카드를, 셀모임 탭에서 출석을 볼 수 있어요. 기록은 '코치 공유'로 올라온 것만 보여요.");
-    $("home-todo").innerHTML=""; $("home-anniv").innerHTML="";
-  } else {
-    $("home-tiles").innerHTML = tile("구성원", state.members.length+"명")
-      + tile("셀", state.cells.length+"개") + tile("대기 중 초대", pendingN+"건");
-    $("home-soon").innerHTML = ""; $("home-absent").innerHTML = "";
+  if (canLead()) { renderPray(); renderCare(); }
+  else if (me.role==="coach" || me.role==="jinjang") { renderReports(); renderCoachCare(); }
+  else {
     $("home-pray").innerHTML = card("영혼 카드는 담당 리더만 열람해요",
       "수퍼 관리자는 사람과 진을 배치해요. 셀을 직접 맡고 있다면 리더 관리에서 '나도 셀을 맡아요'를 켜주세요.");
-    $("home-todo").innerHTML=""; $("home-anniv").innerHTML="";
+    $("home-soon").innerHTML = "";
   }
+  renderRooms();
   $("btn-manage").hidden = !(me.role==="super" || me.role==="jinjang");
   $("btn-home-cellmgr").hidden = !isManager();
+  $("btn-home-org").hidden = me.role !== "super";
+  $("drawer-sub").textContent = [
+    me.role==="super" ? "조직 구성" : "", isManager() ? "셀 관리" : "",
+    (me.role==="super"||me.role==="jinjang") ? "리더 관리" : "", "교회 명부 · 알림 · 설정"
+  ].filter(Boolean).join(" · ");
+  renderHomeHand();
   markSide("home"); show("s-home");
+  homeBackground();
   /* 기기 알림을 눌러 앱이 새로 열렸으면 바로 소식함으로 */
   if (state.openInboxOnStart) { state.openInboxOnStart = false; openInbox(); }
 }
-/* ── 곧 만날 사람 ──
-   앱이 알림을 못 보내니(서버가 없어서), 앱을 열었을 때 눈에 띄게 둡니다.
-   하루 한 번은 여시는 앱이라 실제로는 이게 제일 많이 보일 거예요. */
+/* 홈이 뜬 뒤 — 명부 정리 · 인계 요청 · 기록(곧 만날 사람 · 1:1). 그 사이 다른 화면으로 가도 괜찮게 */
+async function homeBackground() {
+  const onHome = () => !$("s-home").hidden;
+  try {
+    await Promise.all([ensureDirectory(), loadHandovers()]);
+    if (onHome()) renderHomeHand();
+    if (canLead()) {
+      await loadAllRecords();
+      if (onHome()) { renderCare(); renderRooms(); }
+      planAlarms();
+    }
+  } catch (e) { console.warn("홈 뒤 작업", e); }
+}
 /* 여러 명이 묶인 예정은 한 줄로 */
 function oneLinePerGroup(list) {
   const seen = {};
@@ -778,75 +769,41 @@ function oneLinePerGroup(list) {
 const planLine = (r) => r.kind === "train" && r.sponsorName
   ? `${meetLabel(r)} · ${r.sponsorName} → ${(r.sponseeNames||[]).join("·")}`
   : `${(r._names||[r.soulName]).join("·")} · ${meetLabel(r)}`;
-function renderSoon() {
-  const plans = oneLinePerGroup((state.allRecords||[]).filter(r=>r.planned));
-  /* 일주일 안의 예정은 모두 — 앱이 알림을 못 보내니 열었을 때 보이게 */
-  const soon = plans.filter(r=>{ const d=daysUntil(r.date); return d!==null && d>=0 && d<=7; })
-    .sort((a,b)=>String(a.date).localeCompare(String(b.date)));
-  const past = plans.filter(r=>{ const d=daysUntil(r.date); return d!==null && d<0; })
-    .sort((a,b)=>String(b.date).localeCompare(String(a.date)));
-  const cells = state.meetings.filter(m=>{ const d=daysUntil(m.date); return d!==null && d>=0 && d<=7; });
-  if (!soon.length && !past.length && !cells.length) { $("home-soon").innerHTML = ""; return; }
-  const when = (d) => { const n = daysUntil(d);
-    return n===0 ? "오늘" : n===1 ? "내일" : n===2 ? "모레" : `${fmtDate(d)} · ${n}일 뒤`; };
-  $("home-soon").innerHTML = `
-    <div class="card" style="margin-top:14px">
-      <h3 style="font-size:13px;font-weight:600">곧 만날 사람</h3>
-      <div class="list" style="margin-top:10px">
-        ${cells.map(m=>{ const c=state.cells.find(x=>x.id===m.cellId);
-          return `<div class="row" data-gomeet2="${m.id}" style="cursor:pointer">
-            <i style="width:8px;height:8px;border-radius:999px;background:var(--brand);flex-shrink:0"></i>
-            <div class="grow"><p class="nm">${esc(c?c.name:"셀")} 셀모임</p>
-              <p class="sub">${when(m.date)}${m.time?" "+esc(fmtSpan(m.time,m.timeEnd)):""}</p></div>
-          </div>`; }).join("")}
-        ${soon.map(r=>`<div class="row" data-gosoul6="${r.soulId}" style="cursor:pointer">
-            <i style="width:8px;height:8px;border-radius:999px;background:#E8B473;flex-shrink:0"></i>
-            <div class="grow"><p class="nm">${esc(planLine(r))}</p>
-              <p class="sub">${when(r.date)}${r.time?" "+esc(fmtSpan(r.time,r.timeEnd)):""}${
-                r.place?" · "+esc(r.place):""}</p></div>
-          </div>`).join("")}
-        ${past.slice(0,3).map(r=>`<div class="row" data-gosoul6="${r.soulId}" style="cursor:pointer">
-            <i style="width:8px;height:8px;border-radius:999px;background:#6B5C5D;flex-shrink:0"></i>
-            <div class="grow"><p class="nm">${esc(planLine(r))}</p>
-              <p class="sub">${fmtDate(r.date)} — 만나셨으면 기록을 채워주세요</p></div>
-            <span class="chip warn">기록 비어 있음</span>
-          </div>`).join("")}
-      </div>
-    </div>`;
-}
+/* 예전 이름을 부르는 곳이 남아 있어도 되게 */
+function renderSoon() { renderCare(); }
 
 const tile = (k,v) => `<div class="tile"><p class="k">${k}</p><p class="v">${v}</p></div>`;
 const card = (h,b) => `<div class="card"><h3 class="serif" style="font-size:17px;font-weight:600">${h}</h3>
   <p class="muted" style="margin-top:8px">${b}</p></div>`;
 
-function renderAbsent(list) {
-  if (!list.length) { $("home-absent").innerHTML=""; return; }
-  $("home-absent").innerHTML = `
-    <div class="card" style="margin-top:14px;background:var(--warn-bg);border-color:#3A2E1E">
-      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--warn-tx)">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9.2v4m0 2.9h.01"/><path d="M10.4 4.3 3 17.2A1.8 1.8 0 0 0 4.6 20h14.8a1.8 1.8 0 0 0 1.6-2.8L13.6 4.3a1.8 1.8 0 0 0-3.2 0Z"/></svg>
-        연속 결석
-      </div>
-      <p style="margin-top:8px;font-size:14px;line-height:1.7;color:#E8D9C4">
-        ${list.map(s=>`${esc(s.name)} (${absentStreak(attKey(s),attCell(s))}주)`).join(" · ")}</p>
-      <p class="muted" style="margin-top:6px;font-size:12px">안부 연락을 남겨볼 때예요.</p>
-    </div>`;
-}
+/* ── 오늘의 전시 · 기도할 영혼 ──
+   '기도했어요'를 누르면 오늘은 빠지고, 다 하면 '오늘 다 기도했어요'로 바뀝니다.
+   다음 날이 되면 다시 떠요. 카드에서 아예 사라지는 건 기도제목이 모두 응답됐을 때예요. */
 const prayList = () => state.souls.filter(s=>(s.prayOpen||0)>0 && isLeaderOf(s))
   .sort((a,b)=>String(a.lastPrayedAt||"").localeCompare(String(b.lastPrayedAt||"")));
+const prayTodo = () => prayList().filter(s => s.lastPrayedAt !== todayStr());
 function renderPray() {
-  const list = prayList();
-  if (!list.length) {
+  const all = prayList(), list = prayTodo();
+  if (!all.length) {
     $("home-pray").innerHTML = card("기도제목을 적어보세요",
       "영혼 카드에서 기도제목을 추가하면, 여기에 오늘 기도할 영혼이 한 명씩 떠요."); return;
+  }
+  if (!list.length) {
+    $("home-pray").innerHTML = `
+      <section class="card" style="border-radius:20px;padding:20px">
+        <span style="font-size:12px;letter-spacing:.06em;color:var(--brand)">오늘의 전시 · 기도할 영혼</span>
+        <h2 class="serif" style="font-size:19px;font-weight:600;margin-top:12px">오늘 ${all.length}명 모두 기도했어요</h2>
+        <p class="muted" style="margin-top:6px;font-size:13px">내일 아침에 다시 한 명씩 떠요.</p>
+      </section>`;
+    return;
   }
   if (state.prayIdx >= list.length) state.prayIdx = 0;
   const s = list[state.prayIdx], top = s.prayTop || {};
   $("home-pray").innerHTML = `
     <section class="card" style="border-radius:20px;padding:20px">
       <div style="display:flex;align-items:center;justify-content:space-between">
-        <span style="font-size:12px;letter-spacing:.06em;color:var(--brand)">오늘 기도할 영혼</span>
-        <span style="font-size:11px;color:var(--dim)">${state.prayIdx+1} / ${list.length}</span>
+        <span style="font-size:12px;letter-spacing:.06em;color:var(--brand)">오늘의 전시 · 기도할 영혼</span>
+        <span style="font-size:11px;color:var(--dim)">남은 ${list.length}명 / ${all.length}명</span>
       </div>
       <div style="display:flex;align-items:center;gap:12px;margin-top:14px;cursor:pointer" data-gosoul="${s.id}">
         ${avatar(s)}
@@ -861,7 +818,7 @@ function renderPray() {
       <p style="margin-top:14px;font-size:15px;line-height:1.75;color:#DCD6D5">${esc(top.text||"기도제목을 적어주세요.")}</p>
       <div style="display:flex;gap:8px;margin-top:16px">
         <button class="btn" style="height:48px" data-pray="${s.id}">기도했어요</button>
-        <button class="btn-ghost" style="width:48px;height:48px;flex-shrink:0;padding:0" data-next="1" aria-label="다음 영혼">›</button>
+        ${list.length>1?`<button class="btn-ghost" style="width:48px;height:48px;flex-shrink:0;padding:0" data-next="1" aria-label="다음 영혼">›</button>`:""}
       </div>
     </section>`;
 }
@@ -870,22 +827,6 @@ function openTodos() {
   state.souls.filter(isLeaderOf).forEach(s =>
     (s.todos||[]).filter(t=>!t.done).forEach(t=>out.push({...t,soulId:s.id,soulName:s.name})));
   return out.sort((a,b)=>String(a.due||"9999").localeCompare(String(b.due||"9999")));
-}
-function renderTodos(todos) {
-  if (!todos.length) { $("home-todo").innerHTML=""; return; }
-  $("home-todo").innerHTML = `
-    <h3 class="sec-title">챙길 일</h3>
-    <div class="list">${todos.slice(0,6).map(t=>`
-      <div class="row">
-        <button class="icon-btn" style="width:34px;height:34px;color:#6E6260"
-          data-done="${t.id}" data-soul="${t.soulId}" aria-label="완료">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="8.5"/></svg>
-        </button>
-        <div class="grow" data-gosoul="${t.soulId}" style="cursor:pointer">
-          <p class="nm">${esc(t.soulName)} · ${esc(t.text)}</p>
-          <p class="sub">${t.due?(daysUntil(t.due)<0?"지남 · ":"")+fmtDate(t.due)+"까지":"날짜 없음"}</p>
-        </div>
-      </div>`).join("")}</div>`;
 }
 function upcomingAnnivs() {
   const out = [];
@@ -897,23 +838,222 @@ function upcomingAnnivs() {
   });
   return out.sort((a,b)=>a.d-b.d);
 }
-function renderAnnivs(list) {
-  if (!list.length) { $("home-anniv").innerHTML=""; return; }
-  $("home-anniv").innerHTML = `
-    <h3 class="sec-title">이번 주 기념일</h3>
-    <div class="list">${list.map(a=>`
-      <div class="row" data-gosoul="${a.id}" style="cursor:pointer">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F24557" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 20h15M6 20v-5.2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2V20M12 12.2V9.6"/><circle cx="12" cy="7.6" r="1"/></svg>
-        <div class="grow"><p class="nm">${esc(a.name)} ${a.label}</p>
-          <p class="sub">${fmtDate(a.date)} · ${a.d===0?"오늘":"D-"+a.d}</p></div>
-      </div>`).join("")}</div>`;
+
+/* ── 오늘 챙길 사람 ──
+   흩어져 있던 '곧 만날 사람 · 연속 결석 · 챙길 일 · 기념일'에
+   20단계의 '결석 돌봄(연락 단계)'과 '1:1 오래된 사람'을 더해 한 장에 모읍니다. */
+const careRow = (o) => `<div class="crow">
+    <i class="dot" style="background:${o.dot||"var(--brand)"}"></i>
+    <div class="grow" ${o.go||""}><p class="nm">${o.nm}</p>${o.sub?`<p class="sub">${o.sub}</p>`:""}</div>
+    ${o.act?`<div class="cact">${o.act}</div>`:""}</div>`;
+function careGroup(key, label, rows, limit) {
+  if (!rows.length) return "";
+  const n = limit || 4, open = state.careMore && state.careMore[key];
+  const shown = open ? rows : rows.slice(0, n);
+  return `<p class="care-g"><span>${label}</span><span>${rows.length}</span></p>${shown.join("")}${
+    rows.length > n ? `<button class="more-btn" data-cmore="${key}">${open?"접기":`${rows.length-n}명 더 보기`}</button>` : ""}`;
 }
+function renderCare() {
+  const box = $("home-soon"); if (!box) return;
+  const recs = state.allRecords;   // 아직 안 왔으면 null
+  const when = (d) => { const n = daysUntil(d);
+    return n===0 ? "오늘" : n===1 ? "내일" : n===2 ? "모레" : `${fmtDate(d)} · ${n}일 뒤`; };
+
+  /* ① 오늘 · 곧 — 셀모임과 예정된 만남 */
+  const soonRows = [];
+  state.meetings.filter(m=>{ const d=daysUntil(m.date); return d!==null && d>=0 && d<=7; })
+    .sort((a,b)=>String(a.date).localeCompare(String(b.date))).forEach(m=>{
+      const c=state.cells.find(x=>x.id===m.cellId);
+      soonRows.push(careRow({ go:`data-gomeet2="${m.id}"`, nm:`${esc(c?c.name:"셀")} 셀모임`,
+        sub:`${when(m.date)}${m.time?" "+esc(fmtSpan(m.time,m.timeEnd)):""}` }));
+    });
+  const plans = recs ? oneLinePerGroup(recs.filter(r=>r.planned && r.type==="meet")) : [];
+  plans.filter(r=>{ const d=daysUntil(r.date); return d!==null && d>=0 && d<=7; })
+    .sort((a,b)=>String(a.date).localeCompare(String(b.date))).forEach(r=>
+      soonRows.push(careRow({ dot:"#E8B473", go:`data-gosoul6="${r.soulId}"`, nm:esc(planLine(r)),
+        sub:`${when(r.date)}${r.time?" "+esc(fmtSpan(r.time,r.timeEnd)):""}${r.place?" · "+esc(r.place):""}` })));
+  plans.filter(r=>{ const d=daysUntil(r.date); return d!==null && d<0; })
+    .sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,3).forEach(r=>
+      soonRows.push(careRow({ dot:"#6B5C5D", go:`data-gosoul6="${r.soulId}"`, nm:esc(planLine(r)),
+        sub:`${fmtDate(r.date)} — 만나셨으면 기록을 채워주세요`, act:`<span class="chip warn">기록 비어 있음</span>` })));
+
+  /* ② 결석 — 연락할 때 (다시 나오면 저절로 빠짐) */
+  const absRows = state.souls.map(careDue).filter(Boolean)
+    .sort((a,b)=>b.n-a.n).map(d=>{
+      const s = d.s, tel = (s.phone||"").replace(/\D/g,""), last = (d.care.log||[]).slice(-1)[0];
+      const stepNm = STEPS[d.step][1];
+      const link = tel && d.step < 2
+        ? `<a class="btn-sm" href="${d.step===0?"sms":"tel"}:${tel}" aria-label="${stepNm}">${d.step===0?"문자 열기":"전화 걸기"}</a>` : "";
+      return careRow({ dot:"#E8B473", go:`data-gosoul="${s.id}"`, nm:`${esc(s.name)} · 결석 ${d.n}주`,
+        sub:`${esc(whyText(d.why))}${last?` · 지난 연락: ${STEPNAME[last.step]||"연락"} ${fmtDate(last.at)}`:" · 아직 연락 전"}`,
+        act:`${link}<button class="btn-sm" data-care="${s.id}" data-how="${STEPS[d.step][0]}">${stepNm}했어요</button>
+             <button class="btn-sm" data-care="${s.id}" data-how="later" aria-label="일주일 뒤에 다시">1주 뒤</button>` });
+    });
+
+  /* ③ 1:1 오래된 사람 */
+  const oneRows = !recs ? [] : state.souls.filter(s=>isLeaderOf(s) && !isLeaderCard(s))
+    .map(s=>({ s, n: oneDays(s) })).filter(x=>x.n===null || x.n>=ONE_DUE)
+    .sort((a,b)=>(b.n===null?-1:b.n)-(a.n===null?-1:a.n)).sort((a,b)=>(a.n===null)-(b.n===null))
+    .map(({s,n})=>careRow({ dot:"#199e70", go:`data-gosoul="${s.id}"`, nm:esc(s.name),
+      sub: n===null ? "1:1 기록이 아직 없어요" : `1:1 만난 지 ${n}일 지났어요`,
+      act:`<button class="btn-sm" data-one="${s.id}">1:1 잡기</button>` }));
+
+  /* ④ 챙길 일 · ⑤ 기념일 */
+  const todoRows = openTodos().map(t=>careRow({ dot:"#9A8CF0", go:`data-gosoul="${t.soulId}"`,
+    nm:`${esc(t.soulName)} · ${esc(t.text)}`,
+    sub: t.due ? `${daysUntil(t.due)<0?"지남 · ":""}${fmtDate(t.due)}까지` : "날짜 없음",
+    act:`<button class="btn-sm" data-done="${t.id}" data-soul="${t.soulId}">완료</button>` }));
+  const annRows = upcomingAnnivs().map(a=>careRow({ dot:"#F24557", go:`data-gosoul="${a.id}"`,
+    nm:`${esc(a.name)} ${a.label}`, sub:`${fmtDate(a.date)} · ${a.d===0?"오늘":"D-"+a.d}` }));
+
+  const total = absRows.length + oneRows.length + todoRows.length + annRows.length + soonRows.length;
+  box.innerHTML = `
+    <section class="card" style="margin-top:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <h3 style="font-size:15px;font-weight:600">오늘 챙길 사람</h3>
+        <span class="muted" style="font-size:12px">${recs ? "" : "기록 불러오는 중…"}</span>
+      </div>
+      ${total ? "" : `<p class="muted" style="margin-top:10px;font-size:13px">오늘은 따로 챙길 사람이 없어요.</p>`}
+      ${careGroup("abs", "결석 — 연락할 때", absRows)}
+      ${careGroup("soon", "오늘 · 곧", soonRows, 5)}
+      ${careGroup("one", `1:1 만난 지 ${ONE_DUE}일 넘은 사람`, oneRows, 3)}
+      ${careGroup("todo", "챙길 일", todoRows)}
+      ${careGroup("anniv", "이번 주 기념일", annRows)}
+    </section>`;
+}
+
+/* ── 코치 · 진장 홈 ── 오늘의 전시 = 셀 보고 확인, 챙길 사람 = 맡은 셀의 결석 */
+function renderReports() {
+  const mine = state.meetings.filter(m => daysSince(m.date) !== null && daysSince(m.date) >= 0 && daysSince(m.date) <= 30);
+  const wait = mine.filter(m => m.reportedAt && !m.check);
+  const cellsSeen = seenCells();
+  const quiet = cellsSeen.filter(c => !state.meetings.some(m => m.cellId === c.id
+    && daysSince(m.date) !== null && daysSince(m.date) >= 0 && daysSince(m.date) <= 8));
+  const cn = (id) => (state.cells.find(c=>c.id===id)||{}).name || "셀";
+  $("home-pray").innerHTML = `
+    <section class="card" style="border-radius:20px;padding:20px">
+      <span style="font-size:12px;letter-spacing:.06em;color:var(--brand)">오늘의 전시 · 셀 보고</span>
+      <h2 class="serif" style="font-size:19px;font-weight:600;margin-top:12px">${
+        wait.length ? `확인을 기다리는 보고 ${wait.length}건` : "기다리는 보고가 없어요"}</h2>
+      <div style="margin-top:8px">
+        ${wait.map(m=>careRow({ go:`data-gomeet2="${m.id}"`, nm:`${esc(cn(m.cellId))} · ${fmtDate(m.date)} 셀모임`,
+          sub:`출석 ${Object.values(m.attendance||{}).filter(v=>v&&v!=="absent").length}명 · ${fmtDate(m.reportedAt)} 보고`,
+          act:`<button class="btn-sm" data-gomeet2="${m.id}">확인하기</button>` })).join("")}
+        ${quiet.length ? careGroup("quiet", "최근 8일 셀모임 기록 없음",
+          quiet.map(c=>careRow({ dot:"#6B5C5D", nm:esc(c.name), sub:esc(leaderLabel(c.id)) })), 4) : ""}
+      </div>
+    </section>`;
+}
+function renderCoachCare() {
+  const rows = state.souls.filter(s => !isLeaderCard(s)).map(s => {
+    const st = careStreak(attKey(s), attCell(s)); return st.n >= CARE_AT ? { s, st } : null;
+  }).filter(Boolean).sort((a,b)=>b.st.n-a.st.n).map(({s,st})=>{
+    const c = state.cells.find(x=>x.id===s.cellId);
+    const last = (s.care && s.care.ep === st.ep && (s.care.log||[]).slice(-1)[0]) || null;
+    return careRow({ dot:"#E8B473", go:`data-gosoul="${s.id}"`, nm:`${esc(s.name)} · 결석 ${st.n}주`,
+      sub:`${esc(c?c.name:"")} · ${esc(whyText(st.why))}${last?` · 셀리더 연락: ${STEPNAME[last.step]||"연락"} ${fmtDate(last.at)}`:" · 셀리더 연락 전"}` });
+  });
+  $("home-soon").innerHTML = `
+    <section class="card" style="margin-top:14px">
+      <h3 style="font-size:15px;font-weight:600">${state.me.role==="jinjang"?"우리 진에서":"맡은 셀에서"} 챙길 사람</h3>
+      ${rows.length ? careGroup("cabs", `${CARE_AT}주 이상 연달아 결석`, rows, 6)
+        : `<p class="muted" style="margin-top:10px;font-size:13px">연달아 빠진 사람이 없어요.</p>`}
+    </section>`;
+}
+
+/* ── 전시실 — 방 타일 ── */
+function renderRooms() {
+  const me = state.me, room = (k, label, big, small, hot) =>
+    `<button class="room" data-room="${k}"><span class="k">${label}</span>
+      <span class="v"><b>${big}</b>${small?`<span class="${hot?"hot":""}">${small}</span>`:""}</span></button>`;
+  const recs = state.allRecords;
+  const weekEv = () => {
+    let n = state.meetings.filter(m=>{ const d=daysUntil(m.date); return d!==null && d>=0 && d<=7; }).length;
+    if (recs) n += oneLinePerGroup(recs.filter(r=>r.planned && r.type==="meet"))
+      .filter(r=>{ const d=daysUntil(r.date); return d!==null && d>=0 && d<=7; }).length;
+    return n;
+  };
+  const rate8 = () => {
+    const recent = state.meetings.filter(m=>daysSince(m.date)!==null && daysSince(m.date)>=0).slice(0,8);
+    return recent.length ? Math.round(recent.reduce((sum,m)=>{
+      const v = Object.values(m.attendance||{}); return sum + (v.length ? v.filter(x=>x!=="absent").length/v.length : 0);
+    },0)/recent.length*100)+"%" : "—";
+  };
+  const interns = () => state.souls.filter(s=>s.intern && !isLeaderCard(s)).length;
+  let html = "";
+  if (canLead()) {
+    const mine = state.souls.filter(isLeaderOf);
+    const careN = mine.filter(s=>careDue(s) || s.status==="care").length;
+    const unrep = state.meetings.filter(m=>m.leaderUid===uid() && !m.reportedAt
+      && daysSince(m.date)!==null && daysSince(m.date)>=0 && daysSince(m.date)<=14).length;
+    const monthMeets = recs ? recs.filter(r=>r.type==="meet" && !r.planned && !r.away
+      && String(r.date||"").slice(0,7)===todayStr().slice(0,7)).length : "—";
+    html = room("souls","영혼들", mine.length, careN?`돌봄 필요 ${careN}`:"명", careN>0)
+      + room("meet","셀모임", rate8(), unrep?`보고 전 ${unrep}`:"최근 출석률", unrep>0)
+      + room("cal","캘린더", weekEv(), "이번 주 일정")
+      + room("health","셀 건강", interns(), "인턴")
+      + room("dir","교회 명부", state.members.length, `셀 ${state.cells.length}개`)
+      + room("train","훈련 현황", state.courses.length, "과정")
+      + room("stats","활동 통계", monthMeets, "이번 달 만남")
+      + room("photos","사진", "보기", "셀모임 · 만남 사진");
+  } else if (me.role==="coach" || me.role==="jinjang") {
+    const wait = state.meetings.filter(m=>m.reportedAt && !m.check).length;
+    const careN = state.souls.filter(s=>!isLeaderCard(s) && careStreak(attKey(s),attCell(s)).n>=CARE_AT).length;
+    html = room("souls","영혼들", state.souls.length, careN?`결석 돌봄 ${careN}`:"명", careN>0)
+      + room("meet","셀 보고", wait, wait?"확인 기다림":"기다리는 보고 없음", wait>0)
+      + room("health","셀 건강", seenCells().length, `셀 · 인턴 ${interns()}`)
+      + room("dir","교회 명부", state.members.length, `셀 ${state.cells.length}개`)
+      + room("train","훈련 현황", state.courses.length, "과정")
+      + room("cal","캘린더", weekEv(), "이번 주 셀모임");
+  } else {
+    const pendingN = state.invites.filter(i=>i.status==="pending").length;
+    html = room("dir","교회 명부", state.members.length, "명")
+      + room("org","조직 구성", state.cells.length, `셀 · 초대 중 ${pendingN}`, pendingN>0)
+      + room("cellmgr","셀 관리", state.jins.length, "진")
+      + room("usage","사용 현황", "보기", "기기 · 시간대");
+  }
+  $("home-rooms").innerHTML = html;
+}
+/* 내가 볼 수 있는 셀 — 셀리더는 내 셀, 코치는 맡은 셀, 진장은 진 전체 */
+function seenCells() {
+  const me = state.me;
+  if (me.role === "jinjang") return state.cells.filter(c=>c.jinId===me.jinId);
+  if (me.role === "coach") {
+    const ids = new Set([...(me.cellIds||[]), ...myCells().map(c=>c.id)]);
+    return state.cells.filter(c=>ids.has(c.id));
+  }
+  return myCells();
+}
+
 $("s-home").addEventListener("click", async (ev) => {
+  const rm = ev.target.closest("[data-room]");
+  if (rm) {
+    const k = rm.dataset.room;
+    ({ souls:openSouls, meet:openMeet, cal:openCal, health:openHealth, dir:openDir, train:openTrainBoard,
+       stats:openStats, photos:openPhotos, org:openOrg, cellmgr:openCellMgr, usage:openUsage }[k] || (()=>{}))();
+    return;
+  }
+  const more = ev.target.closest("[data-cmore]");
+  if (more) { state.careMore = state.careMore || {}; state.careMore[more.dataset.cmore] = !state.careMore[more.dataset.cmore];
+    if (canLead()) renderCare(); else { renderReports(); renderCoachCare(); } return; }
+  const cr = ev.target.closest("[data-care]");
+  if (cr) {
+    cr.disabled = true;
+    try { await markCare(cr.dataset.care, cr.dataset.how);
+      toast(cr.dataset.how === "later" ? "일주일 뒤에 다시 띄울게요." : "적어 두었어요. 그래도 안 나오면 일주일 뒤 다음 단계로 떠요.");
+      renderCare(); renderRooms(); }
+    catch (e) { toast(msgOf(e)); cr.disabled = false; }
+    return;
+  }
+  const one = ev.target.closest("[data-one]");
+  if (one) { state.soul = state.souls.find(x=>x.id===one.dataset.one) || state.soul;
+    openLog(one.dataset.one, null, { kind:"one" }); return; }
+  if (ev.target.closest("a[href^='tel:'],a[href^='sms:']")) return;
   const go = ev.target.closest("[data-gosoul]"); if (go) { openSoul(go.dataset.gosoul); return; }
   const g6 = ev.target.closest("[data-gosoul6]"); if (g6) { openSoul(g6.dataset.gosoul6); return; }
   const gm = ev.target.closest("[data-gomeet2]"); if (gm) { openMeeting(gm.dataset.gomeet2); return; }
   const next = ev.target.closest("[data-next]");
-  if (next) { const n=prayList().length; state.prayIdx=(state.prayIdx+1)%Math.max(n,1); renderPray(); return; }
+  if (next) { const n=prayTodo().length; state.prayIdx=(state.prayIdx+1)%Math.max(n,1); renderPray(); return; }
   const pray = ev.target.closest("[data-pray]");
   if (pray) {
     try {
@@ -929,12 +1069,17 @@ $("s-home").addEventListener("click", async (ev) => {
     const todos = (s.todos||[]).map(t=>t.id===done.dataset.done?{...t,done:true}:t);
     try {
       await updateDoc(doc(db,"souls",s.id), { todos });
-      s.todos = todos; toast("완료 처리했어요.");
-      const list = openTodos(); renderTodos(list);
-      const tl = $("home-tiles").children; if (tl[2]) tl[2].querySelector(".v").textContent = list.length+"건";
+      s.todos = todos; toast("완료 처리했어요."); renderCare();
     } catch (e) { toast(msgOf(e)); }
   }
 });
+/* 관리 서랍을 열어 두면 다음에도 열린 채로 (이 기기에서만) */
+try { $("home-drawer").open = localStorage.getItem("mokja-drawer") === "1"; } catch {}
+$("home-drawer").addEventListener("toggle", () => {
+  try { localStorage.setItem("mokja-drawer", $("home-drawer").open ? "1" : "0"); } catch {} });
+$("btn-home-photos").onclick = () => openPhotos();
+$("btn-home-notify").onclick = () => $("btn-notify-set").click();
+$("btn-home-more").onclick = () => openMore();
 $("btn-manage").onclick = () => openManage();
 $("btn-back").onclick = () => openHome();
 $("btn-quick-add").onclick = () => {
@@ -1020,7 +1165,8 @@ function renderSouls() {
         <p class="sub">${bt ? esc(bt) : "생일 미입력"}${
           bd !== null && bd <= 14 ? ` · 🎂 ${bd===0?"오늘":"D-"+bd}` : ""}</p>
         <p class="sub2">${st>=2?`<span style="color:var(--warn-tx)">결석 ${st}주</span> · `:""}${
-          agoShort(n)}${rate===null?"":` · 출석 ${rate}%`}${
+          agoShort(n)}${isLeaderCard(s)||oneDays(s)===null?"":` · 1:1 ${oneDays(s)}일 전`}${rate===null?"":` · 출석 ${rate}%`}${
+          s.intern?` · <span style="color:var(--ok-tx)">인턴</span>`:""}${
           (s.prayOpen||0)>0?` · 기도 ${s.prayOpen}`:""}</p>
       </div>
       <span class="chip ${isLeaderCard(s)?"":s.status==="care"?"warn":"rose"}">${
@@ -1127,8 +1273,8 @@ async function openSoul(soulId) {
   const s = state.souls.find(x=>x.id===soulId);
   if (!s) { toast("카드를 찾을 수 없어요."); openSouls(); return; }
   state.soul = s; state.soulTab = "rec"; state.recKw = ""; state.recType = "all";
-  await loadRecords(soulId, isLeaderOf(s));
-  await loadTrainings(soulId);
+  state.alerts = [];
+  await Promise.all([loadRecords(soulId, isLeaderOf(s)), loadTrainings(soulId), loadAlerts(soulId, isLeaderOf(s))]);
   state.shared = isLeaderCard(s) ? await loadShared(s.linkedUid) : [];
   state.linkedSelf = null;
   if (isLeaderCard(s) && s.linkedUid && state.me.role === "jinjang") {
@@ -1144,6 +1290,8 @@ async function openSoul(soulId) {
   $("soul-chips").innerHTML =
     (isLeaderCard(s) ? `<span class="chip">${KINDLABEL[s.kind]}</span>` : "")
     + `<span class="chip rose">${esc(STATUS[s.status]||"—")}</span>`
+    + (s.intern?`<span class="chip ok">인턴</span>`:"")
+    + (careDue(s)?`<span class="chip warn">결석 ${careDue(s).n}주 · 연락할 때</span>`:"")
     + (cell?`<span class="chip">${esc(cell.name)}${isLeaderCard(s)?" 담당":""}</span>`:"");
   const tel = (s.phone||"").replace(/\D/g,"");
   $("soul-contact").innerHTML = tel ? `
@@ -1164,6 +1312,7 @@ function updateSummary() {
   const s = state.soul, n = daysSince(s.lastMetAt), rate = attendRate(attKey(s),attCell(s));
   const meets = state.records.filter(r=>r.type==="meet").length;
   $("soul-summary").textContent = agoText(n)
+    + (isLeaderCard(s)?"":` · ${oneText(s)}`)
     + (rate===null?"":` · 출석 ${rate}%`)
     + ` · 만남 ${meets}회 · 기도 ${s.prayOpen||0}개`;
 }
@@ -1302,6 +1451,7 @@ function renderSoulBody() {
     const types = [["all","전체"],["update","근황"],["pray","기도"],
                    ["meet","만남"],["heart","받은 마음"]];
     box.innerHTML = `
+      ${alertBlock(s)}
       ${isLeaderCard(s) && !s.linkedUid ? "" : attendBlock(attKey(s), attCell(s))}
       ${state.shared.length ? `<div class="card" style="margin-bottom:12px;background:var(--rose-bg);border-color:#3A2226">
         <h3 style="font-size:13px;font-weight:600;color:var(--rose-tx)">본인이 열어준 기록</h3>
@@ -2022,6 +2172,13 @@ async function saveLog() {
         await updateDoc(doc(db,"souls",soulId), { lastMetAt: date });
         if (s) s.lastMetAt = date;
       }
+      /* 20단계 — 1:1 은 따로 '마지막 1:1'도 (홈의 '1:1 만난 지 ○일') */
+      if (L.kind === "one" && date <= todayStr()) for (const soulId of [...new Set(touched)]) {
+        const s = state.souls.find(x=>x.id===soulId);
+        if (s && String(s.lastOneAt||"") >= date) continue;
+        await updateDoc(doc(db,"souls",soulId), { lastOneAt: date });
+        if (s) s.lastOneAt = date;
+      }
     }
     /* 훈련 모임이면 피후원자마다 훈련 이력의 그 회차를 체크(또는 예정)합니다 */
     if (train) {
@@ -2631,6 +2788,7 @@ function renderCalDay() {
         <p class="sub">${[fmtSpan(e.time,e.timeEnd),e.place,e.sub]
           .filter(Boolean).map(esc).join(" · ")||"&nbsp;"}</p></div>
       <button class="btn-sm" data-gcal="${i}">캘린더에</button>
+      ${ds >= todayStr() ? `<button class="btn-sm" data-ics="${i}">알림 넣기</button>` : ""}
       ${e.r && e.r.by===uid() && e.r.planned
         ?`<button class="btn-sm" data-calrec="${e.r.soulId}|${e.r.id}|fill">만났어요</button>`:""}
       ${e.r && e.r.by===uid()?`<button class="btn-sm" data-calrec="${e.r.soulId}|${e.r.id}">수정</button>`:""}
@@ -2653,6 +2811,13 @@ $("cal-prev").onclick=()=>{ const [y,m]=state.calMonth.split("-").map(Number);
 $("cal-next").onclick=()=>{ const [y,m]=state.calMonth.split("-").map(Number);
   const d=new Date(y,m,1); state.calMonth=`${d.getFullYear()}-${pad2(d.getMonth()+1)}`; renderCal(); };
 $("cal-day-list").addEventListener("click",(ev)=>{
+  const ic=ev.target.closest("[data-ics]");
+  if (ic) {
+    const list = calEvents().filter(e=>e.date===state.calPick)
+      .sort((a,b)=>String(a.time||"").localeCompare(String(b.time||"")));
+    const e = list[Number(ic.dataset.ics)]; if (e) icsOne(e);
+    return;
+  }
   const g=ev.target.closest("[data-gcal]");
   if (g) {
     const list = calEvents().filter(e=>e.date===state.calPick)
@@ -3048,6 +3213,7 @@ async function openMeet() {
     return `<div class="row" data-meeting="${m.id}" style="cursor:pointer">
       <div class="grow"><p class="nm">${fmtDate(m.date)} · ${esc(cellNm(m.cellId))}</p>
         <p class="sub">출석 ${ok} / ${v.length}${m.topic?" · "+esc(m.topic):""}${notes?` · 나눔 ${notes}명`:""}</p></div>
+      ${m.check?`<span class="chip ok">확인됨</span>`:m.reportedAt?`<span class="chip warn">보고함</span>`:""}
       <span class="chip">${v.length?Math.round(ok/v.length*100)+"%":"—"}</span></div>`;
   }).join("") || `<p class="muted">아직 모임 기록이 없어요. 오른쪽 위 + 를 눌러 이번 주 모임을 만들어요.</p>`;
   $("btn-meet-new").hidden = !canLead();
@@ -3164,10 +3330,10 @@ function openMeeting(id, opts) {
   const m = id?state.meetings.find(x=>x.id===id):null;
   const cells = myCells();
   if(!m && !cells.length){ toast("먼저 셀을 만들어 주세요. 리더 관리에서 추가할 수 있어요."); return; }
-  state.meeting = m ? { attendance:{}, reasons:{}, notes:{}, ...m } : {
+  state.meeting = m ? { attendance:{}, reasons:{}, notes:{}, reasonKinds:{}, ...m } : {
     id:null, cellId:defaultCellId(), jinId:state.me.jinId, date:o.date||todayStr(), time:"",
     timeEnd:"", place:"", topic:"", note:"", visitors:"",
-    attendance:{}, reasons:{}, notes:{}, open:{} };
+    attendance:{}, reasons:{}, notes:{}, reasonKinds:{}, open:{} };
   state.meeting.back = o.back || null;
   state.meeting.open = state.meeting.open || {};
   state.meeting.shots = (m && m.photos ? m.photos.slice() : []);
@@ -3195,6 +3361,8 @@ function openMeeting(id, opts) {
   /* 저장된 모임이면 댓글 — 이 모임을 볼 수 있는 사람(셀리더 · 담당 코치 · 진장)이 같이 봅니다 */
   $("btn-m-cmt").hidden = !m;
   $("btn-m-cmt").textContent = "댓글";
+  state.meeting.reasonKinds = { ...(state.meeting.reasonKinds||{}) };
+  renderReportBox();
   if (m) loadComments(meetTarget(m)).then(rows => {
     if (state.meeting && state.meeting.id === m.id)
       $("btn-m-cmt").textContent = rows.length ? `댓글 ${rows.length}개` : "댓글 남기기";
@@ -3249,8 +3417,10 @@ function renderAttendance(mine) {
           `<button data-att="${s.id}" data-v="${k}" class="${v===k?"on":""}" ${mine?"":"disabled"}>${ATT[k].slice(0,2)}</button>`).join("")}</div>
         ${mine?`<button class="btn-sm" data-open-m="${s.id}" style="width:38px;padding:0">${open?"▴":"▾"}</button>`:""}
       </div>
-      ${v==="absent"?`<input data-reason="${s.id}" value="${esc(mt.reasons[s.id]||"")}"
-        placeholder="결석 사유 (한 줄)" style="height:40px;margin-top:10px;font-size:14px" ${mine?"":"disabled"}>`:""}
+      ${v==="absent"?`<div class="rsn">${Object.entries(REASON).map(([k,l])=>
+          `<button data-rk="${s.id}" data-k="${k}" class="${(mt.reasonKinds[s.id]||"")===k?"on":""}" ${mine?"":"disabled"}>${l}</button>`).join("")}</div>
+        <input data-reason="${s.id}" value="${esc(mt.reasons[s.id]||"")}"
+        placeholder="한 줄 메모 (선택)" style="height:40px;margin-top:8px;font-size:14px" ${mine?"":"disabled"}>`:""}
       ${open?`<div class="more">
         <p class="tag">근황 · 나눔</p>
         <textarea data-note="${s.id}" data-k="update" placeholder="오늘 나눈 이야기, 요즘 어떤지" ${mine?"":"disabled"}>${esc(nt.update||"")}</textarea>
@@ -3264,6 +3434,9 @@ function renderAttendance(mine) {
 $("list-att").addEventListener("click",(ev)=>{
   const o=ev.target.closest("[data-open-m]");
   if(o){ const id=o.dataset.openM; state.meeting.open[id]=!state.meeting.open[id]; renderAttendance(true); return; }
+  const rk=ev.target.closest("[data-rk]");
+  if(rk){ const id=rk.dataset.rk, k=rk.dataset.k, R=state.meeting.reasonKinds;
+    if (R[id]===k) delete R[id]; else R[id]=k; renderAttendance(true); return; }
   const b=ev.target.closest("[data-att]"); if(!b) return;
   const id=b.dataset.att, v=b.dataset.v;
   state.meeting.attendance[id]=(state.meeting.attendance[id]===v)?"":v;
@@ -3289,6 +3462,7 @@ $("btn-meeting-save").onclick=async()=>{
     place:$("m-place").value.trim(), topic:$("m-topic").value.trim(),
     note:$("m-note").value.trim(), visitors:$("m-visitor").value.trim(),
     attendance:mt.attendance, reasons:mt.reasons, notes:mt.notes,
+    reasonKinds:Object.fromEntries(Object.entries(mt.reasonKinds||{}).filter(([k])=>mt.attendance[k]==="absent")),
     recRefs: mt.recRefs||{}, updatedAt:serverTimestamp() };
   $("btn-meeting-save").disabled=true;
   try {
@@ -3365,7 +3539,8 @@ $("btn-report").onclick=()=>{
     `출석 ${present.length+online.length}명 / 결석 ${absent.length}명`,
     present.length?`출석: ${present.map(s=>s.name).join(", ")}`:"",
     online.length?`온라인: ${online.map(s=>s.name).join(", ")}`:"",
-    absent.length?`결석: ${absent.map(s=>mt.reasons[s.id]?`${s.name}(${mt.reasons[s.id]})`:s.name).join(", ")}`:"",
+    absent.length?`결석: ${absent.map(s=>{ const why=[REASON[(mt.reasonKinds||{})[s.id]],mt.reasons[s.id]].filter(Boolean).join(" · ");
+      return why?`${s.name}(${why})`:s.name; }).join(", ")}`:"",
     $("m-topic").value.trim()?`나눔: ${$("m-topic").value.trim()}`:"",
     $("m-visitor").value.trim()?`새 방문자: ${$("m-visitor").value.trim()}`:"",
     shares.length?`\n나눔\n${shares.join("\n")}`:"",
@@ -3390,6 +3565,7 @@ async function openMore() {
   $("app-ver").textContent=APP_VERSION;
   $("btn-go-usage").hidden = me.role!=="super";
   $("btn-go-cellmgr").hidden = !isManager();
+  $("btn-manage-org") && ($("btn-manage-org").hidden = me.role !== "super");
   $("install-sub").textContent = window.matchMedia("(display-mode: standalone)").matches
     ? "이미 앱으로 설치되어 있어요":"폰 홈 화면에서 바로 열 수 있어요";
   markSide("more"); show("s-more");
@@ -3496,6 +3672,7 @@ $("btn-export-all").onclick=async()=>{
 async function openManage() {
   show("s-loading");
   await loadOrg(true); await syncBadges();
+  $("btn-manage-org").hidden = state.me.role !== "super";
   const isSuper=state.me.role==="super";
   const cellName=(id)=>(state.cells.find(c=>c.id===id)||{}).name||"";
   const jinName=(id)=>(state.jins.find(j=>j.id===id)||{}).name||"";
@@ -3747,7 +3924,7 @@ $("iv-send").onclick=async()=>{
 /* 초대 — '리더 초대하기'와 명부의 '역할 주기'가 같이 씁니다.
    명부 카드와 이어서 초대하면, 초대장을 만들기 '전에' 그분 목양 카드에 이메일 차단부터 겁니다.
    (그분이 로그인해 코치 · 진장 역할을 받는 순간 이미 막혀 있어야 하니까요) */
-async function sendInvite({ name, email, pick, jinId, cellId, memberId }) {
+async function sendInvite({ name, email, pick, jinId, cellId, memberId, cellIds }) {
   const role = pick === "coachleader" ? "coach" : pick;
   const isLeader = pick === "coachleader";
   let exist = null;
@@ -3765,7 +3942,7 @@ async function sendInvite({ name, email, pick, jinId, cellId, memberId }) {
     await updateDoc(doc(db,"members",memberId), { linkedEmail: email, invitedRole: pick, updatedAt: serverTimestamp() });
     if (m) Object.assign(m, { linkedEmail: email, invitedRole: pick });
   }
-  await setDoc(doc(db,"invites",email),{ email, name, role, jinId, cellId, isLeader, cellIds:[], status:"pending",
+  await setDoc(doc(db,"invites",email),{ email, name, role, jinId, cellId, isLeader, cellIds: cellIds || [], status:"pending",
     ...(memberId ? { memberId } : {}), invitedBy:state.me.id, invitedAt:serverTimestamp() });
   await log("초대", email, role);
   return { msg: warn
@@ -3833,7 +4010,7 @@ window.addEventListener("pagehide", flushUsage);
 const SCREEN_NAME = { home:"홈", souls:"영혼들", cal:"캘린더", meet:"셀모임", more:"더보기",
   soul:"영혼 카드", log:"만남 기록", meeting:"셀모임 입력", train:"훈련 현황",
   search:"기록 검색", manage:"리더 관리", usage:"사용 현황", edit:"영혼 수정",
-  dir:"교회 명부", cellmgr:"셀 관리", inbox:"소식", photos:"사진 모아보기", stats:"활동 통계", mine:"내 카드" };
+  dir:"교회 명부", cellmgr:"셀 관리", org:"조직 구성", inbox:"소식", photos:"사진 모아보기", stats:"활동 통계", mine:"내 카드" };
 const ACT_NAME = { recordCreate:"기록 남김", planCreate:"만남 예약", meetingSave:"셀모임 저장",
   soulCreate:"영혼 추가", trainSave:"훈련 기록", exportCsv:"내려받기" };
 
@@ -4815,6 +4992,22 @@ async function backfillThumbs() {
    올릴 때마다 version.json 도 같이 올립니다. 앱은 열 때 · 다시 볼 때 · 10분마다
    그 파일만 살짝 확인해서(아주 작은 파일), 지금 버전보다 새것이면 위에 알림을 띄웁니다. */
 const CHANGELOG = [
+  { v:"20.0", d:"2026-11-05", items:[
+    "홈을 '전시실'로 — 오늘의 전시 · 오늘 챙길 사람 · 방 타일 · 관리 서랍",
+    "결석 돌봄 — 연달아 빠지면 '연락할 때'에 뜨고 문자 → 전화 → 만남 순서로, 다시 나오면 저절로 빠져요",
+    "결석 사유 고르기 — 아파서 · 집안 일 · 근무·출장 · 여행 · 모름 (출장 · 여행은 돌봄에 안 셈)",
+    "1:1 만난 지 ○일 — 카드 · 영혼 목록 · 홈에",
+    "민감 메모 — 카드 맨 위 빨간 표시, 눌러야 보여요 (나만 / 담당 / 코치까지)",
+    "셀 건강 · 인턴 체크 — 8주 모임 · 평균 출석 · 새 방문자 · 인턴",
+    "셀 보고 · 코치 확인 — 보고하면 코치 · 진장에게 소식, 확인과 한 줄 격려가 셀리더에게",
+    "일정 미리 알림 — 폰 캘린더에 알림째 넣기, 앱이 켜져 있으면 1시간 전에 알려요",
+    "기도했어요를 누르면 오늘은 빠지고, 다 하면 '오늘 모두 기도했어요'" ] },
+  { v:"19.0", d:"2026-11-05", items:[
+    "로그인 · 홈이 훨씬 빨리 떠요 — 꼭 필요한 것만 먼저 읽고, 나머지는 홈이 뜬 뒤에",
+    "영혼들의 기록을 한 명씩 차례로 읽던 것을 한꺼번에 (영혼이 많아도 느려지지 않게)",
+    "조직 구성 (수퍼) — 진 · 셀 · 진장 · 코치 · 셀리더 자리를 먼저 짜고 자리마다 구글 이메일",
+    "가입 전인 분도 자리에 '초대 보냄'으로 보여서 구조가 바로 잡혀요",
+    "여러 셀 한꺼번에 — 셀 이름 / 셀리더 / 이메일을 붙여넣기" ] },
   { v:"18.0", d:"2026-10-28", items:[
     "교회 명부 — 같은 진 사람을 이름 · 연락처로 찾기 (셀별 · 리더들 · 셀원)",
     "멤버 카드 두 겹: 명부(기본 사항)는 같은 진 리더 모두, 목양 카드는 맡은 사람만",
@@ -5140,7 +5333,7 @@ async function goToNotice(n) {
     await loadMeetings(true);
     const m = state.meetings.find(x=>x.id===t.id);
     if (!m) { toast("지금은 볼 수 없는 모임이에요."); return; }
-    openMeeting(m.id); openComments(meetTarget(m));
+    openMeeting(m.id); if (!t.report) openComments(meetTarget(m));
   } else if (t.kind === "record") {
     await loadSouls();
     const s = state.souls.find(x=>x.id===t.soulId);
@@ -5156,7 +5349,7 @@ $("btn-bell").onclick = () => openInbox();
 
 /* ════════ 알림 설정 · 안 읽은 수 ════════
    새 소식은 앱이 열려 있는 동안 실시간으로 받습니다(읽지 않은 것만 지켜봄 — 읽기 횟수가 적어요). */
-const notifyPrefs = () => ({ comment:true, dm:true, device:false, ...((state.me && state.me.notifyPrefs) || {}) });
+const notifyPrefs = () => ({ comment:true, dm:true, device:false, plan:true, ...((state.me && state.me.notifyPrefs) || {}) });
 function startLive() {
   if (state.liveOn || !state.me) return;
   state.liveOn = true;
@@ -5184,7 +5377,7 @@ function alertNew(kind, r) {
   const P = notifyPrefs();
   if ((kind === "notice" && !P.comment) || (kind === "dm" && !P.dm)) return;
   const title = kind === "dm" ? `${r.fromName||""} 님의 쪽지`
-    : r.kind === "handover" ? `${r.fromName||""} 님 — ${r.title||"셀 관리"}` : `${r.fromName||""} 님이 댓글을 남겼어요`;
+    : (r.kind === "handover" || r.kind === "report") ? `${r.fromName||""} 님 — ${r.title||"셀 관리"}` : `${r.fromName||""} 님이 댓글을 남겼어요`;
   const body = kind === "dm" ? (r.body||"").slice(0,80) : `${r.title||""} — ${r.snippet||""}`;
   toast(`${title} · ${body.slice(0,40)}`);
   if (P.device && document.hidden && "Notification" in window && Notification.permission === "granted") {
@@ -5202,6 +5395,7 @@ const dlgNt = $("dlg-notify");
 $("btn-notify-set").onclick = () => {
   const P = notifyPrefs();
   $("nt-comment").checked = P.comment; $("nt-dm").checked = P.dm; $("nt-device").checked = P.device;
+  $("nt-plan").checked = P.plan !== false;
   $("nt-err").textContent = "";
   if (!("Notification" in window)) { $("nt-device").disabled = true;
     $("nt-device-hint").textContent = "이 브라우저는 기기 알림을 지원하지 않아요. 아이폰은 홈 화면에 추가한 앱에서만 돼요."; }
@@ -5209,13 +5403,14 @@ $("btn-notify-set").onclick = () => {
 };
 $("nt-cancel").onclick = () => dlgNt.close();
 $("nt-save").onclick = async () => {
-  const p = { comment:$("nt-comment").checked, dm:$("nt-dm").checked, device:$("nt-device").checked };
+  const p = { comment:$("nt-comment").checked, dm:$("nt-dm").checked, device:$("nt-device").checked, plan:$("nt-plan").checked };
   if (p.device && "Notification" in window && Notification.permission !== "granted") {
     try { const r = await Notification.requestPermission();
       if (r !== "granted") { p.device = false; $("nt-err").textContent = "기기 알림이 허용되지 않았어요. 브라우저 설정에서 허용한 뒤 다시 켜주세요."; } }
     catch { p.device = false; }
   }
   try { await updateDoc(doc(db,"users",state.me.id), { notifyPrefs: p }); state.me.notifyPrefs = p;
+        planAlarms();
         if (!$("nt-err").textContent) { dlgNt.close(); toast("알림 설정을 저장했어요."); } }
   catch (e) { $("nt-err").textContent = msgOf(e); }
 };
@@ -5299,6 +5494,11 @@ const doneCourses = (soulId) => coursesDone((state.allTrainings||[]).filter(t =>
 /* ── 명부로 옮겨오기 · 새 사람 카드 · 배지 맞추기 ──
    새 버전을 처음 열 때 각자 '자기가 맡은 카드'만 옮깁니다. 수퍼라도 남의 목양 카드는 못 읽으니까요. */
 async function ensureDirectory() {
+  if (state.dirP) return state.dirP;
+  state.dirP = ensureDirectoryOnce();
+  try { return await state.dirP; } finally { state.dirP = null; }
+}
+async function ensureDirectoryOnce() {
   const me = state.me; if (!me || !me.jinId) return;
   let touched = false;
   /* ① 내 명부 카드 */
@@ -5320,7 +5520,8 @@ async function ensureDirectory() {
   if (isManager()) await syncBadges();
   /* ③ 내가 맡은 목양 카드 → 명부 */
   const mine = state.souls.filter(s => s.leaderUid === me.id && s.active !== false);
-  if (mine.some(s => !s.memberId && !isLeaderCard(s))) await loadAllTrainings();
+  const sameAsMe = (s) => (s.name||"").trim() && (s.name||"").trim() === (me.name||"").trim();
+  if (mine.some(s => !s.memberId && !isLeaderCard(s) && !sameAsMe(s))) await loadAllTrainings();
   for (const s of mine) {
     const patch = {};
     let m = s.memberId ? memberById(s.memberId) : null;
@@ -5364,7 +5565,8 @@ async function ensureDirectory() {
   /* ④ 내 셀에 새로 등록된 사람 — 목양 카드를 내가 만듭니다 */
   if (canLead() && me.cellId) {
     const fresh = state.dir.filter(x => x.cellId === me.cellId && !x.uid && x.active !== false
-      && !(x.soulIds||[]).length && x.linkedEmail !== myEmail() && (!x.careUid || x.careUid === me.id));
+      && !(x.soulIds||[]).length && x.linkedEmail !== myEmail() && (!x.careUid || x.careUid === me.id)
+      && !x.pendingSeat && !x.invitedRole);
     for (const m of fresh) {
       try {
         const ref = await addDoc(collection(db,"souls"), soulFromMember(m, me.cellId));
@@ -5514,7 +5716,8 @@ function renderDir() {
     const none = list.filter(m => !m.cellId || !cells.some(c => c.id === m.cellId));
     $("dir-list").innerHTML = groups.map(({c, ms}) => {
       const ls = leadersOf(c.id);
-      return `<p class="dgh"><span><b>${esc(c.name)}</b> · 담당 ${ls.length ? esc(ls.map(u=>u.name).join(", ")) : "없음"}</span><span>${ms.length}명</span></p>
+      const lb = leaderLabel(c.id);
+      return `<p class="dgh"><span><b>${esc(c.name)}</b> · 담당 ${lb ? esc(lb) : "없음"}</span><span>${ms.length}명</span></p>
         <div class="list">${ms.map(row).join("") || `<p class="muted" style="font-size:12px">아직 등록된 사람이 없어요.</p>`}</div>`;
     }).join("") + (none.length ? `<p class="dgh"><span><b>셀 없음</b> · 진장 · 코치 등</span><span>${none.length}명</span></p>
         <div class="list">${none.map(row).join("")}</div>` : "");
@@ -5878,10 +6081,12 @@ async function loadHandovers() {
   const me = state.me, col = collection(db,"handovers"), out = [], seen = {};
   const push = (rows) => rows.forEach(r => { if (!seen[r.id]) { seen[r.id] = true; out.push(r); } });
   try {
-    if (me.role === "super") push(pack(await getDocs(col)));
-    else if (isManager() && me.jinId) push(pack(await getDocs(query(col, where("jinId","==",me.jinId)))));
-    push(pack(await getDocs(query(col, where("fromUid","==",me.id)))));
-    push(pack(await getDocs(query(col, where("toUid","==",me.id)))));
+    const rs = await Promise.all([
+      me.role === "super" ? getDocs(col)
+        : (isManager() && me.jinId) ? getDocs(query(col, where("jinId","==",me.jinId))) : Promise.resolve({ docs:[] }),
+      getDocs(query(col, where("fromUid","==",me.id))),
+      getDocs(query(col, where("toUid","==",me.id)))]);
+    rs.forEach(r => push(pack(r)));
   } catch (e) { console.warn("인계 요청", e); }
   state.handovers = out.sort((a,b) => (b.atMs||0) - (a.atMs||0));
 }
@@ -6049,7 +6254,7 @@ function renderCellMgr() {
     return `<div class="row" style="flex-direction:column;align-items:stretch">
       <div style="display:flex;align-items:center;gap:10px">
         <div class="grow"><p class="nm">${esc(c.name)}</p>
-          <p class="sub">${jn ? esc(jn) + " · " : ""}담당 ${ls.length ? esc(ls.map(u => u.name).join(", "))
+          <p class="sub">${jn ? esc(jn) + " · " : ""}담당 ${leaderLabel(c.id) ? esc(leaderLabel(c.id))
             : `<span style="color:var(--warn-tx)">없음</span>`} · ${ms.length}명</p></div>
         <button class="btn-sm" data-cmview="${c.id}">명부</button>
       </div>
@@ -6262,4 +6467,677 @@ async function forceHandover(h) {
     invalidate(); state.soulsAt = 0; await loadSouls(true); renderCellMgr();
     toast(`${n}장을 넘겼어요.${skip ? ` 새 셀리더 본인 카드 ${skip}장은 그대로 뒀어요.` : ""}`);
   } catch (e) { toast(msgOf(e)); }
+}
+
+/* ════════════════════════════════════════════════════════════
+   19단계 · 조직 구성 — 기관 관리자가 자리를 먼저 짭니다
+   ────────────────────────────────────────────────────────────
+   진 → 진장 · 코치 · 셀 → 셀리더 자리를 만들고, 자리마다 이름과 구글 이메일을 넣습니다.
+   이메일을 넣으면 그 순간 초대가 걸리고(명부 카드와 이어져 본인 차단도 같이),
+   그분이 가입하기 전에도 자리는 '초대 보냄'으로 보입니다.
+   이메일을 모르면 이름만 넣어 둡니다(명부 카드의 pendingSeat).
+   ════════════════════════════════════════════════════════════ */
+const SEATNAME = { jinjang:"진장", coach:"코치", leader:"셀리더" };
+/* 자리에 앉은 사람 — 가입함(acc) · 초대 보냄(inv) · 이름만(noe) */
+function seatList(kind, jinId, cellId) {
+  const out = [], seenEmail = new Set();
+  const us = (state.members||[]).filter(u => u.active !== false && u.jinId === jinId);
+  const inv = (state.invites||[]).filter(i => i.status === "pending" && i.jinId === jinId);
+  const ph = (state.dir||[]).filter(m => m.active !== false && m.jinId === jinId && !m.uid
+    && m.pendingSeat && !pendingInvite(m));
+  const cellsTxt = (ids) => (ids||[]).map(cellNameOf).filter(Boolean).join(" · ");
+  const addU = (u, sub) => { seenEmail.add((u.email||"").toLowerCase()); out.push({ t:"acc", name:u.name, uid:u.id, sub }); };
+  const addI = (i, sub) => { if (seenEmail.has(i.email)) return; out.push({ t:"inv", name:i.name, email:i.email, inv:i, sub }); };
+  const addP = (m, sub) => out.push({ t:"noe", name:m.name, m, sub });
+  if (kind === "jinjang") {
+    us.filter(u => u.role === "jinjang").forEach(u => addU(u));
+    inv.filter(i => i.role === "jinjang").forEach(i => addI(i));
+    ph.filter(m => m.pendingSeat.role === "jinjang").forEach(m => addP(m));
+  } else if (kind === "coach") {
+    us.filter(u => u.role === "coach").forEach(u => addU(u, cellsTxt(u.cellIds)));
+    inv.filter(i => i.role === "coach").forEach(i => addI(i, cellsTxt(i.cellIds)));
+    ph.filter(m => ["coach","coachleader"].includes(m.pendingSeat.role)).forEach(m => addP(m, cellsTxt(m.pendingSeat.cellIds)));
+  } else {
+    leadersOf(cellId).forEach(u => addU(u, u.role === "coach" ? "코치 겸함" : ""));
+    inv.filter(i => i.cellId === cellId && (i.role === "leader" || (i.role === "coach" && i.isLeader)))
+      .forEach(i => addI(i, i.role === "coach" ? "코치 겸함" : ""));
+    ph.filter(m => m.pendingSeat.cellId === cellId && ["leader","coachleader"].includes(m.pendingSeat.role))
+      .forEach(m => addP(m, m.pendingSeat.role === "coachleader" ? "코치 겸함" : ""));
+  }
+  return out;
+}
+/* 명부 · 셀 관리의 '담당 OO' — 가입 전인 분도 같이 */
+function leaderLabel(cellId) {
+  const c = state.cells.find(x => x.id === cellId); if (!c) return "";
+  return seatList("leader", c.jinId, cellId)
+    .map(p => p.name + (p.t === "inv" ? " (초대 중)" : p.t === "noe" ? " (가입 전)" : "")).join(", ");
+}
+async function openOrg() {
+  if (!state.me || state.me.role !== "super") { toast("조직 구성은 수퍼 관리자가 해요."); return; }
+  show("s-loading");
+  await loadOrg(true);
+  if (!state.orgName) { try { const o = await getDoc(doc(db,"org","main")); if (o.exists()) state.orgName = o.data().name; } catch {} }
+  renderOrg(); show("s-org");
+}
+function renderOrg() {
+  $("org-church").textContent = state.orgName || "교회 이름을 정해 주세요";
+  state.orgSeats = [];
+  const chip = (p, kind, jinId, cellId) => {
+    const i = state.orgSeats.push({ ...p, kind, jinId, cellId }) - 1;
+    const tag = p.t === "inv" ? " <i>✉ 초대 보냄</i>" : p.t === "noe" ? " <i>이메일 없음</i>" : "";
+    return `<button type="button" class="pchip ${p.t}" data-oseat="${i}">${esc(p.name||"")}${tag}${p.sub ? ` <i>${esc(p.sub)}</i>` : ""}</button>`;
+  };
+  const add = (kind, jinId, cellId) => `<button type="button" class="pchip add" data-oadd="${kind}" data-jin="${jinId}" data-cell="${cellId||""}">＋ ${SEATNAME[kind]}</button>`;
+  const jins = state.jins.filter(j => j.active !== false);
+  $("org-jins").innerHTML = jins.map(j => {
+    const cells = activeCells().filter(c => c.jinId === j.id);
+    const jj = seatList("jinjang", j.id), co = seatList("coach", j.id);
+    return `<div class="card" style="margin-top:14px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+        <h3 class="grow" style="font-size:16px;font-weight:600">${esc(j.name)}</h3>
+        <button class="btn-sm" data-ojrename="${j.id}">이름</button>
+      </div>
+      <div class="seat"><span class="lb">진장</span><div class="ppl">${jj.map(p => chip(p, "jinjang", j.id)).join("")}${jj.length ? "" : add("jinjang", j.id)}</div></div>
+      <div class="seat"><span class="lb">코치</span><div class="ppl">${co.map(p => chip(p, "coach", j.id)).join("")}${add("coach", j.id)}</div></div>
+      <div style="display:flex;align-items:center;gap:6px;margin:14px 0 2px;flex-wrap:wrap">
+        <p class="grow" style="font-size:13px;font-weight:600">셀 ${cells.length}개</p>
+        <button class="btn-sm" data-obulk="${j.id}">여러 셀 한꺼번에</button>
+        <button class="btn-sm" data-ocell="${j.id}">＋ 셀</button>
+      </div>
+      ${cells.map(c => {
+        const ls = seatList("leader", j.id, c.id);
+        const n = (state.dir||[]).filter(m => m.cellId === c.id && m.active !== false).length;
+        return `<div class="ocell"><span class="cn" data-ocview="${c.id}" title="명부에서 보기">${esc(c.name)}</span>
+          <div class="ppl" style="display:flex;flex-wrap:wrap;gap:6px;flex:1;min-width:0">${ls.map(p => chip(p, "leader", j.id, c.id)).join("")}${ls.length ? "" : add("leader", j.id, c.id)}</div>
+          <span class="cnt">${n}명</span></div>`;
+      }).join("") || `<p class="muted" style="font-size:12px;padding:8px 0">아직 셀이 없어요. '＋ 셀'이나 '여러 셀 한꺼번에'로 만들어요.</p>`}
+    </div>`;
+  }).join("") || `<p class="muted" style="margin-top:14px">아직 진이 없어요. 오른쪽 위 '＋ 진'으로 만들어요.</p>`;
+}
+$("org-back").onclick = () => openHome();
+$("btn-home-org").onclick = () => openOrg();
+$("btn-manage-org").onclick = () => openOrg();
+$("btn-org-church").onclick = async () => {
+  const name = prompt("교회 이름", state.orgName || ""); if (!name || !name.trim()) return;
+  try { await updateDoc(doc(db,"org","main"), { name: name.trim() }); state.orgName = name.trim();
+    await log("교회 이름 변경", name.trim()); renderOrg(); toast("바꿨어요."); }
+  catch (e) { toast(msgOf(e)); }
+};
+$("btn-org-jin").onclick = async () => {
+  const name = prompt("새 진 이름", `${state.jins.length + 1}진`); if (!name || !name.trim()) return;
+  try { const ref = await addDoc(collection(db,"jins"), { name: name.trim(), jinjangUid: null, active: true, createdAt: serverTimestamp() });
+    state.jins.push({ id: ref.id, name: name.trim(), jinjangUid: null, active: true });
+    await log("진 추가", name.trim()); renderOrg(); toast(`${name.trim()}을 만들었어요.`); }
+  catch (e) { toast(msgOf(e)); }
+};
+$("s-org").addEventListener("click", async (ev) => {
+  const b = ev.target.closest("[data-oseat],[data-oadd],[data-ojrename],[data-obulk],[data-ocell],[data-ocview]"); if (!b) return;
+  const d = b.dataset;
+  if (d.oseat !== undefined) {
+    const p = state.orgSeats[+d.oseat]; if (!p) return;
+    if (p.t === "acc") { const m = memberOfUid(p.uid); if (m) openMember(m.id); else toast("명부 카드가 아직 없어요. 그분이 앱을 한 번 열면 생겨요."); return; }
+    openSeat({ kind: p.kind, jinId: p.jinId, cellId: p.cellId, entry: p });
+    return;
+  }
+  if (d.oadd) { openSeat({ kind: d.oadd, jinId: d.jin, cellId: d.cell || null }); return; }
+  if (d.ocview) { state.dirCell = d.ocview; state.dirRole = "all"; $("dir-search").value = ""; openDir(); return; }
+  if (d.ojrename) {
+    const j = state.jins.find(x => x.id === d.ojrename);
+    const name = prompt("진 이름", j.name); if (!name || !name.trim() || name.trim() === j.name) return;
+    try { await updateDoc(doc(db,"jins",j.id), { name: name.trim() }); j.name = name.trim(); renderOrg(); toast("바꿨어요."); }
+    catch (e) { toast(msgOf(e)); }
+    return;
+  }
+  if (d.ocell) {
+    const name = prompt("새 셀 이름", ""); if (!name || !name.trim()) return;
+    if (activeCells().some(c => c.jinId === d.ocell && c.name === name.trim())) { toast("같은 이름의 셀이 이미 있어요."); return; }
+    try { const data = { name: name.trim(), jinId: d.ocell, active: true, createdAt: serverTimestamp() };
+      const ref = await addDoc(collection(db,"cells"), data); state.cells.push({ id: ref.id, ...data });
+      await log("셀 추가", name.trim()); renderOrg(); }
+    catch (e) { toast(msgOf(e)); }
+    return;
+  }
+  if (d.obulk) openBulk(d.obulk);
+});
+
+/* ── 자리에 사람 넣기 ── */
+const dlgSt = $("dlg-seat");
+function openSeat(S) {
+  state.seat = S;
+  const j = state.jins.find(x => x.id === S.jinId) || {}, c = S.cellId && state.cells.find(x => x.id === S.cellId);
+  const e = S.entry;
+  $("sx-title").textContent = `${c ? c.name : j.name} ${SEATNAME[S.kind]}`;
+  $("sx-sub").textContent = e && e.t === "inv" ? `${e.name} 님께 ${e.email}로 초대를 보냈어요. 이메일을 고쳐 다시 보내거나 빼낼 수 있어요.`
+    : e && e.t === "noe" ? `${e.name} 님 — 이메일을 넣으면 초대가 걸려요.`
+    : S.kind === "leader" ? "이 셀을 맡을 분이에요. 셀 이름은 그대로 두고 사람만 바뀔 수 있어요."
+    : S.kind === "coach" ? "진장을 도와 여러 셀을 돌보는 분이에요. 돌볼 셀을 골라 주세요."
+    : "이 진을 맡는 분이에요.";
+  const members = (state.dir||[]).filter(m => m.active !== false && m.jinId === S.jinId && !m.uid && !pendingInvite(m));
+  const accs = (state.members||[]).filter(u => u.active !== false && u.jinId === S.jinId
+    && !(S.kind === "jinjang" && u.role === "super"));
+  $("sx-pick").innerHTML = `<option value="new">새로 넣기 — 이름 · 이메일</option>`
+    + (members.length ? `<optgroup label="명부에 있는 분 (아직 계정 없음)">${members.map(m =>
+        `<option value="m:${m.id}">${esc(m.name)}${m.cellId ? " · " + esc(cellNameOf(m.cellId)) : ""}${m.pendingSeat ? " · 자리 대기" : ""}</option>`).join("")}</optgroup>` : "")
+    + (accs.length && !(e && e.t !== "acc") ? `<optgroup label="이미 가입한 분">${accs.map(u =>
+        `<option value="u:${u.id}">${esc(u.name)} · ${esc(ROLEBADGE[badgeOf(u)]||"")}</option>`).join("")}</optgroup>` : "");
+  $("sx-pick").value = e && e.t === "noe" ? `m:${e.m.id}` : "new";
+  $("sx-name2").value = e ? (e.name || "") : "";
+  $("sx-email").value = e && e.t === "inv" ? e.email : "";
+  $("sx-coach-wrap").hidden = S.kind !== "leader";
+  $("sx-coach").checked = !!(e && e.sub === "코치 겸함");
+  $("sx-cells-wrap").hidden = S.kind !== "coach";
+  if (S.kind === "coach") {
+    const pre = new Set((e && e.t === "inv" && e.inv.cellIds) || (e && e.t === "noe" && e.m.pendingSeat.cellIds) || []);
+    $("sx-cells").innerHTML = activeCells().filter(x => x.jinId === S.jinId).map(x =>
+      `<label><input type="checkbox" value="${x.id}"${pre.has(x.id) ? " checked" : ""}> ${esc(x.name)}</label>`).join("")
+      || `<p class="muted">이 진에 셀이 아직 없어요.</p>`;
+  }
+  $("sx-del").hidden = !(e && (e.t === "inv" || e.t === "noe"));
+  $("sx-err").textContent = "";
+  syncSeatPick();
+  dlgSt.showModal();
+}
+function syncSeatPick() {
+  const v = $("sx-pick").value, S = state.seat;
+  const isAcc = v.startsWith("u:");
+  $("sx-new").hidden = isAcc;
+  if (v.startsWith("m:")) { const m = memberById(v.slice(2)); if (m) $("sx-name2").value = m.name || ""; }
+  $("sx-hint").textContent = isAcc
+    ? (S.kind === "leader" ? "가입한 분을 셀리더로 앉혀요. 이 셀 사람들의 목양 카드는 지금 맡은 셀리더가 앱을 열어 넘겨요."
+       : "가입한 분의 역할을 바로 바꿔요.")
+    : $("sx-email").value.trim() ? "넣으면 이 이메일로 초대가 걸려요. 그분이 같은 구글 계정으로 로그인하면 이 자리로 바로 들어와요."
+    : "이메일을 비워 두면 이름만 자리에 넣어 둬요. 나중에 이 자리를 눌러 이메일을 채우면 초대가 걸려요.";
+  $("sx-save").textContent = isAcc ? "앉히기" : ($("sx-email").value.trim() ? "넣고 초대하기" : "이름만 넣기");
+}
+$("sx-pick").onchange = syncSeatPick;
+$("sx-email").oninput = syncSeatPick;
+$("sx-cancel").onclick = () => dlgSt.close();
+$("sx-del").onclick = async () => {
+  const S = state.seat, e = S.entry; if (!e) return;
+  if (!confirm(`${e.name} 님을 이 자리에서 뺄까요?${e.t === "inv" ? "\n보낸 초대도 취소돼요." : ""}`)) return;
+  try {
+    if (e.t === "inv") {
+      await deleteDoc(doc(db,"invites",e.email));
+      state.invites = state.invites.filter(i => i.email !== e.email);
+      if (e.inv.memberId) { try { await updateDoc(doc(db,"members",e.inv.memberId), { invitedRole: null, pendingSeat: null }); } catch {} }
+    } else if (e.t === "noe") {
+      await updateDoc(doc(db,"members",e.m.id), { pendingSeat: null }); e.m.pendingSeat = null;
+    }
+    await log("자리에서 빼기", e.name, SEATNAME[S.kind]);
+    dlgSt.close(); await loadOrg(true); renderOrg(); toast("뺐어요.");
+  } catch (err) { $("sx-err").textContent = msgOf(err); }
+};
+$("sx-save").onclick = async () => {
+  const S = state.seat, v = $("sx-pick").value;
+  const pick = S.kind === "leader" ? ($("sx-coach").checked ? "coachleader" : "leader") : S.kind;
+  const cellIds = S.kind === "coach" ? [...$("sx-cells").querySelectorAll("input:checked")].map(i => i.value) : [];
+  const cellId = S.kind === "leader" ? S.cellId : null;
+  $("sx-err").textContent = "";
+  $("sx-save").disabled = true;
+  try {
+    if (v.startsWith("u:")) {
+      /* 이미 가입한 분 — 역할 · 맡은 셀을 바로 */
+      const u = userOf(v.slice(2)), p = {};
+      if (S.kind === "jinjang") Object.assign(p, { role: "jinjang", jinId: S.jinId });
+      if (S.kind === "coach") Object.assign(p, { role: "coach", jinId: S.jinId, cellIds,
+        isLeader: !!(u.isLeader || (u.role === "leader" && u.cellId)) });
+      if (S.kind === "leader") {
+        if (leadersOf(cellId).some(x => x.id !== u.id)) {
+          $("sx-err").textContent = "이 셀에는 이미 담당 셀리더가 있어요. 셀 관리의 '담당 바꾸기'로 바꿔 주세요."; return; }
+        p.cellId = cellId;
+        if (pick === "coachleader" && u.role !== "super") Object.assign(p, { role: "coach", isLeader: true });
+        else if (u.role !== "leader") p.isLeader = true;
+      }
+      await updateDoc(doc(db,"users",u.id), p); Object.assign(u, p);
+      if (u.id === state.me.id) Object.assign(state.me, p);
+      if (S.kind === "jinjang") { try { await updateDoc(doc(db,"jins",S.jinId), { jinjangUid: u.id }); } catch {} }
+      await syncBadges();
+      if (S.kind === "leader") {
+        const c = state.cells.find(x => x.id === cellId);
+        const mine = await requestCellHandovers(c, u.id, []);
+        if (mine.length) toast("이 셀 카드 중 내가 맡은 것이 있어요 — 홈에서 넘겨 주세요.");
+      }
+      await log("자리 앉히기", u.name, SEATNAME[S.kind]);
+    } else {
+      /* 새 분 · 명부에 있는 분 — 이메일이 있으면 초대, 없으면 이름만 */
+      let m = v.startsWith("m:") ? memberById(v.slice(2)) : null;
+      const name = (m ? m.name : $("sx-name2").value.trim()) || $("sx-name2").value.trim();
+      const email = $("sx-email").value.trim().toLowerCase();
+      if (!name) { $("sx-err").textContent = "이름을 적어주세요."; return; }
+      if (email && !email.includes("@")) { $("sx-err").textContent = "이메일 형식을 확인해 주세요."; return; }
+      if (email && (state.members||[]).some(u => (u.email||"").toLowerCase() === email)) {
+        $("sx-err").textContent = "이미 가입한 분이에요. '누구를'에서 '이미 가입한 분'으로 골라 주세요."; return; }
+      const e = S.entry;
+      if (!m && e && e.t === "inv" && e.inv.memberId) m = memberById(e.inv.memberId);
+      if (!m) {
+        const d = { name, jinId: S.jinId, cellId: null, uid: "", role: "member", linkedEmail: "", careUid: "",
+          soulIds: [], trainingsDone: [], active: true, thumb: "", phone: "", gender: "", birthMD: "", lunar: false,
+          position: "", registeredAt: "", baptizedAt: "", createdBy: uid(), createdAt: serverTimestamp(), updatedAt: serverTimestamp() };
+        const ref = await addDoc(collection(db,"members"), d);
+        m = { id: ref.id, ...d }; state.dir.push(m);
+      }
+      const seat = { role: pick, cellId: cellId || null, cellIds };
+      if (email) {
+        /* 고친 이메일로 다시 보내면 예전 초대는 지웁니다 */
+        if (e && e.t === "inv" && e.email !== email) { try { await deleteDoc(doc(db,"invites",e.email)); } catch {} }
+        const r = await sendInvite({ name, email, pick, jinId: S.jinId, cellId: seat.cellId, cellIds, memberId: m.id });
+        if (r.err) { $("sx-err").textContent = r.err; return; }
+        await updateDoc(doc(db,"members",m.id), { pendingSeat: null }); m.pendingSeat = null;
+      } else {
+        await updateDoc(doc(db,"members",m.id), { pendingSeat: seat, name, updatedAt: serverTimestamp() });
+        Object.assign(m, { pendingSeat: seat, name });
+      }
+      await log(email ? "자리 초대" : "자리에 이름만", name, SEATNAME[S.kind]);
+    }
+    dlgSt.close(); await loadOrg(true); renderOrg();
+    toast(v.startsWith("u:") ? "앉혔어요." : $("sx-email").value.trim() ? "자리에 넣고 초대했어요." : "이름만 자리에 넣어 뒀어요.");
+  } catch (err) { $("sx-err").textContent = msgOf(err); }
+  finally { $("sx-save").disabled = false; }
+};
+
+/* ── 여러 셀 한꺼번에 ── */
+const dlgBk = $("dlg-bulk");
+function bulkRows() {
+  return $("bk-text").value.split("\n").map(l => l.trim()).filter(Boolean).map(l => {
+    const parts = l.split(/\t|\s*\/\s*|\s*,\s*/).map(x => x.trim());
+    return { cell: parts[0] || "", name: parts[1] || "", email: (parts[2] || "").toLowerCase() };
+  }).filter(r => r.cell);
+}
+function openBulk(jinId) {
+  state.bkJin = jinId;
+  const j = state.jins.find(x => x.id === jinId) || {};
+  $("bk-sub").textContent = `${j.name}에 셀을 여러 개 만들어요. 이미 있는 셀 이름이면 그 셀에 셀리더만 넣어요.`;
+  $("bk-text").value = ""; $("bk-err").textContent = ""; renderBulk();
+  dlgBk.showModal();
+}
+function renderBulk() {
+  const rows = bulkRows(), jinId = state.bkJin;
+  $("bk-preview").innerHTML = rows.map(r => {
+    const exists = activeCells().some(c => c.jinId === jinId && c.name === r.cell);
+    const bad = r.email && !r.email.includes("@");
+    return `<div class="row"><div class="grow"><p class="nm">${esc(r.cell)} ${exists ? `<span class="chip">있는 셀</span>` : `<span class="chip rose">새 셀</span>`}</p>
+      <p class="sub">${r.name ? `셀리더 ${esc(r.name)}${r.email ? ` · ${esc(r.email)}` : " · 이메일 없음"}` : "셀리더는 나중에"}${bad ? ` <span style="color:var(--rose-tx)">이메일 확인</span>` : ""}</p></div></div>`;
+  }).join("");
+  $("bk-save").textContent = rows.length ? `${rows.length}줄 만들기` : "만들기";
+}
+$("bk-text").oninput = renderBulk;
+$("bk-cancel").onclick = () => dlgBk.close();
+$("bk-save").onclick = async () => {
+  const rows = bulkRows(), jinId = state.bkJin;
+  if (!rows.length) { $("bk-err").textContent = "한 줄에 셀 하나씩 적어 주세요."; return; }
+  if (rows.some(r => r.email && !r.email.includes("@"))) { $("bk-err").textContent = "이메일 형식을 확인해 주세요."; return; }
+  $("bk-save").disabled = true; $("bk-err").textContent = "";
+  let nCell = 0, nInv = 0, nName = 0; const errs = [];
+  try {
+    for (const r of rows) {
+      let c = activeCells().find(x => x.jinId === jinId && x.name === r.cell);
+      if (!c) {
+        const data = { name: r.cell, jinId, active: true, createdAt: serverTimestamp() };
+        const ref = await addDoc(collection(db,"cells"), data); c = { id: ref.id, ...data }; state.cells.push(c); nCell++;
+      }
+      if (!r.name) continue;
+      if (seatList("leader", jinId, c.id).length) { errs.push(`${r.cell}: 이미 셀리더가 있어 건너뜀`); continue; }
+      if (r.email && (state.members||[]).some(u => (u.email||"").toLowerCase() === r.email)) {
+        errs.push(`${r.cell}: ${r.email}은 이미 가입한 분 — 자리를 눌러 '이미 가입한 분'으로 앉혀 주세요`); continue; }
+      const d = { name: r.name, jinId, cellId: null, uid: "", role: "member", linkedEmail: "", careUid: "",
+        soulIds: [], trainingsDone: [], active: true, thumb: "", phone: "", gender: "", birthMD: "", lunar: false,
+        position: "", registeredAt: "", baptizedAt: "", createdBy: uid(), createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+        pendingSeat: r.email ? null : { role: "leader", cellId: c.id, cellIds: [] } };
+      const ref = await addDoc(collection(db,"members"), d); const m = { id: ref.id, ...d }; state.dir.push(m);
+      if (r.email) {
+        const res = await sendInvite({ name: r.name, email: r.email, pick: "leader", jinId, cellId: c.id, memberId: m.id });
+        if (res.err) errs.push(`${r.cell}: ${res.err}`); else nInv++;
+      } else nName++;
+    }
+    await log("여러 셀 만들기", (state.jins.find(x => x.id === jinId)||{}).name || "", `셀 ${nCell} · 초대 ${nInv} · 이름만 ${nName}`);
+    dlgBk.close(); await loadOrg(true); renderOrg();
+    toast(`새 셀 ${nCell}개 · 초대 ${nInv}명 · 이름만 ${nName}명${errs.length ? ` · 건너뜀 ${errs.length}` : ""}`);
+    if (errs.length) setTimeout(() => alert(errs.join("\n")), 300);
+  } catch (e) { $("bk-err").textContent = msgOf(e); }
+  finally { $("bk-save").disabled = false; }
+};
+
+/* ════════════════════════════════════════════════════════════
+   20단계 — 돌봄 (결석 · 1:1 · 민감 메모 · 셀 건강 · 셀 보고 · 일정 알림)
+   ════════════════════════════════════════════════════════════ */
+/* 결석 사유 — 출석 체크에서 고릅니다.
+   근무·출장 · 여행처럼 미리 알고 있는 결석은 '챙길 사람'에 세지 않아요. */
+const REASON = { sick:"아파서", family:"집안 일", work:"근무·출장", trip:"여행", unknown:"모름" };
+const REASON_OK = ["work","trip"];
+const CARE_AT = 2;      // 이만큼 연달아 빠지면 '결석 — 연락할 때'에 뜹니다
+const ONE_DUE = 30;     // 1:1 만난 지 이만큼 지나면 '챙길 사람'에
+const STEPS = [["sms","문자"],["call","전화"],["meet","만남"]];
+const STEPNAME = { sms:"문자", call:"전화", meet:"만남" };
+
+/* 연달아 빠진 횟수 — 출석하면 끊기고, 미리 알린 결석은 건너뜁니다.
+   ep 는 이번 결석이 시작된 모임 날짜예요. 다시 나왔다가 또 빠지면 ep 가 바뀌어
+   지난번 연락 기록과 섞이지 않습니다(= 출석하면 저절로 끝). */
+function careStreak(key, cellId) {
+  let n = 0, ep = null; const why = [];
+  for (const m of cellMeetings(cellId)) {
+    if (daysUntil(m.date) > 0) continue;              // 앞으로 할 모임은 빼고
+    const v = m.attendance && m.attendance[key];
+    if (!v) continue;
+    if (v !== "absent") break;
+    const k = (m.reasonKinds || {})[key] || "";
+    if (REASON_OK.includes(k)) continue;
+    n++; ep = m.date; why.push(k || "unknown");
+  }
+  return { n, ep, why };
+}
+function whyText(why) {
+  const ks = [...new Set(why || [])].filter(k => k && k !== "unknown");
+  return ks.length ? ks.map(k => REASON[k] || k).join(" · ") : "사유 모름";
+}
+/* 담당 리더 화면에 띄울지 — 연락하거나 미루면 일주일 쉬었다가, 그래도 안 나오면 다음 단계로 */
+function careDue(s) {
+  if (!isLeaderOf(s)) return null;
+  const st = careStreak(attKey(s), attCell(s));
+  if (st.n < CARE_AT) return null;
+  const care = (s.care && s.care.ep === st.ep) ? s.care : { ep: st.ep, log: [], snooze: "" };
+  if (care.snooze && care.snooze > todayStr()) return null;
+  return { s, n: st.n, why: st.why, care, step: Math.min((care.log || []).length, STEPS.length - 1) };
+}
+async function markCare(soulId, how) {
+  const s = state.souls.find(x => x.id === soulId); if (!s) return;
+  const d = careDue(s); if (!d) return;
+  const log = [...(d.care.log || [])];
+  if (how !== "later") log.push({ step: how, at: todayStr() });
+  const care = { ep: d.care.ep, log: log.slice(-10), snooze: plusDays(7) };
+  await updateDoc(doc(db, "souls", soulId), { care });
+  s.care = care;
+  if (how !== "later") bump("careContact");
+}
+
+/* ── 1:1 만난 지 얼마나 ── 내가 직접 함께한 1:1만 셉니다(예정 · 나 없이 들은 것 빼고) */
+function lastOneAt(s) {
+  let d = s.lastOneAt || "";
+  (state.allRecords || []).forEach(r => {
+    if (r.soulId === s.id && r.type === "meet" && r.kind === "one" && !r.planned && !r.away
+        && String(r.date || "") > d && daysUntil(r.date) <= 0) d = r.date;
+  });
+  (state.soul && state.soul.id === s.id ? state.records : []).forEach(r => {
+    if (r.type === "meet" && r.kind === "one" && !r.planned && !r.away
+        && String(r.date || "") > d && daysUntil(r.date) <= 0) d = r.date;
+  });
+  return d || null;
+}
+function oneDays(s) { const d = lastOneAt(s); return d ? daysSince(d) : null; }
+function oneText(s) {
+  const n = oneDays(s);
+  return n === null ? "1:1 기록 없음" : n === 0 ? "오늘 1:1" : `1:1 만난 지 ${n}일`;
+}
+
+/* ════════ 셀 건강 · 인턴 ════════
+   셀교회에서 쓰는 지표 몇 가지만 — 모임을 꾸준히 했는지, 얼마나 나오는지,
+   새 사람이 오는지, 다음 셀리더(인턴)가 자라고 있는지. 인턴은 셀리더가 직접 체크합니다. */
+function ownCells() {
+  const ids = new Set([state.me.cellId, ...state.souls.filter(s => isLeaderOf(s) && !isLeaderCard(s)).map(s => s.cellId)]
+    .filter(Boolean));
+  state.meetings.filter(m => m.leaderUid === uid()).forEach(m => ids.add(m.cellId));
+  return state.cells.filter(c => ids.has(c.id));
+}
+function cellHealth(cellId) {
+  const ms = cellMeetings(cellId).filter(m => { const n = daysSince(m.date); return n !== null && n >= 0 && n < 56; });
+  const people = state.souls.filter(s => s.cellId === cellId && !isLeaderCard(s));
+  const came = ms.map(m => Object.values(m.attendance || {}).filter(v => v && v !== "absent").length);
+  const marked = ms.map(m => Object.values(m.attendance || {}).filter(Boolean).length);
+  const avg = came.length ? Math.round(came.reduce((a, b) => a + b, 0) / came.length * 10) / 10 : null;
+  const rate = marked.reduce((a, b) => a + b, 0) ? Math.round(came.reduce((a, b) => a + b, 0) / marked.reduce((a, b) => a + b, 0) * 100) : null;
+  const visitors = ms.reduce((n, m) => n + String(m.visitors || "").split(/[,，·、\n]/).map(x => x.trim()).filter(Boolean).length, 0);
+  const interns = people.filter(s => s.intern);
+  const care = people.filter(s => careStreak(attKey(s), attCell(s)).n >= CARE_AT).length;
+  const notes = [];
+  if (ms.length < 4) notes.push(["warn", "모임이 뜸해요"]);
+  if (interns.length && avg !== null && avg >= 10) notes.push(["ok", "분가를 준비해 볼 때"]);
+  else if (!interns.length && avg !== null && avg >= 8) notes.push(["warn", "인턴을 세울 때"]);
+  if (rate !== null && rate >= 75 && ms.length >= 6) notes.push(["ok", "꾸준해요"]);
+  if (care) notes.push(["warn", `연달아 결석 ${care}명`]);
+  return { ms: ms.length, avg, rate, visitors, people, interns, care, notes };
+}
+async function openHealth() {
+  if (!canLead() && !["coach", "jinjang"].includes(state.me.role)) { toast("셀을 맡은 분과 코치 · 진장이 볼 수 있어요."); return; }
+  await Promise.all([loadSouls(), loadMeetings()]);
+  renderHealth(); $("hl-err").textContent = ""; $("dlg-health").showModal();
+}
+function renderHealth() {
+  const own = new Set(ownCells().map(c => c.id));
+  const cells = canLead() && !["coach", "jinjang"].includes(state.me.role) ? ownCells() : seenCells();
+  $("hl-body").innerHTML = cells.map(c => {
+    const h = cellHealth(c.id), mine = own.has(c.id);
+    const canTick = mine && h.people.some(isLeaderOf);
+    return `<div class="card hcell">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <h3 style="font-size:15px;font-weight:600">${esc(c.name)}</h3>
+        <span class="muted" style="font-size:12px">${esc(leaderLabel(c.id))}</span></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${h.notes.map(([k, t]) =>
+        `<span class="chip ${k}">${esc(t)}</span>`).join("") || `<span class="chip">기록이 더 쌓이면 보여요</span>`}</div>
+      <div class="hm">
+        <div><p>8주 모임</p><b>${h.ms}회</b></div>
+        <div><p>평균 출석</p><b>${h.avg === null ? "—" : h.avg + "명"}</b></div>
+        <div><p>출석률</p><b>${h.rate === null ? "—" : h.rate + "%"}</b></div>
+        <div><p>새 방문자</p><b>${h.visitors}명</b></div>
+      </div>
+      <p class="tag" style="margin-top:12px;font-size:12px;color:var(--dim)">인턴 (예비 셀리더) ${h.interns.length}명${
+        canTick ? " — 체크해서 세워요" : ""}</p>
+      ${canTick ? `<div class="ints">${h.people.filter(isLeaderOf).map(s => `
+        <label><input type="checkbox" data-intern="${s.id}" ${s.intern ? "checked" : ""}>
+          <span>${esc(s.name)}</span>${s.intern && s.internSince ? `<span class="muted" style="font-size:12px">${fmtDate(s.internSince)}부터</span>` : ""}</label>`).join("")}</div>`
+        : `<p style="font-size:14px;margin-top:6px">${h.interns.map(s => esc(s.name)).join(", ") || "아직 없어요"}</p>`}
+    </div>`;
+  }).join("") || `<p class="muted">볼 수 있는 셀이 없어요.</p>`;
+}
+$("hl-body").addEventListener("change", async (ev) => {
+  const cb = ev.target.closest("[data-intern]"); if (!cb) return;
+  const s = state.souls.find(x => x.id === cb.dataset.intern); if (!s || !isLeaderOf(s)) return;
+  const patch = cb.checked ? { intern: true, internSince: s.internSince || todayStr() } : { intern: false, internSince: "" };
+  cb.disabled = true;
+  try { await updateDoc(doc(db, "souls", s.id), patch); Object.assign(s, patch);
+        toast(cb.checked ? `${s.name} 님을 인턴으로 세웠어요.` : "인턴 표시를 뺐어요."); renderHealth(); renderRooms(); }
+  catch (e) { cb.checked = !cb.checked; $("hl-err").textContent = msgOf(e); }
+  finally { cb.disabled = false; }
+});
+$("hl-close").onclick = () => $("dlg-health").close();
+
+/* ════════ 민감 메모 ════════
+   기록과 따로 둡니다(souls/{id}/alerts). 검색 · 캘린더 · 통계 어디에도 섞이지 않고,
+   카드 맨 위에 빨간 표시로만 보이며 눌러야 펼쳐져요. 누가 볼지는 기록과 같은 세 단계.
+   본인 차단은 규칙에서 — 카드 주인공은 어떤 단계로도 못 봅니다. */
+async function loadAlerts(soulId, canSeeAll) {
+  const col = collection(db, "souls", soulId, "alerts");
+  try {
+    const parts = canSeeAll
+      ? await Promise.all([getDocs(query(col, where("by", "==", uid()))),
+          getDocs(query(col, where("scope", "==", "leader"))), getDocs(query(col, where("scope", "==", "coach")))])
+      : [await getDocs(query(col, where("scope", "==", "coach")))];
+    const seen = {};
+    state.alerts = parts.flatMap(pack).filter(r => seen[r.id] ? false : (seen[r.id] = true))
+      .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+  } catch { state.alerts = []; }
+}
+function alertBlock(s) {
+  const mine = isLeaderOf(s), list = state.alerts || [];
+  if (!list.length) return mine ? `<button class="btn-sm" data-alnew="1" style="margin-bottom:12px">민감 메모 추가</button>` : "";
+  const open = state.alertOpen === s.id;
+  return `<div class="alertc">
+    <button class="hd" data-altgl="1" aria-expanded="${open}">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9.2v4m0 2.9h.01"/><path d="M10.4 4.3 3 17.2A1.8 1.8 0 0 0 4.6 20h14.8a1.8 1.8 0 0 0 1.6-2.8L13.6 4.3a1.8 1.8 0 0 0-3.2 0Z"/></svg>
+      <span style="flex:1">민감 메모 ${list.length}개 — ${open ? "접기" : "눌러서 보기"}</span></button>
+    ${open ? list.map(a => `<div class="it">
+      <p>${esc(a.body)}</p>
+      <div style="display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap">
+        ${scopeChip(a.scope)}<span class="muted" style="font-size:12px">${esc(a.byName || "")} · ${fmtDate(a.date)}</span>
+        ${a.by === uid() ? `<button class="btn-sm" data-aledit="${a.id}" style="margin-left:auto;height:32px">고치기</button>` : ""}
+      </div></div>`).join("") + (mine ? `<button class="btn-sm" data-alnew="1" style="margin-top:10px">하나 더</button>` : "") : ""}
+  </div>`;
+}
+function openAlertDlg(id) {
+  const a = id ? (state.alerts || []).find(x => x.id === id) : null;
+  state.alertEdit = a ? a.id : null;
+  $("al-text").value = a ? a.body : ""; $("al-scope").value = a ? a.scope : "private";
+  $("al-del").hidden = !a; $("al-err").textContent = "";
+  $("dlg-alert").showModal();
+}
+$("al-cancel").onclick = () => $("dlg-alert").close();
+$("al-save").onclick = async () => {
+  const body = $("al-text").value.trim(), scope = $("al-scope").value, s = state.soul;
+  if (!body) { $("al-err").textContent = "내용을 적어주세요."; return; }
+  $("al-save").disabled = true;
+  try {
+    if (state.alertEdit) await updateDoc(doc(db, "souls", s.id, "alerts", state.alertEdit), { body, scope });
+    else await addDoc(collection(db, "souls", s.id, "alerts"),
+      { body, scope, date: todayStr(), by: uid(), byName: state.me.name || "", createdAt: serverTimestamp() });
+    await loadAlerts(s.id, isLeaderOf(s)); state.alertOpen = s.id;
+    $("dlg-alert").close(); toast("민감 메모를 저장했어요."); renderSoulBody();
+  } catch (e) { $("al-err").textContent = msgOf(e); }
+  finally { $("al-save").disabled = false; }
+};
+$("al-del").onclick = async () => {
+  if (!state.alertEdit || !confirm("이 민감 메모를 지울까요?")) return;
+  try { await deleteDoc(doc(db, "souls", state.soul.id, "alerts", state.alertEdit));
+        await loadAlerts(state.soul.id, isLeaderOf(state.soul));
+        $("dlg-alert").close(); toast("지웠어요."); renderSoulBody(); }
+  catch (e) { $("al-err").textContent = msgOf(e); }
+};
+$("soul-body").addEventListener("click", (ev) => {
+  if (ev.target.closest("[data-altgl]")) { state.alertOpen = state.alertOpen === state.soul.id ? null : state.soul.id; renderSoulBody(); return; }
+  if (ev.target.closest("[data-alnew]")) { openAlertDlg(null); return; }
+  const e = ev.target.closest("[data-aledit]"); if (e) openAlertDlg(e.dataset.aledit);
+});
+
+/* ════════ 셀 보고 · 코치 확인 ════════
+   셀리더가 '보고하기'를 누르면 담당 코치 · 진장에게 소식이 가고,
+   코치 · 진장은 '확인했어요'와 한 줄 격려를 남깁니다(셀리더에게 소식).
+   확인 칸(check)은 코치 · 진장만 쓸 수 있고, 셀리더는 못 고칩니다(규칙). */
+function overseers(cellId, jinId) {
+  return (state.members || []).filter(u => u.active !== false && u.id !== uid() && u.jinId === jinId
+    && (u.role === "jinjang" || (u.role === "coach" && (u.cellIds || []).includes(cellId))));
+}
+async function sendNotices(toList, payload) {
+  for (const to of toList) {
+    try { await addDoc(collection(db, "notices"), { to, from: uid(), fromName: state.me.name || "",
+      ...payload, atMs: Date.now(), at: serverTimestamp(), read: false }); } catch {}
+  }
+}
+function renderReportBox() {
+  const box = $("m-report"), m = state.meeting && state.meeting.id ? state.meetings.find(x => x.id === state.meeting.id) : null;
+  if (!m) { box.hidden = true; return; }
+  const mine = m.leaderUid === uid(), ck = m.check;
+  const seer = !mine && ["coach", "jinjang"].includes(state.me.role);
+  const ckLine = ck ? `<p style="font-size:14px;margin-top:8px"><b>${esc(ck.name || "")}</b> 님이 ${fmtDate(ck.at)}에 확인했어요${
+    ck.note ? `<br><span style="color:#DCD6D5">“${esc(ck.note)}”</span>` : ""}</p>` : "";
+  let html = `<p style="font-size:13px;font-weight:600">셀 보고</p>`;
+  if (mine) {
+    html += m.reportedAt
+      ? `<p class="muted" style="font-size:13px;margin-top:6px">${fmtDate(m.reportedAt)}에 보고했어요.${ck ? "" : " 코치 · 진장 확인을 기다리는 중이에요."}</p>${ckLine}`
+      : `<p class="muted" style="font-size:13px;margin-top:6px">출석과 나눔을 다 적었으면 코치 · 진장에게 알려요.</p>
+         <button class="btn-sm" id="btn-m-report" style="margin-top:10px">코치에게 보고하기</button>`;
+  } else if (seer) {
+    html += `<p class="muted" style="font-size:13px;margin-top:6px">${m.reportedAt ? `${fmtDate(m.reportedAt)}에 보고됨` : "아직 보고 전이에요 (기록은 볼 수 있어요)"}</p>${ckLine}`
+      + (ck && ck.by !== uid() ? "" : `
+        <input id="m-ck-note" maxlength="200" placeholder="셀리더에게 한 줄 (선택) — 예) 수고했어요, 민지 같이 기도할게요"
+          value="${esc(ck && ck.by === uid() ? ck.note || "" : "")}" style="height:44px;margin-top:10px">
+        <button class="btn-sm" id="btn-m-check" style="margin-top:8px">${ck ? "다시 남기기" : "확인했어요"}</button>`);
+  } else html += m.reportedAt ? `<p class="muted" style="font-size:13px;margin-top:6px">${fmtDate(m.reportedAt)}에 보고됨</p>${ckLine}` : "";
+  box.innerHTML = html; box.hidden = false;
+  const rb = $("btn-m-report");
+  if (rb) rb.onclick = async () => {
+    rb.disabled = true;
+    try {
+      await updateDoc(doc(db, "meetings", m.id), { reportedAt: todayStr() });
+      m.reportedAt = todayStr();
+      const cn = (state.cells.find(c => c.id === m.cellId) || {}).name || "셀";
+      await sendNotices(overseers(m.cellId, m.jinId).map(u => u.id), { kind: "report",
+        target: { kind: "meeting", id: m.id, report: true }, title: `${cn} ${fmtDate(m.date)} 셀 보고`,
+        snippet: `출석 ${Object.values(m.attendance || {}).filter(v => v && v !== "absent").length}명${m.topic ? " · " + m.topic : ""}` });
+      toast("보고했어요. 코치 · 진장에게 소식이 갔어요."); bump("meetingReport"); renderReportBox();
+    } catch (e) { toast(msgOf(e)); rb.disabled = false; }
+  };
+  const cb = $("btn-m-check");
+  if (cb) cb.onclick = async () => {
+    cb.disabled = true;
+    const check = { by: uid(), name: state.me.name || "", at: todayStr(), note: $("m-ck-note").value.trim().slice(0, 200) };
+    try {
+      await updateDoc(doc(db, "meetings", m.id), { check });
+      m.check = check;
+      const cn = (state.cells.find(c => c.id === m.cellId) || {}).name || "셀";
+      await sendNotices([m.leaderUid], { kind: "report", target: { kind: "meeting", id: m.id, report: true },
+        title: `${cn} ${fmtDate(m.date)} 셀 보고 확인`, snippet: check.note || "확인했어요" });
+      toast("확인을 남겼어요."); renderReportBox();
+    } catch (e) { toast(msgOf(e)); cb.disabled = false; }
+  };
+}
+
+/* ════════ 일정 미리 알림 ════════
+   무료 요금제에는 서버가 없어서, 앱을 완전히 닫으면 앱이 직접 울릴 수 없어요. 그래서 두 갈래로 합니다.
+   ① 폰 캘린더에 알림째 넣기(.ics) — 폰이 대신 울려줍니다. 앱을 닫아도 울려요.
+   ② 앱이 켜져 있거나 뒤에 떠 있으면 1시간 전에 앱이 직접 알려요. */
+function icsBuild(evs) {
+  const esc2 = (s) => String(s || "").replace(/[\\;,]/g, m => "\\" + m).replace(/\n/g, "\\n");
+  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//목자의 삶//KO", "CALSCALE:GREGORIAN", "X-WR-CALNAME:목자의 삶"];
+  evs.forEach((e, i) => {
+    const d = e.date.replace(/-/g, "");
+    lines.push("BEGIN:VEVENT", `UID:mokja-${e.id || i}-${d}@mokyang-note`, `DTSTAMP:${todayStr().replace(/-/g, "")}T000000Z`);
+    if (e.time) {
+      const [hh, mm] = e.time.split(":").map(Number);
+      lines.push(`DTSTART:${d}T${pad2(hh)}${pad2(mm)}00`, `DTEND:${endStamp(e)}`);
+    } else {
+      const nx = new Date(e.date + "T00:00:00"); nx.setDate(nx.getDate() + 1);
+      lines.push(`DTSTART;VALUE=DATE:${d}`, `DTEND;VALUE=DATE:${ymd(nx).replace(/-/g, "")}`);
+    }
+    lines.push(`SUMMARY:${esc2(e.title)}`);
+    if (e.sub) lines.push(`DESCRIPTION:${esc2(e.sub)}`);
+    if (e.place) lines.push(`LOCATION:${esc2(e.place)}`);
+    (ALARM[e.kind] || ["-PT1H"]).forEach(t => lines.push("BEGIN:VALARM", "ACTION:DISPLAY",
+      `TRIGGER:${t}`, `DESCRIPTION:${esc2(e.title)}`, "END:VALARM"));
+    lines.push("END:VEVENT");
+  });
+  lines.push("END:VCALENDAR");
+  return lines.join("\r\n");
+}
+function icsOne(e) {
+  download(`목자의삶_${e.date}_${String(e.title).replace(/[\\/:*?"<>|\s]+/g, "_").slice(0, 24)}.ics`, icsBuild([e]), "text/calendar");
+  toast("파일을 열면 폰 캘린더에 알림째 들어가요.");
+}
+$("btn-ics-meeting").onclick = () => {
+  const cellId = $("m-cell").value || state.meeting.cellId;
+  const c = state.cells.find(x => x.id === cellId);
+  icsOne({ kind: "meeting", id: state.meeting.id || "new", date: $("m-date").value || todayStr(),
+    time: $("m-time").value || "", timeEnd: $("m-time-end").value || "",
+    title: `${c ? c.name : "셀"} 셀모임`, sub: $("m-topic").value.trim(), place: $("m-place").value.trim() });
+};
+/* 앱이 켜져 있는 동안 — 앞으로 하루 안의 일정을 1시간 전에 */
+function upcomingPlans() {
+  const out = [];
+  state.meetings.forEach(m => {
+    if (!m.time) return; const c = state.cells.find(x => x.id === m.cellId);
+    out.push({ key: "m" + m.id, at: new Date(`${m.date}T${m.time}:00`), title: `${c ? c.name : "셀"} 셀모임`, place: m.place || "" });
+  });
+  oneLinePerGroup((state.allRecords || []).filter(r => r.planned && r.type === "meet" && r.time)).forEach(r => {
+    out.push({ key: "r" + (r.groupId || r.id), at: new Date(`${r.date}T${r.time}:00`), title: planLine(r), place: r.place || "" });
+  });
+  return out.filter(e => !isNaN(e.at));
+}
+function planAlarms() {
+  (state.alarmT || []).forEach(clearTimeout); state.alarmT = [];
+  if (notifyPrefs().plan === false) return;
+  const now = Date.now();
+  upcomingPlans().forEach(e => {
+    const fire = e.at.getTime() - 60 * 60 * 1000, wait = fire - now;
+    if (wait < -10 * 60 * 1000 || wait > 24 * 60 * 60 * 1000) return;   // 지났거나 하루보다 멀면
+    state.alarmT.push(setTimeout(() => remindPlan(e), Math.max(wait, 0)));
+  });
+}
+function remindPlan(e) {
+  const seen = (() => { try { return JSON.parse(localStorage.getItem("mokja-reminded") || "{}"); } catch { return {}; } })();
+  const id = e.key + "@" + e.at.getTime(); if (seen[id]) return;
+  seen[id] = 1; try { localStorage.setItem("mokja-reminded", JSON.stringify(seen)); } catch {}
+  const title = `1시간 뒤 — ${e.title}`, body = `${fmtTime(`${pad2(e.at.getHours())}:${pad2(e.at.getMinutes())}`)}${e.place ? " · " + e.place : ""}`;
+  toast(`${title} · ${body}`);
+  if (notifyPrefs().device && "Notification" in window && Notification.permission === "granted") {
+    (navigator.serviceWorker ? navigator.serviceWorker.getRegistration() : Promise.resolve(null))
+      .then(reg => reg ? reg.showNotification(title, { body, tag: "mokja-plan-" + e.key, icon: "./icons/icon-192.png" })
+                       : new Notification(title, { body }))
+      .catch(() => {});
+  }
 }

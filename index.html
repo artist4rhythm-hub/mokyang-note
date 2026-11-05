@@ -58,6 +58,9 @@
     border-radius:12px;background:var(--surface);color:var(--text);font-size:16px;
     font-family:inherit;appearance:none}
   input,select{height:48px;padding:0 14px}
+  /* 체크 칸은 체크 칸답게 — 위의 공통 칸 모양(appearance:none)이 체크 표시까지 지워 버려서 */
+  input[type=checkbox],input[type=radio]{appearance:auto;-webkit-appearance:auto;width:20px;height:20px;
+    padding:0;margin:0;border-radius:4px;accent-color:var(--action);flex-shrink:0;background:none}
   textarea{min-height:92px;line-height:1.7;resize:none;overflow:hidden}
   input:focus,select:focus,textarea:focus{outline:2px solid var(--brand);outline-offset:-1px}
   input::placeholder,textarea::placeholder{color:#8A7F7D;opacity:1}
@@ -441,6 +444,20 @@
     textarea{min-height:110px}
   }
   @media (max-width:879px){ .only-wide{display:none !important} }
+  /* 19단계 — 조직 구성 */
+  .seat{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+  .seat:first-child{border-top:none}
+  .seat>.lb{width:64px;flex-shrink:0;font-size:12px;color:var(--dim);padding-top:7px}
+  .seat>.ppl{display:flex;flex-wrap:wrap;gap:6px;flex:1;min-width:0}
+  .pchip{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:999px;
+    border:1px solid var(--line);background:var(--surface);color:var(--text);font-size:13px;cursor:pointer;max-width:100%}
+  .pchip i{font-style:normal;font-size:11px;color:var(--dim)}
+  .pchip.inv{border-style:dashed}
+  .pchip.noe{border-style:dashed;color:var(--dim)}
+  .pchip.add{color:var(--dim);border-style:dashed}
+  .ocell{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+  .ocell .cn{width:96px;flex-shrink:0;font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+  .ocell .cnt{font-size:12px;color:var(--dim);flex-shrink:0}
   /* 18단계 — 명부 · 셀 관리 */
   .dgh{display:flex;align-items:baseline;justify-content:space-between;gap:8px;
     font-size:12px;color:var(--dim);margin:18px 2px 8px}
@@ -452,6 +469,63 @@
     font-size:14px;cursor:pointer}
   .ckl input{width:20px;height:20px;accent-color:var(--action);flex-shrink:0}
   .ckl{display:flex;flex-direction:column;gap:6px;max-height:42vh;overflow-y:auto}
+
+  /* ── 20단계 — 전시실 홈 ── */
+  .home2{display:block}
+  .room-h{margin:20px 2px 10px;font-size:13px;font-weight:600;color:var(--dim)}
+  .rooms{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .room{min-height:104px;border-radius:16px;background:var(--surface);border:1px solid var(--line);
+    color:var(--text);text-align:left;padding:14px;display:flex;flex-direction:column;
+    justify-content:space-between;gap:10px;font-family:inherit;cursor:pointer}
+  .room:active{background:var(--surface2)}
+  .room .k{font-size:13px;color:var(--dim)}
+  .room .v{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
+  .room .v b{font-size:24px;font-weight:700;line-height:1}
+  .room .v span{font-size:12px;color:var(--dim)}
+  .room .v span.hot{color:var(--rose-tx)}
+  .drawer{margin-top:14px;border:1px dashed var(--line);border-radius:14px}
+  .drawer summary{list-style:none;min-height:52px;display:flex;align-items:center;justify-content:space-between;
+    gap:10px;padding:0 16px;cursor:pointer;font-size:13px;color:var(--dim)}
+  .drawer summary b{color:var(--text);font-weight:600}
+  .drawer summary::-webkit-details-marker{display:none}
+  .drawer summary svg{flex-shrink:0;transition:transform .15s}
+  .drawer[open] summary svg{transform:rotate(180deg)}
+  .drawer-in{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:0 12px 12px}
+  .drawer-in .btn-ghost{height:48px;font-size:14px}
+  .care-g{font-size:11px;color:var(--dim);margin:16px 0 8px;letter-spacing:.04em;display:flex;justify-content:space-between}
+  .care-g:first-of-type{margin-top:12px}
+  .crow{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+  .crow{flex-wrap:wrap}
+  .crow .grow{flex:1 1 150px;min-width:0;cursor:pointer}
+  .cact{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap;justify-content:flex-end}
+  .crow .nm{font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .crow .sub{font-size:12px;color:var(--dim);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .crow .dot{width:8px;height:8px;border-radius:999px;flex-shrink:0}
+  .crow .btn-sm{height:34px;font-size:12px;padding:0 10px;flex-shrink:0}
+  .crow a.btn-sm{display:inline-flex;align-items:center;text-decoration:none;color:var(--text)}
+  .more-btn{background:none;border:none;color:var(--dim);font-size:12px;padding:8px 0 0;cursor:pointer;font-family:inherit}
+  .rsn{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+  .rsn button{height:34px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:none;
+    color:var(--dim);font-size:13px;font-family:inherit;cursor:pointer}
+  .rsn button.on{background:var(--rose-bg);border-color:#5A2A32;color:var(--rose-tx)}
+  .rsn button:disabled{opacity:.6;cursor:default}
+  .alertc{background:#2A1216;border:1px solid #6A2430;border-radius:14px;padding:12px 14px;margin-bottom:12px}
+  .alertc .hd{display:flex;align-items:center;gap:8px;font-size:13px;color:#FF9AA6;font-weight:600;cursor:pointer;
+    background:none;border:none;width:100%;text-align:left;padding:0;font-family:inherit}
+  .alertc .it{margin-top:10px;padding-top:10px;border-top:1px solid #4A1C24}
+  .alertc .it p{font-size:14px;line-height:1.7;white-space:pre-wrap}
+  .hcell{margin-bottom:12px}
+  .hcell .hm{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:10px}
+  .hcell .hm div{background:var(--surface2);border-radius:10px;padding:8px}
+  .hcell .hm p{font-size:11px;color:var(--dim)} .hcell .hm b{font-size:16px;font-weight:600}
+  .hcell .ints{display:flex;flex-direction:column;gap:2px;margin-top:10px;max-height:240px;overflow:auto}
+  .hcell .ints label{display:flex;align-items:center;gap:10px;min-height:40px;font-size:14px}
+  .rp-box{margin-top:12px;border:1px solid var(--line);border-radius:14px;padding:12px 14px;max-width:520px}
+  @media (min-width:880px){
+    .home2{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:0 20px;align-items:start}
+    .home2 .room-h{margin-top:0}
+    .rooms{grid-template-columns:repeat(2,minmax(0,1fr))}
+  }
 </style>
 </head>
 <body>
@@ -579,17 +653,28 @@
         <span class="chip" id="home-where"></span>
       </div>
       <div id="home-hand"></div>
-      <div class="tiles" id="home-tiles"></div>
-      <div id="home-soon"></div>
-      <div id="home-absent"></div>
-      <div class="wide" style="margin-top:14px">
-        <div id="home-pray"></div>
-        <div><div id="home-todo"></div><div id="home-anniv"></div></div>
-      </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;max-width:520px">
-        <button class="btn-ghost" id="btn-manage" style="flex:1 1 150px" hidden>리더 관리</button>
-        <button class="btn-ghost" id="btn-home-cellmgr" style="flex:1 1 150px" hidden>셀 관리</button>
-        <button class="btn-ghost" id="btn-home-dir" style="flex:1 1 150px">교회 명부</button>
+      <div class="home2">
+        <div>
+          <div id="home-pray"></div>
+          <div id="home-soon"></div>
+        </div>
+        <div>
+          <p class="room-h">전시실</p>
+          <div class="rooms" id="home-rooms"></div>
+          <details class="drawer" id="home-drawer">
+            <summary><span><b>관리 서랍</b> <span id="drawer-sub">교회 명부 · 사진 · 알림 · 설정</span></span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg></summary>
+            <div class="drawer-in">
+              <button class="btn-ghost" id="btn-home-org" hidden>조직 구성</button>
+              <button class="btn-ghost" id="btn-manage" hidden>리더 관리</button>
+              <button class="btn-ghost" id="btn-home-cellmgr" hidden>셀 관리</button>
+              <button class="btn-ghost" id="btn-home-dir">교회 명부</button>
+              <button class="btn-ghost" id="btn-home-photos">사진 모아보기</button>
+              <button class="btn-ghost" id="btn-home-notify">알림 설정</button>
+              <button class="btn-ghost" id="btn-home-more">설정 · 더보기</button>
+            </div>
+          </details>
+        </div>
       </div>
       <button type="button" class="row" id="btn-ver" style="margin-top:16px;width:100%;text-align:left;cursor:pointer;max-width:520px">
         <span class="grow"><span class="nm" style="display:block" id="ver-now">버전</span>
@@ -718,10 +803,12 @@
       <div class="field"><label for="m-note">모임 메모</label>
         <textarea id="m-note" placeholder="모임 전체에 대한 메모"></textarea></div>
       <button type="button" class="btn-ghost" id="btn-m-cmt" style="margin-top:10px;height:44px;font-size:13px;max-width:320px" hidden>댓글</button>
+      <div class="rp-box" id="m-report" hidden></div>
       <p class="err" id="meeting-err"></p>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn-sm" id="btn-report">셀 보고서 문구 만들기</button>
         <button class="btn-sm" id="btn-gcal-meeting">구글 캘린더에 추가</button>
+        <button class="btn-sm" id="btn-ics-meeting">폰에 미리 알림 넣기</button>
       </div>
     </div>
     <div class="savebar"><button class="btn" id="btn-meeting-save">저장</button></div>
@@ -1280,6 +1367,27 @@
     </div>
   </section>
 
+  <!-- 조직 구성 (기관 관리자) -->
+  <section class="screen" id="s-org" hidden>
+    <div class="topbar">
+      <button class="icon-btn" id="org-back" aria-label="뒤로"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5m6-6-6 6 6 6"/></svg></button>
+      <h2 style="font-size:17px;font-weight:600">조직 구성</h2>
+      <button class="btn-sm" id="btn-org-jin">＋ 진</button>
+    </div>
+    <div class="scroll pad">
+      <div class="card" style="display:flex;align-items:center;gap:10px">
+        <div class="grow"><p class="muted" style="font-size:12px">교회</p>
+          <p id="org-church" style="font-size:16px;font-weight:600;margin-top:2px"></p></div>
+        <button class="btn-sm" id="btn-org-church">이름</button>
+      </div>
+      <p class="hint" style="margin:12px 2px 0">자리를 먼저 짜고, 자리마다 그분의 이름과 구글 이메일을 넣으세요.
+        이메일을 넣는 순간 초대가 걸리고, 그분이 가입하기 전에도 구조는 그대로 보여요.
+        이메일을 아직 모르면 이름만 넣어 두었다가 나중에 채워도 돼요.</p>
+      <div id="org-jins"></div>
+      <p class="hint" style="margin-top:16px"><b>실선</b> = 가입함 · <b>점선 ✉</b> = 초대 보냄(가입 전) · <b>점선 이메일 없음</b> = 이름만 넣어 둠</p>
+    </div>
+  </section>
+
   <!-- 리더 관리 -->
   <section class="screen" id="s-manage" hidden>
     <div class="topbar">
@@ -1302,7 +1410,10 @@
         <button class="btn-sm" id="btn-my-save">저장</button>
       </div>
 
-      <button class="btn" id="btn-invite-open" style="margin-top:16px;max-width:320px">리더 초대하기</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;max-width:520px">
+        <button class="btn" id="btn-invite-open" style="flex:1 1 200px">리더 초대하기</button>
+        <button class="btn-ghost" id="btn-manage-org" style="flex:1 1 200px" hidden>조직 구성 — 자리 짜기</button>
+      </div>
       <h3 class="sec-title">구성원</h3>
       <div class="list" id="list-members"></div>
       <h3 class="sec-title">대기 중인 초대</h3>
@@ -1438,6 +1549,42 @@
   <div class="dlg-btns">
     <button class="btn-ghost" id="sp-cancel">취소</button>
     <button class="btn" id="sp-save">만들기</button>
+  </div>
+</dialog>
+
+<!-- 자리에 사람 넣기 -->
+<dialog id="dlg-seat">
+  <h3 id="sx-title">자리에 사람 넣기</h3>
+  <p class="muted" id="sx-sub" style="margin-bottom:12px"></p>
+  <div class="field"><label for="sx-pick">누구를</label><select id="sx-pick"></select></div>
+  <div id="sx-new">
+    <div class="field"><label for="sx-name2">이름</label><input id="sx-name2" placeholder="예) 김요셉"></div>
+    <div class="field"><label for="sx-email">구글 이메일 <span style="color:var(--dim)">(모르면 비워 두기)</span></label>
+      <input id="sx-email" type="email" placeholder="그분이 로그인할 구글 계정"></div>
+  </div>
+  <label class="check" id="sx-coach-wrap" style="margin:-4px 0 14px"><input type="checkbox" id="sx-coach"> 코치도 겸함 (다른 셀도 돌봄)</label>
+  <div class="field" id="sx-cells-wrap"><label>돌볼 셀 (코치)</label><div class="ckl" id="sx-cells"></div></div>
+  <p class="hint" id="sx-hint"></p>
+  <button class="btn-sm danger" id="sx-del" hidden style="margin-top:4px">이 자리에서 빼기</button>
+  <p class="err" id="sx-err"></p>
+  <div class="dlg-btns">
+    <button class="btn-ghost" id="sx-cancel">취소</button>
+    <button class="btn" id="sx-save">넣기</button>
+  </div>
+</dialog>
+
+<!-- 여러 셀 한꺼번에 -->
+<dialog id="dlg-bulk">
+  <h3>여러 셀 한꺼번에</h3>
+  <p class="muted" id="bk-sub" style="margin-bottom:12px"></p>
+  <div class="field"><label for="bk-text">한 줄에 셀 하나 — 셀 이름 / 셀리더 이름 / 구글 이메일</label>
+    <textarea id="bk-text" rows="8" placeholder="다니엘 셀 / 이현우 / hyunwoo@gmail.com&#10;요셉 셀 / 김요셉&#10;여호수아 셀"></textarea>
+    <p class="hint">셀리더 이름 · 이메일은 없어도 돼요. 엑셀에서 세 칸을 복사해 붙여넣어도 됩니다.</p></div>
+  <div class="list" id="bk-preview"></div>
+  <p class="err" id="bk-err"></p>
+  <div class="dlg-btns">
+    <button class="btn-ghost" id="bk-cancel">취소</button>
+    <button class="btn" id="bk-save">만들기</button>
   </div>
 </dialog>
 
@@ -1679,6 +1826,7 @@
   <p class="muted" style="margin-bottom:12px">끄면 알림이 뜨지 않고 소식함에만 쌓여요. 안 읽은 수는 그대로 보여요.</p>
   <label class="check" style="margin-bottom:12px"><input type="checkbox" id="nt-comment"> 내 모임 · 기록에 댓글이 달리면 알림</label>
   <label class="check" style="margin-bottom:12px"><input type="checkbox" id="nt-dm"> 쪽지가 오면 알림</label>
+  <label class="check" style="margin-bottom:12px"><input type="checkbox" id="nt-plan"> 일정 미리 알림 — 셀모임 · 예정된 만남 1시간 전</label>
   <label class="check" style="margin-bottom:6px"><input type="checkbox" id="nt-device"> 이 기기 알림으로도 띄우기</label>
   <p class="hint" id="nt-device-hint" style="margin-bottom:12px">앱(이 창)이 열려 있거나 뒤에 켜져 있을 때 폰 · 컴퓨터 알림으로 보여줘요.
     앱을 완전히 닫았을 때 오는 알림은 유료 요금제(Blaze)로 바꾼 뒤에 붙일 수 있어요.</p>
@@ -1686,6 +1834,36 @@
   <div class="dlg-btns">
     <button class="btn-ghost" id="nt-cancel">취소</button>
     <button class="btn" id="nt-save">저장</button>
+  </div>
+</dialog>
+
+<!-- 20단계 — 셀 건강 · 인턴 -->
+<dialog id="dlg-health">
+  <h3>셀 건강</h3>
+  <p class="muted" style="margin-bottom:12px" id="hl-sub">최근 8주 셀모임 기록으로 셈해요.</p>
+  <div id="hl-body"></div>
+  <p class="err" id="hl-err"></p>
+  <div class="dlg-btns"><button class="btn" id="hl-close">닫기</button></div>
+</dialog>
+
+<!-- 20단계 — 민감 메모 -->
+<dialog id="dlg-alert">
+  <h3>민감 메모</h3>
+  <p class="muted" style="margin-bottom:12px">카드 맨 위에 빨간 표시로만 보이고, 내용은 눌러야 펼쳐져요.
+    본인은 어떤 경우에도 볼 수 없어요.</p>
+  <div class="field"><label for="al-text">내용</label>
+    <textarea id="al-text" rows="4" maxlength="1000" placeholder="예) 가정 문제로 남편 이야기는 꺼내지 않기"></textarea></div>
+  <div class="field"><label for="al-scope">누가 볼 수 있나요</label>
+    <select id="al-scope">
+      <option value="private">나만 보기</option>
+      <option value="leader">담당 리더 (카드를 넘겨받는 분도)</option>
+      <option value="coach">코치 · 진장까지</option>
+    </select></div>
+  <p class="err" id="al-err"></p>
+  <div class="dlg-btns">
+    <button class="btn-ghost" id="al-del" style="color:var(--rose-tx)" hidden>지우기</button>
+    <button class="btn-ghost" id="al-cancel">취소</button>
+    <button class="btn" id="al-save">저장</button>
   </div>
 </dialog>
 
