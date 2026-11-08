@@ -520,6 +520,14 @@
   .hcell .hm p{font-size:11px;color:var(--dim)} .hcell .hm b{font-size:16px;font-weight:600}
   .hcell .ints{display:flex;flex-direction:column;gap:2px;margin-top:10px;max-height:240px;overflow:auto}
   .hcell .ints label{display:flex;align-items:center;gap:10px;min-height:40px;font-size:14px}
+  .sharebar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:10px;font-size:12px;color:var(--dim)}
+  .sharebar button{height:32px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:none;
+    color:var(--dim);font-size:12px;font-family:inherit;cursor:pointer}
+  .sharebar button.on{background:var(--ok-bg);border-color:#24503A;color:var(--ok-tx)}
+  .shr-sec{margin-bottom:12px}
+  .shr-sec h3{font-size:14px;font-weight:600;margin-bottom:4px}
+  .shr-sec label.check{margin-top:10px}
+  #ps-jins label{display:flex;align-items:center;gap:10px;min-height:40px;font-size:14px}
   .rp-box{margin-top:12px;border:1px solid var(--line);border-radius:14px;padding:12px 14px;max-width:520px}
   @media (min-width:880px){
     .home2{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:0 20px;align-items:start}
@@ -631,6 +639,38 @@
     </div>
   </section>
 
+  <!-- 21단계 — 개인정보 동의 (처음 한 번) -->
+  <section class="screen" id="s-consent" hidden>
+    <div class="scroll pad" style="max-width:560px;margin:0 auto;width:100%">
+      <h2 class="serif" style="font-size:22px;font-weight:600;margin-top:12px">시작하기 전에</h2>
+      <p class="muted" style="margin-top:8px">목자의 삶은 셀 식구들을 기억하고 기도하기 위한 메모장이에요.
+        다른 사람의 이야기가 들어가는 만큼, 아래 내용에 동의해 주셔야 쓸 수 있어요.</p>
+      <div class="card" style="margin-top:16px;font-size:14px;line-height:1.75" id="consent-text"></div>
+      <label class="check" style="margin-top:16px"><input type="checkbox" id="cs-1"> 개인정보를 위 목적으로 적고 보관하는 데 동의해요</label>
+      <label class="check" style="margin-top:10px"><input type="checkbox" id="cs-2"> 여기서 알게 된 이야기를 밖으로 옮기지 않을게요</label>
+      <p class="err" id="consent-err"></p>
+      <button class="btn" id="btn-consent" style="margin-top:14px">동의하고 시작하기</button>
+      <button class="link" id="btn-consent-no" style="margin-top:10px">동의하지 않음 (로그아웃)</button>
+      <div style="height:24px"></div>
+    </div>
+  </section>
+
+  <!-- 21단계 — 공유 설정 -->
+  <section class="screen" id="s-share" hidden>
+    <div class="topbar">
+      <button class="icon-btn" id="share-back" aria-label="뒤로"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5m6-6-6 6 6 6"/></svg></button>
+      <h2 style="font-size:17px;font-weight:600">공유 설정</h2>
+      <span style="width:44px"></span>
+    </div>
+    <div class="scroll pad" style="max-width:640px">
+      <p class="hint" style="margin:0 2px 12px">한 번 정해 두면 새로 만드는 카드 · 기록 · 셀모임에 그대로 적용돼요.
+        카드마다 따로 바꿀 수도 있어요. 본인 카드는 어떤 설정으로도 본인에게 안 보여요.</p>
+      <div id="share-body"></div>
+      <p class="err" id="share-err"></p>
+    </div>
+    <div class="savebar"><button class="btn" id="btn-share-save">저장</button></div>
+  </section>
+
   <!-- 홈 -->
   <section class="screen" id="s-home" hidden>
     <div class="topbar">
@@ -670,6 +710,7 @@
               <button class="btn-ghost" id="btn-home-cellmgr" hidden>셀 관리</button>
               <button class="btn-ghost" id="btn-home-dir">교회 명부</button>
               <button class="btn-ghost" id="btn-home-photos">사진 모아보기</button>
+              <button class="btn-ghost" id="btn-home-share">공유 설정</button>
               <button class="btn-ghost" id="btn-home-notify">알림 설정</button>
               <button class="btn-ghost" id="btn-home-more">설정 · 더보기</button>
             </div>
@@ -911,6 +952,7 @@
         <select id="log-scope">
           <option value="leader">담당 리더 — 나와 다음 담당자</option>
           <option value="coach">코치 공유 — 코치·진장도 봄</option>
+          <option value="pastor">교역자까지 — 코치·진장·담당 교역자</option>
           <option value="private">나만 보기</option>
         </select></div>
       <p class="err" id="log-err"></p>
@@ -1383,6 +1425,7 @@
       <p class="hint" style="margin:12px 2px 0">자리를 먼저 짜고, 자리마다 그분의 이름과 구글 이메일을 넣으세요.
         이메일을 넣는 순간 초대가 걸리고, 그분이 가입하기 전에도 구조는 그대로 보여요.
         이메일을 아직 모르면 이름만 넣어 두었다가 나중에 채워도 돼요.</p>
+      <div class="card" style="margin-top:14px" id="org-top"></div>
       <div id="org-jins"></div>
       <p class="hint" style="margin-top:16px"><b>실선</b> = 가입함 · <b>점선 ✉</b> = 초대 보냄(가입 전) · <b>점선 이메일 없음</b> = 이름만 넣어 둠</p>
     </div>
@@ -1675,6 +1718,7 @@
     <select id="r-scope">
       <option value="leader">담당 리더 — 나와 다음 담당자</option>
       <option value="coach">코치 공유 — 코치·진장도 봄</option>
+      <option value="pastor">교역자까지 — 코치·진장·담당 교역자</option>
       <option value="private">나만 보기</option>
     </select></div>
   <p class="err" id="rec-err"></p>
@@ -1834,6 +1878,37 @@
   <div class="dlg-btns">
     <button class="btn-ghost" id="nt-cancel">취소</button>
     <button class="btn" id="nt-save">저장</button>
+  </div>
+</dialog>
+
+<!-- 21단계 — 수퍼 관리자 세우기 · 소유권 넘기기 (소유자만) -->
+<dialog id="dlg-super">
+  <h3 id="su-title">수퍼 관리자 세우기</h3>
+  <p class="muted" style="margin-bottom:12px" id="su-sub"></p>
+  <div class="field"><label for="su-user">누구를</label><select id="su-user"></select></div>
+  <p class="err" id="su-err"></p>
+  <div class="dlg-btns">
+    <button class="btn-ghost" id="su-cancel">취소</button>
+    <button class="btn" id="su-save">확인</button>
+  </div>
+</dialog>
+
+<!-- 21단계 — 담당 교역자 -->
+<dialog id="dlg-pastor">
+  <h3 id="ps-title">담당 교역자</h3>
+  <p class="muted" style="margin-bottom:12px">맡은 진에서 셀리더 · 진장 · 코치가 '교역자에게 보이기'로 공유한 것만 봐요.
+    직접 카드를 쓰거나 고치지는 않아요.</p>
+  <div class="field"><label for="ps-pick">누구를</label><select id="ps-pick"></select></div>
+  <div id="ps-new">
+    <div class="field"><label for="ps-name">이름</label><input id="ps-name" placeholder="예) 김OO 목사"></div>
+    <div class="field"><label for="ps-email">구글 이메일</label><input id="ps-email" type="email" placeholder="name@gmail.com"></div>
+  </div>
+  <div class="field"><label>맡은 진</label><div class="list" id="ps-jins" style="gap:2px"></div></div>
+  <p class="err" id="ps-err"></p>
+  <div class="dlg-btns">
+    <button class="btn-ghost" id="ps-del" style="color:var(--rose-tx)" hidden>빼기</button>
+    <button class="btn-ghost" id="ps-cancel">취소</button>
+    <button class="btn" id="ps-save">저장</button>
   </div>
 </dialog>
 
