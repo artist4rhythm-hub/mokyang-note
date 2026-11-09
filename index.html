@@ -468,6 +468,50 @@
   .dgh{display:flex;align-items:baseline;justify-content:space-between;gap:8px;
     font-size:12px;color:var(--dim);margin:18px 2px 8px}
   .dgh b{color:var(--text);font-size:13px;font-weight:600}
+  /* 25단계 — 셀 번호 배지 · 셀리더 카드 · 가지 배열 */
+  .cbadge{display:inline-flex;align-items:center;height:28px;padding:0 12px;border-radius:999px;
+    background:var(--rose-bg);color:var(--rose-tx);font-size:14px;font-weight:600;letter-spacing:.02em;flex-shrink:0}
+  .cbadge.plain{background:var(--surface2);color:var(--text)}
+  .lcard{display:flex;align-items:flex-start;gap:12px;padding:12px;border-radius:14px;cursor:pointer;
+    background:linear-gradient(135deg,#2A161A 0%,var(--surface2) 70%);border:1px solid #4A2229;position:relative}
+  .lcard + .lcard{margin-top:8px}
+  .lcard.empty{cursor:default;background:var(--surface);border-style:dashed;border-color:var(--line)}
+  .lcard .grow{flex-grow:1;min-width:0}
+  .lcard .lk{font-size:11px;color:var(--rose-tx);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .lcard .lk .chip{padding:2px 8px;font-size:10px}
+  .lcard .nm{font-size:16px;font-weight:600;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .lcard .sub{font-size:12px;color:#CFC5C3;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .lcard .sub2{font-size:12px;color:var(--dim);margin-top:2px;line-height:1.5}
+  .lcard .ava{border:2px solid #5A2A32}
+  .ctree{display:flex;flex-direction:column;gap:14px;margin-top:12px}
+  .ccol{display:contents}
+  @media (min-width:1100px){
+    .ctree:not(.one){flex-direction:row;align-items:flex-start}
+    .ctree:not(.one) .ccol{display:flex;flex-direction:column;gap:14px;flex:1 1 0;min-width:0}
+  }
+  .cgrp{background:var(--surface);
+    border:1px solid var(--line);border-radius:18px;padding:12px}
+  .cgh{display:flex;align-items:center;gap:8px;margin:0 0 10px}
+  .cgh .cgm{flex-grow:1;min-width:0;font-size:12px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .cgh .cgc{font-size:12px;color:var(--dim);flex-shrink:0}
+  .twigs{margin:0 0 0 39px;padding:8px 0 0 20px;display:flex;flex-direction:column;gap:6px}
+  .twig{position:relative;padding:9px 10px;background:var(--surface2);border-color:transparent}
+  .twig::before{content:"";position:absolute;left:-20px;top:-6px;bottom:0;border-left:2px solid #4A2229}
+  .twig:first-child::before{top:-14px}
+  .twig::after{content:"";position:absolute;left:-20px;top:50%;width:16px;border-top:2px solid #4A2229}
+  .twig:last-child::before{bottom:50%;width:16px;border-bottom:2px solid #4A2229;border-bottom-left-radius:10px}
+  .twig:last-child::after{display:none}
+  .twig .nm{font-size:14px}
+  .twig-empty{font-size:12px;margin:8px 0 0 4px}
+  .ctree.one .twigs{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));margin-left:0;padding-left:0;padding-top:10px}
+  .ctree.one .twigs .twig::after,.ctree.one .twigs .twig::before{display:none}
+  #cm-list.cmgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px}
+  .cmc{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:12px;display:flex;flex-direction:column;gap:10px}
+  .cmc .acts{margin-top:0}
+  .cmh{display:flex;align-items:center;gap:10px}
+  .cmh .grow{flex-grow:1;min-width:0}
+  .cmh .sub{font-size:12px;color:var(--dim)}
+  @media (max-width:420px){ #cm-list.cmgrid{grid-template-columns:1fr} }
   .kv{display:grid;grid-template-columns:92px 1fr;gap:8px 12px;font-size:13px;margin-top:14px}
   .kv span:nth-child(odd){color:var(--dim)}
   .ckl label{display:flex;align-items:center;gap:10px;margin:0;padding:10px 12px;
@@ -1473,7 +1517,7 @@
     </div>
     <div class="scroll pad">
       <div id="cm-pending"></div>
-      <div class="list" id="cm-list" style="margin-top:14px"></div>
+      <div class="cmgrid" id="cm-list" style="margin-top:14px"></div>
       <p class="hint" style="margin-top:16px">셀 이름은 그대로 두고 담당 셀리더만 바꿀 수 있어요.
         목양 카드는 지금 맡은 셀리더가 앱을 열어 '얼마나 넘길지'(전부 · 요약만 · 지금부터)를 골라 넘깁니다.
         지난 셀모임 출석은 원래 셀에 그대로 남아요.</p>
