@@ -14,7 +14,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
 import {
   getAuth, onAuthStateChanged, GoogleAuthProvider,
-  signInWithPopup, signInWithRedirect, getRedirectResult,
+  signInWithPopup, signInWithRedirect, getRedirectResult, reauthenticateWithPopup,
   createUserWithEmailAndPassword, signInWithEmailAndPassword,
   sendEmailVerification, sendPasswordResetEmail, signOut
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
@@ -24,7 +24,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
 const APP_NAME = "목자의 삶";
-const APP_VERSION = "26.0 (2026-11-09)";
+const APP_VERSION = "27.0 (2026-11-09)";
 
 /* 사진 크기 — 얼굴을 알아볼 수 있는 선에서 가장 작게.
    얼굴 하나가 가로 80px은 되어야 알아보는데, 여럿이 한 줄로 선
@@ -685,6 +685,7 @@ async function loadPhoto(soulId) {
 const invalidate = () => {
   state.allRecords = null; state.allTrainings = null; state.recP = null; state.trP = null;
   state.soulsAt = 0; state.meetingsAt = 0;
+  if (typeof gcalSoon === "function") gcalSoon();   // 27단계 — 고치면 구글 캘린더도 따라서
 };
 
 /* ── 출석 계산 ── */
@@ -772,6 +773,7 @@ async function homeBackground() {
       if (onHome()) { renderCare(); renderRooms(); }
       planAlarms();
       syncCalShare().catch(e => console.warn("캘린더 공유", e));
+      gcalDoc().then(() => { renderGcal(); if (gcalTok()) gcalSync().catch(() => {}); });
     }
   } catch (e) { console.warn("홈 뒤 작업", e); }
 }
@@ -833,7 +835,7 @@ function renderPray() {
           </div>
         </div>
       </div>
-      <p style="margin-top:14px;font-size:15px;line-height:1.75;color:#DCD6D5">${esc(top.text||"기도제목을 적어주세요.")}</p>
+      <p style="margin-top:14px;font-size:15px;line-height:1.75;color:var(--body-tx)">${esc(top.text||"기도제목을 적어주세요.")}</p>
       <div style="display:flex;gap:8px;margin-top:16px">
         <button class="btn" style="height:48px" data-pray="${s.id}">기도했어요</button>
         ${list.length>1?`<button class="btn-ghost" style="width:48px;height:48px;flex-shrink:0;padding:0" data-next="1" aria-label="다음 영혼">›</button>`:""}
@@ -892,7 +894,7 @@ function renderCare() {
         sub:`${when(r.date)}${r.time?" "+esc(fmtSpan(r.time,r.timeEnd)):""}${r.place?" · "+esc(r.place):""}` })));
   plans.filter(r=>{ const d=daysUntil(r.date); return d!==null && d<0; })
     .sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,3).forEach(r=>
-      soonRows.push(careRow({ dot:"#6B5C5D", go:`data-gosoul6="${r.soulId}"`, nm:esc(planLine(r)),
+      soonRows.push(careRow({ dot:"var(--faint)", go:`data-gosoul6="${r.soulId}"`, nm:esc(planLine(r)),
         sub:`${fmtDate(r.date)} — 만나셨으면 기록을 채워주세요`, act:`<span class="chip warn">기록 비어 있음</span>` })));
 
   /* ② 결석 — 연락할 때 (다시 나오면 저절로 빠짐) */
@@ -973,7 +975,7 @@ function renderReports() {
           sub:`출석 ${Object.values(m.attendance||{}).filter(v=>v&&v!=="absent").length}명 · ${fmtDate(m.reportedAt)} 보고${m.check?` · ${esc(m.check.name||"")} 확인`:""}`,
           act:`<button class="btn-sm" data-gomeet2="${m.id}">${pastor?"보기":"확인하기"}</button>` })).join("")}
         ${quiet.length ? careGroup("quiet", "최근 8일 셀모임 기록 없음",
-          quiet.map(c=>careRow({ dot:"#6B5C5D", nm:esc(c.name), sub:esc(leaderLabel(c.id)) })), 4) : ""}
+          quiet.map(c=>careRow({ dot:"var(--faint)", nm:esc(c.name), sub:esc(leaderLabel(c.id)) })), 4) : ""}
       </div>
     </section>`;
 }
@@ -1176,8 +1178,20 @@ function renderSouls() {
   if (newView) (state.allRecords||[]).forEach(r=>{
     if (r.type === "meet" && !r.planned && !r.away) metCount[r.soulId] = (metCount[r.soulId]||0) + 1;
   });
+  /* 27단계 — 명함처럼: 같은 크기 카드 · 같은 자리에 같은 정보 (만남 · 1:1 · 출석 · 기도) */
+  const dago = (n) => n === null ? "없음" : n <= 0 ? "오늘" : n === 1 ? "어제" : `${n}일 전`;
+  const tone = (r) => r === null ? "" : r >= 75 ? "good" : r >= 50 ? "mid" : "low";
+  const stat = (k, v, cls) => `<div class="sc-st ${cls || ""}"><span>${k}</span><b>${v}</b></div>`;
+  const scard = (o) => `<div class="scard${o.cls ? " " + o.cls : ""}" ${o.attr} style="cursor:pointer">
+      <div class="sc-top">${o.ava}
+        <div class="sc-id"><p class="sc-nm">${o.name}</p><p class="sc-sub">${o.sub || "&nbsp;"}</p></div>
+        <span class="chip ${o.chipCls || ""}">${o.chip}</span></div>
+      <div class="sc-stats">${o.stats.join("")}</div>
+      <div class="sc-foot">${o.foot.filter(Boolean).join("") || `<span class="sc-ok">특별히 챙길 일 없음</span>`}</div>
+    </div>`;
   $("list-souls").innerHTML = list.map(s=>{
     const n = daysSince(s.lastMetAt), st = absentStreak(attKey(s),attCell(s));
+    const rate = attendRate(attKey(s), attCell(s)), pray = s.prayOpen || 0;
     if (newView) {
       /* 새가족은 '등록하고 몇 주 지났나'가 제일 중요한 숫자입니다.
          반갑게 맞고는 정신없이 지내다 보면 석 달이 지나 있거든요. */
@@ -1185,36 +1199,24 @@ function renderSouls() {
       const weeks = days === null ? null : Math.floor(days / 7) + 1;
       const met = metCount[s.id] || 0;
       const slow = weeks !== null && weeks >= 4 && met < 2;
-      return `<div class="row" data-open="${s.id}" style="cursor:pointer">
-        ${avatar(s)}
-        <div class="grow">
-          <p class="nm">${esc(s.name)}</p>
-          <p class="sub">${weeks === null
-            ? "교회 등록일을 적어주세요"
-            : `등록 ${weeks}주차 · 그동안 만남 ${met}번`}${
-            (s.prayOpen||0)>0?` · 기도 ${s.prayOpen}`:""}</p>
-          <p class="sub2">${agoShort(n)}${
-            attendRate(attKey(s),attCell(s))===null?"":` · 출석 ${attendRate(attKey(s),attCell(s))}%`}</p>
-        </div>
-        <span class="chip ${slow?"warn":"rose"}">${slow?"챙길 때":"새가족"}</span>
-      </div>`;
+      return scard({ attr: `data-open="${s.id}"`, ava: avatar(s, 52), name: esc(s.name),
+        sub: weeks === null ? "교회 등록일을 적어주세요" : `등록 ${weeks}주차`,
+        chip: slow ? "챙길 때" : "새가족", chipCls: slow ? "warn" : "rose",
+        stats: [stat("등록", weeks === null ? "—" : `${weeks}주차`), stat("만남", `${met}번`),
+          stat("출석", rate === null ? "—" : rate + "%", tone(rate)), stat("기도", pray ? pray : "—")],
+        foot: [slow ? `<span class="tpill streak">4주가 지났는데 만남이 적어요</span>` : "",
+          st >= 2 ? `<span class="tpill streak">결석 ${st}주</span>` : ""] });
     }
-    const bt = birthText(s), bd = annivIn(s.birth);
-    const rate = attendRate(attKey(s), attCell(s));
-    return `<div class="row" data-open="${s.id}" style="cursor:pointer">
-      ${avatar(s)}
-      <div class="grow">
-        <p class="nm">${esc(s.name)}</p>
-        <p class="sub">${bt ? esc(bt) : "생일 미입력"}${
-          bd !== null && bd <= 14 ? ` · 🎂 ${bd===0?"오늘":"D-"+bd}` : ""}</p>
-        <p class="sub2">${st>=2?`<span style="color:var(--warn-tx)">결석 ${st}주</span> · `:""}${
-          agoShort(n)}${isLeaderCard(s)||oneDays(s)===null?"":` · 1:1 ${oneDays(s)}일 전`}${rate===null?"":` · 출석 ${rate}%`}${
-          s.intern?` · <span style="color:var(--ok-tx)">인턴</span>`:""}${
-          (s.prayOpen||0)>0?` · 기도 ${s.prayOpen}`:""}</p>
-      </div>
-      <span class="chip ${isLeaderCard(s)?"":s.status==="care"?"warn":"rose"}">${
-        isLeaderCard(s)?KINDLABEL[s.kind]:esc(STATUS[s.status]||"—")}</span>
-    </div>`;
+    const bt = birthText(s), bd = annivIn(s.birth), od = isLeaderCard(s) ? null : oneDays(s);
+    return scard({ attr: `data-open="${s.id}"`, ava: avatar(s, 52), name: esc(s.name),
+      sub: (bt ? esc(bt) : "생일 미입력") + (bd !== null && bd <= 14 ? ` · 🎂 ${bd === 0 ? "오늘" : "D-" + bd}` : ""),
+      chip: isLeaderCard(s) ? KINDLABEL[s.kind] : esc(STATUS[s.status] || "—"),
+      chipCls: isLeaderCard(s) ? "" : s.status === "care" ? "warn" : "rose",
+      stats: [stat("만남", dago(n), n !== null && n >= 30 ? "mid" : ""), stat("1:1", isLeaderCard(s) ? "—" : dago(od), od !== null && od >= 30 ? "mid" : ""),
+        stat("출석", rate === null ? "—" : rate + "%", tone(rate)), stat("기도", pray ? pray : "—")],
+      foot: [st >= 2 ? `<span class="tpill streak">결석 ${st}주</span>` : "",
+        s.intern ? `<span class="tpill">인턴</span>` : "",
+        s.status === "care" ? `<span class="tpill warnp">돌봄 필요</span>` : ""] });
   }).join("") || `<p class="muted">${
     kw ? "찾는 이름이 없어요."
     : state.me.role==="coach" && !(state.me.cellIds||[]).length
@@ -1225,13 +1227,11 @@ function renderSouls() {
      눌러도 진장·코치가 쓰는 목양 카드가 아니라, 내가 나에 대해 적는 '내 카드'가 열립니다. */
   if (canLead() && state.filter === "all" && !kw) {
     const a = myActivity(statsFrom("3"));
-    $("list-souls").insertAdjacentHTML("afterbegin", `
-      <div class="row" data-mine="1" style="cursor:pointer;border-color:#3A2226">
-        ${meAvatar()}
-        <div class="grow"><p class="nm">${esc(state.me.name||"나")}</p>
-          <p class="sub">내 카드 · 셀모임 출석 ${a.marked?`${a.came}/${a.marked}`:"—"} · 최근 3개월 함께한 모임 ${a.met}번</p></div>
-        <span class="chip rose">나 · 셀리더</span>
-      </div>`);
+    $("list-souls").insertAdjacentHTML("afterbegin", scard({ cls: "me", attr: `data-mine="1"`, ava: meAvatar(52),
+      name: esc(state.me.name || "나"), sub: "내 카드 — 최근 3개월", chip: "나 · 셀리더", chipCls: "rose",
+      stats: [stat("셀모임 출석", a.marked ? `${a.came}/${a.marked}` : "—"), stat("함께한 모임", `${a.met}번`),
+        stat("1:1", `${a.one}번`), stat("훈련", `${a.train}번`)],
+      foot: [`<span class="tpill">기본은 나만 봐요</span>`] }));
   }
 }
 /* 나의 출석과 활동 — 내 셀모임의 내 출석, 내가 직접 함께한 모임 */
@@ -1454,7 +1454,7 @@ function attendBlock(soulId, cellId) {
     <div class="ring">
       <svg width="84" height="84" viewBox="0 0 84 84" role="img"
         aria-label="출석률 ${rate===null?"기록 없음":rate+"퍼센트"}">
-        <circle cx="42" cy="42" r="${R}" fill="none" stroke="#2A2424" stroke-width="9"/>
+        <circle cx="42" cy="42" r="${R}" fill="none" style="stroke:var(--track)" stroke-width="9"/>
         ${rate===null?"":`<circle cx="42" cy="42" r="${R}" fill="none" stroke="var(--brand)"
           stroke-width="9" stroke-linecap="round" stroke-dasharray="${on.toFixed(1)} ${(C-on).toFixed(1)}"
           transform="rotate(-90 42 42)"/>`}
@@ -1471,9 +1471,9 @@ function attendBlock(soulId, cellId) {
       </div>
     </div>
     <div class="legend">
-      <span><i class="present" style="background:#2E7D54;border-color:#2E7D54"></i>출석</span>
-      <span><i class="online" style="background:#4A4140;border-color:#5A4F4E"></i>온라인</span>
-      <span><i class="absent" style="background:var(--rose-bg);border-color:#5A2A32"></i>결석</span>
+      <span><i class="present" style="background:var(--ok-strong);border-color:var(--ok-strong)"></i>출석</span>
+      <span><i class="online" style="background:var(--online-bg);border-color:var(--online-line)"></i>온라인</span>
+      <span><i class="absent" style="background:var(--rose-bg);border-color:var(--rose-line2)"></i>결석</span>
       <span><i></i>기록 없음</span>
     </div>
   </div>`;
@@ -1497,7 +1497,7 @@ function renderSoulBody() {
     box.innerHTML = `
       ${alertBlock(s)}
       ${isLeaderCard(s) && !s.linkedUid ? "" : attendBlock(attKey(s), attCell(s))}
-      ${state.shared.length ? `<div class="card" style="margin-bottom:12px;background:var(--rose-bg);border-color:#3A2226">
+      ${state.shared.length ? `<div class="card" style="margin-bottom:12px;background:var(--rose-bg);border-color:var(--rose-line)">
         <h3 style="font-size:13px;font-weight:600;color:var(--rose-tx)">본인이 열어준 기록</h3>
         <p class="muted" style="font-size:12px;margin-top:4px">
           ${esc(s.name)} 님이 '내 기록'에서 진장에게 보이기로 켠 것들이에요.</p>
@@ -1541,7 +1541,7 @@ function renderSoulBody() {
       ${mine?`<button class="btn-ghost" id="btn-todo-new" style="height:44px;font-size:13px;margin-bottom:12px;max-width:320px">후속조치 추가</button>`:""}
       <div class="list">${todos.length?todos.map(t=>`
         <div class="row ${t.done?"off":""}">
-          ${mine?`<button class="icon-btn" style="width:34px;height:34px;color:${t.done?"#F24557":"#6E6260"}" data-tgl="${t.id}" aria-label="완료 전환">
+          ${mine?`<button class="icon-btn" style="width:34px;height:34px;color:${t.done?"#F24557":"var(--faint)"}" data-tgl="${t.id}" aria-label="완료 전환">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="8.5"/>${t.done?'<path d="m8.5 12 2.5 2.5 4.5-5" stroke-linecap="round" stroke-linejoin="round"/>':""}</svg>
           </button>`:""}
           <div class="grow"><p class="nm" style="white-space:normal">${esc(t.text)}</p>
@@ -2749,6 +2749,7 @@ async function openCal() {
   state.calPick = state.calPick || todayStr();
   if (calOther()) await loadOtherCal(state.calWho);
   renderCal(); markSide("cal"); show("s-cal");
+  gcalDoc().then(() => renderGcal());
   if (canLead()) syncCalShare().catch(e => console.warn("캘린더 공유", e));
 }
 function calEvents() {
@@ -2973,7 +2974,7 @@ $("cn-go").onclick = () => {
 };
 $("btn-cal-help").onclick = () => $("dlg-gcal").showModal();
 $("gcal-close").onclick = () => $("dlg-gcal").close();
-$("btn-go-cal-help").onclick = () => $("dlg-gcal").showModal();
+$("btn-go-cal-help").onclick = async () => { await openCal(); setTimeout(() => $("gcal-box").scrollIntoView({ behavior: "smooth", block: "center" }), 200); };
 $("btn-ics").onclick = () => {
   const evs = calEvents();
   if (!evs.length) { toast("내보낼 일정이 없어요."); return; }
@@ -3028,8 +3029,8 @@ function openEdit(soulId) {
     :`<option value="">아직 셀이 없어요</option>`;
   const canAddCell = state.me.role==="super"||state.me.role==="jinjang";
   $("no-cell-help").innerHTML = use.length?"":`
-    <div class="card" style="margin-bottom:14px;background:var(--warn-bg);border-color:#3A2E1E;max-width:560px">
-      <p style="font-size:13px;line-height:1.7;color:#E8D9C4">셀이 아직 없어요. 셀이 없어도 저장은 되지만, 출석 체크를 하려면 셀이 필요해요.</p>
+    <div class="card" style="margin-bottom:14px;background:var(--warn-bg);border-color:var(--warn-line);max-width:560px">
+      <p style="font-size:13px;line-height:1.7;color:var(--warn-sub)">셀이 아직 없어요. 셀이 없어도 저장은 되지만, 출석 체크를 하려면 셀이 필요해요.</p>
       ${canAddCell?`<button class="btn-sm" id="btn-cell-here" style="margin-top:10px">여기서 셀 만들기</button>`
         :`<p class="muted" style="margin-top:8px;font-size:12px">진장에게 셀 생성을 요청해 주세요.</p>`}</div>`;
   const cb=$("btn-cell-here"); if(cb) cb.onclick=()=>addCell(()=>openEdit(state.editingId));
@@ -3332,7 +3333,7 @@ function renderMeetChart() {
         <h3 style="font-size:13px;font-weight:600">주차별 출석률</h3>
         <span class="muted" style="font-size:12px;display:inline-flex;align-items:center;gap:5px">
           최근 ${recent.length}회
-          <i style="width:14px;border-top:1px dashed #6B5C5D;display:inline-block"></i>평균 ${avg}%
+          <i style="width:14px;border-top:1px dashed var(--faint);display:inline-block"></i>평균 ${avg}%
         </span>
       </div>
       <div class="chart">
@@ -4643,7 +4644,7 @@ function renderPhotos() {
   const cells = ids.map(id=>state.cells.find(c=>c.id===id)).filter(Boolean);
   if (state.phCell !== "all" && !ids.includes(state.phCell)) state.phCell = "all";
   $("ph-cells").innerHTML = `<button type="button" data-phc="all">전체</button>`
-    + cells.map(c=>`<button type="button" data-phc="${c.id}">${esc(c.name)}</button>`).join("");
+    + cells.map(c=>`<button type="button" data-phc="${c.id}">${cellChipIn(c)}</button>`).join("");
   /* .seg 는 display:flex 라 hidden 이 안 먹어요 — 직접 숨깁니다 */
   $("ph-cells").style.display = cells.length < 2 ? "none" : "";
   $("ph-cells").querySelectorAll("[data-phc]").forEach(b=>b.classList.toggle("on", b.dataset.phc===state.phCell));
@@ -4722,6 +4723,7 @@ async function openStats() {
   show("s-loading"); markSide("stats");
   await loadOrg(); await loadSouls(); await loadMeetings(); await loadAllRecords();
   state.st = state.st || { per:"3", cell:"all", withCell:true, away:false };
+  if (stOther()) await loadOtherStats(state.stWho);
   renderStats(); show("s-stats");
 }
 function statsFrom(per) {
@@ -4731,6 +4733,10 @@ function statsFrom(per) {
   d.setMonth(d.getMonth() - Number(per)); return ymd(d);
 }
 function renderStats() {
+  whoChips("st-who", "st-who-hint", state.stWho, canLead() ? "내 통계" : "나",
+    (u) => `${cellNameOf(u.cellId) || ""} ${u.name} 님 셀 — 셀모임 · 출석은 셀 보고에서, 만남은 횟수 · 종류만 (누구와 · 내용은 안 보여요).`);
+  ["st-cells", "st-opts", "st-people"].forEach(id => { $(id).hidden = stOther(); });
+  if (stOther()) { $("st-period").querySelectorAll("[data-per]").forEach(b => b.classList.toggle("on", b.dataset.per === state.st.per)); renderOtherStats(); return; }
   const S = state.st, from = statsFrom(S.per), to = todayStr();
   const inP = (d) => !!d && d >= from && d <= to;
   $("st-period").querySelectorAll("[data-per]").forEach(b=>b.classList.toggle("on", b.dataset.per===S.per));
@@ -4738,7 +4744,7 @@ function renderStats() {
   const cells = ids.map(id=>state.cells.find(c=>c.id===id)).filter(Boolean);
   if (S.cell !== "all" && !ids.includes(S.cell)) S.cell = "all";
   $("st-cells").innerHTML = `<button type="button" data-stc="all">전체</button>`
-    + cells.map(c=>`<button type="button" data-stc="${c.id}">${esc(c.name)}</button>`).join("");
+    + cells.map(c=>`<button type="button" data-stc="${c.id}">${cellChipIn(c)}</button>`).join("");
   $("st-cells").style.display = cells.length < 2 ? "none" : "";
   $("st-cells").querySelectorAll("[data-stc]").forEach(b=>b.classList.toggle("on", b.dataset.stc===S.cell));
   $("st-opts").querySelector('[data-opt="cell"]').classList.toggle("on", S.withCell);
@@ -5051,6 +5057,16 @@ async function backfillThumbs() {
    올릴 때마다 version.json 도 같이 올립니다. 앱은 열 때 · 다시 볼 때 · 10분마다
    그 파일만 살짝 확인해서(아주 작은 파일), 지금 버전보다 새것이면 위에 알림을 띄웁니다. */
 const CHANGELOG = [
+  { v:"27.0", d:"2026-11-09", items:[
+    "다크 · 라이트 두 가지 화면 (더보기 › 화면 — 기기 설정 따르기도)",
+    "셀 고르는 칸을 깔끔한 탭 상자로 — 셀 번호 아래 늘 셀리더 이름",
+    "홈 · 더보기 — 폰 · 패드 · 컴퓨터마다 칸 배치",
+    "영혼 카드 — 명함처럼 같은 크기, 만남 · 1:1 · 출석 · 기도가 같은 자리에",
+    "교회 명부 — 셀리더 카드도 셀원과 같은 크기 (빨간 띠로 구분), 줄 맞춤",
+    "셀 보고 — 셀을 고르면 옆에 출석 그래프 · 셀모임 캘린더, 모든 셀은 셀별 출석률 막대",
+    "셀 건강 — 출석률 고리 · 8주 출석 막대 · 사람별 출석 줄",
+    "활동 통계 — 같은 진 다른 셀 보기 (셀모임 · 출석 · 만남 횟수만)",
+    "구글 캘린더 자동 넣기 — 한 번 연결하면 앱 일정이 내 구글 캘린더 '목자의 삶'에" ] },
   { v:"26.0", d:"2026-11-09", items:[
     "교회 명부 — 화면 넓이에 맞춰 1 · 2 · 3줄 (컴퓨터 · 패드 · 휴대폰), 셀리더 · 셀원 카드 크기를 고르게",
     "카드마다 칸이 정해진 정보 — 생년 · 생일 · 연락처 · 수료 훈련 · 최근 3개월 출석률",
@@ -5779,7 +5795,7 @@ function renderDir() {
   const hasNone = pool.some(m => !cellOfM(m));
   if (state.dirCell !== "all" && state.dirCell !== "none" && !cells.some(c => c.id === state.dirCell)) state.dirCell = "all";
   $("dir-cells").innerHTML = `<button type="button" data-dc="all">전체</button>`
-    + cells.map(c => `<button type="button" data-dc="${c.id}">${esc(c.name)}</button>`).join("")
+    + cells.map(c => `<button type="button" data-dc="${c.id}">${cellChipIn(c)}</button>`).join("")
     + (hasNone ? `<button type="button" data-dc="none">셀 없음</button>` : "");
   $("dir-cells").querySelectorAll("[data-dc]").forEach(b => b.classList.toggle("on", b.dataset.dc === state.dirCell));
   $("dir-roles").innerHTML = DROLES.map(([k,l]) => `<button type="button" data-dr="${k}" class="${state.dirRole===k?"on":""}">${l}</button>`).join("");
@@ -5804,14 +5820,16 @@ function renderDir() {
       const ents = cellLeadEntries(c);
       const lids = new Set(ents.map(e => e.m && e.m.id).filter(Boolean));
       const ms = list.filter(m => cellOfM(m) === c.id && !lids.has(m.id));
+      const leadH = ents.length ? ents.map(e => e.m ? card(e.m, { leadEnt: e }) : leadGhostHTML(e)).join("")
+          : `<div class="mcard lead empty"><span class="ava" style="width:48px;height:48px">?</span>
+              <div class="mc-body"><p class="mc-role">셀리더</p><p class="mc-nm" style="color:var(--dim);font-weight:500">아직 정해지지 않았어요</p></div></div>`;
+      const single = state.dirCell !== "all";   // 셀 하나만 볼 땐 셀리더도 같은 크기 카드로 한 판에
       return `<section class="cgrp">
         <div class="cgh"><span class="cbadge">${esc(c.name)}</span>
           <span class="cgm">${esc(jinName(c))}</span><span class="cgc" data-cellatt="${c.id}">셀원 ${ms.length}명</span></div>
-        ${ents.length ? ents.map(e => e.m ? card(e.m, { leadEnt: e }) : leadGhostHTML(e)).join("")
-          : `<div class="mcard lead empty"><span class="ava" style="width:52px;height:52px">?</span>
-              <div class="mc-body"><p class="mc-role">셀리더</p><p class="mc-nm" style="color:var(--dim);font-weight:500">아직 정해지지 않았어요</p></div></div>`}
-        ${ms.length ? `<div class="twigs">${ms.map(m => card(m, { twig: true })).join("")}</div>`
-          : `<p class="muted twig-empty">아직 등록된 셀원이 없어요.</p>`}
+        ${single ? `<div class="mgrid one">${leadH}${ms.map(m => card(m, {})).join("")}</div>`
+          : `${leadH}${ms.length ? `<div class="twigs">${ms.map(m => card(m, { twig: true })).join("")}</div>`
+          : `<p class="muted twig-empty">아직 등록된 셀원이 없어요.</p>`}`}
       </section>`;
     });
     if (none.length) secs.push(`<section class="cgrp">
@@ -6236,7 +6254,7 @@ function renderHomeHand() {
   const me = uid(), parts = [];
   (state.handovers||[]).filter(h => h.status === "pending" && h.fromUid === me).forEach(h => {
     const n = handTargets(h).length;
-    parts.push(`<div class="card" style="margin-bottom:12px;background:var(--rose-bg);border-color:#3A2226">
+    parts.push(`<div class="card" style="margin-bottom:12px;background:var(--rose-bg);border-color:var(--rose-line)">
       <p style="font-size:13px;font-weight:600;color:var(--rose-tx)">${esc(handTitle(h))}</p>
       <p class="muted" style="margin-top:6px">${esc(h.byName || "")} 님이 요청했어요 — 내가 맡은 목양 카드 ${n}장을
         <b style="color:var(--text)">${esc(userName(h.toUid))}</b> 님에게 넘겨주세요.</p>
@@ -6273,7 +6291,7 @@ function openHrun(id) {
   const self = T.filter(s => isAboutUid(s, h.toUid));
   const jj = (state.members||[]).find(u => u.role === "jinjang" && u.active !== false && u.jinId === h.jinId && u.id !== uid());
   state.hrJJ = jj ? jj.id : null;
-  $("hr-lead-wrap").innerHTML = self.length ? `<div class="card" style="background:var(--lock-bg);border-color:#2E2727">
+  $("hr-lead-wrap").innerHTML = self.length ? `<div class="card" style="background:var(--lock-bg);border-color:var(--track)">
       <p style="font-size:13px;line-height:1.7">${esc(self.map(s => s.name).join(", "))} 님 카드는 본인에게 넘기지 않아요.
         '셀리더 카드'로 바뀌고, 본인은 어떤 경로로도 못 봐요.</p>
       ${jj ? `<label class="check" style="margin-top:10px"><input type="checkbox" id="hr-tojj" checked> 진장(${esc(jj.name)})에게 넘기기</label>`
@@ -7023,16 +7041,11 @@ function renderHealth() {
     const canTick = mine && h.people.some(isLeaderOf);
     return `<div class="card hcell">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-        <h3 style="font-size:15px;font-weight:600">${esc(c.name)}</h3>
-        <span class="muted" style="font-size:12px">${esc(leaderLabel(c.id))}</span></div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${h.notes.map(([k, t]) =>
+        <span class="cbadge">${esc(c.name)}</span>
+        <span class="muted" style="font-size:12px">${esc(cellLeadName(c) ? cellLeadName(c) + " 셀리더" : leaderLabel(c.id))}</span></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">${h.notes.map(([k, t]) =>
         `<span class="chip ${k}">${esc(t)}</span>`).join("") || `<span class="chip">기록이 더 쌓이면 보여요</span>`}</div>
-      <div class="hm">
-        <div><p>8주 모임</p><b>${h.ms}회</b></div>
-        <div><p>평균 출석</p><b>${h.avg === null ? "—" : h.avg + "명"}</b></div>
-        <div><p>출석률</p><b>${h.rate === null ? "—" : h.rate + "%"}</b></div>
-        <div><p>새 방문자</p><b>${h.visitors}명</b></div>
-      </div>
+      ${healthViz(c, h)}
       <p class="tag" style="margin-top:12px;font-size:12px;color:var(--dim)">인턴 (예비 셀리더) ${h.interns.length}명${
         canTick ? " — 체크해서 세워요" : ""}</p>
       ${canTick ? `<div class="ints">${h.people.filter(isLeaderOf).map(s => `
@@ -7141,7 +7154,7 @@ function renderReportBox() {
   const mine = m.leaderUid === uid(), ck = m.check;
   const seer = !mine && ["coach", "jinjang"].includes(state.me.role);
   const ckLine = ck ? `<p style="font-size:14px;margin-top:8px"><b>${esc(ck.name || "")}</b> 님이 ${fmtDate(ck.at)}에 확인했어요${
-    ck.note ? `<br><span style="color:#DCD6D5">“${esc(ck.note)}”</span>` : ""}</p>` : "";
+    ck.note ? `<br><span style="color:var(--body-tx)">“${esc(ck.note)}”</span>` : ""}</p>` : "";
   let html = `<p style="font-size:13px;font-weight:600">셀 보고</p>`;
   if (mine) {
     html += m.reportedAt
@@ -7662,7 +7675,7 @@ async function openReports(cellId) {
   show("s-loading");
   await loadOrg();
   if (canLead() || ["coach","jinjang","pastor"].includes(me.role)) { await loadMeetings(); await loadSouls(); }
-  state.repF = { cellId: cellId === undefined ? ((state.repF && state.repF.cellId) || "") : cellId };
+  state.repF = { cellId: cellId === undefined ? ((state.repF && state.repF.cellId) || "") : cellId }; state.repCalYm = "";
   if (canLead()) syncMyReports().catch(() => {});
   renderRepChips();
   $("rep-list").innerHTML = `<p class="muted">불러오는 중…</p>`;
@@ -7674,14 +7687,15 @@ async function openReports(cellId) {
 }
 function repCells() {
   const js = new Set(repJins());
-  return activeCells().filter(c => js.has(c.jinId)).sort((a, b) => (a.name || "").localeCompare(b.name || "", "ko"));
+  return activeCells().filter(c => js.has(c.jinId));
 }
 function renderRepChips() {
   const f = state.repF || {}, cells = repCells();
   $("rep-chips").innerHTML = `<button type="button" data-repc="" class="${!f.cellId ? "on" : ""}">최근 ${REP_MONTHS}달 · 모든 셀</button>`
-    + cells.map(c => `<button type="button" data-repc="${c.id}" class="${f.cellId === c.id ? "on" : ""}">${esc(c.name)}</button>`).join("");
+    + cells.map(c => `<button type="button" data-repc="${c.id}" class="${f.cellId === c.id ? "on" : ""}">${cellChipIn(c)}</button>`).join("");
 }
 function renderRepList() {
+  renderRepSide();
   const rows = state.reps || [], f = state.repF || {};
   const byMonth = {};
   rows.forEach(r => { (byMonth[ymOf(r.date)] = byMonth[ymOf(r.date)] || []).push(r); });
@@ -7693,7 +7707,7 @@ function renderRepList() {
     <h3 class="sec-title" style="margin-top:14px">${Number(ym.slice(0, 4))}년 ${Number(ym.slice(5, 7))}월</h3>
     <div class="list">${byMonth[ym].map(r => {
       const c = repCount(r), mine = r.leaderUid === uid() || (r.leaderMemberId && memberOfUid(uid()) && r.leaderMemberId === memberOfUid(uid()).id);
-      return `<div class="row" data-rep="${r.id}" style="cursor:pointer">
+      return `<div class="row" data-rep="${r.id}" data-repdate="${r.date}" style="cursor:pointer">
         <div class="grow"><p class="nm">${fmtDate(r.date)} · ${esc(r.cellName || cellNameOf(r.cellId) || "셀")}${mine ? ` <span class="chip rose" style="font-size:10px;padding:1px 7px">내 셀</span>` : ""}</p>
           <p class="sub">${esc(r.leaderName || "")}${r.topic ? " · " + esc(r.topic) : ""}${(r.peopleIds || []).length ? ` · 나눔 ${(r.peopleIds || []).length}명` : ""}</p></div>
         ${r.imported ? `<span class="chip">노션</span>` : ""}
@@ -7703,7 +7717,7 @@ function renderRepList() {
 }
 $("rep-chips").addEventListener("click", async (ev) => {
   const b = ev.target.closest("[data-repc]"); if (!b) return;
-  state.repF = { cellId: b.dataset.repc };
+  state.repF = { cellId: b.dataset.repc }; state.repCalYm = "";
   renderRepChips(); $("rep-list").innerHTML = `<p class="muted">불러오는 중…</p>`;
   try { state.reps = await loadReports(state.repF); renderRepList(); }
   catch (e) { $("rep-list").innerHTML = `<p class="err">${esc(msgOf(e))}</p>`; }
@@ -8243,7 +8257,7 @@ function memCardHTML(m, o) {
   const cellId = o.cellId || (state.dirLM && state.dirLM.get(m.id)) || m.cellId || "";
   const trs = (m.trainingsDone || []).map(t => `<span class="tpill">${esc(t)}</span>`).join("");
   return `<div class="mcard${lead ? " lead" : ""}${o.twig ? " twig" : ""}" data-mem="${m.id}" data-cell="${cellId}">
-    ${avatar(m, lead ? 52 : 44)}
+    ${avatar(m, lead ? 48 : 44)}
     <div class="mc-body">
       <div class="mc-top">
         <div class="mc-id">${role ? `<p class="mc-role">${esc(role)}${chips.length ? " " + chips.join(" ") : ""}</p>` : ""}
@@ -8253,7 +8267,6 @@ function memCardHTML(m, o) {
       <div class="mc-info">
         ${yr ? slot("yr", "생년", "…", ` data-yr="${m.id}"`) : ""}${slot("bd", "생일", bd)}${slot("ph", "연락처", m.phone)}${o.showCell ? slot("cl", "셀", o.cellName) : ""}
       </div>
-      ${lead ? `<p class="mc-fam" data-fam="${m.id}" hidden></p>` : ""}
       <div class="mc-tags" data-tags="${m.id}">${trs}</div>
     </div>
   </div>`;
@@ -8505,5 +8518,415 @@ $("ph-body").addEventListener("click", (ev) => {
   if (r && state.phOtherData) {
     const [rid, i] = r.dataset.rpph.split("|"); const rep = state.phOtherData.reps.find(x => x.id === rid);
     if (rep && rep.photos[Number(i)]) showMeetPhoto(rep.photos[Number(i)]);
+  }
+});
+
+/* ════════ 27단계 — 화면 밝기 (다크 · 라이트 · 기기 설정) ════════ */
+function themePref() { try { return localStorage.getItem("mokja-theme") || "dark"; } catch { return "dark"; } }
+function applyTheme(pref) {
+  const t = pref === "system" ? (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark") : pref;
+  document.documentElement.dataset.theme = t;
+  const m = document.querySelector('meta[name="theme-color"]'); if (m) m.content = t === "light" ? "#F5F3F2" : "#0F0F0F";
+  document.querySelectorAll("#more-theme [data-theme]").forEach(b => b.classList.toggle("on", b.dataset.theme === pref));
+}
+$("more-theme").addEventListener("click", (ev) => {
+  const b = ev.target.closest("[data-theme]"); if (!b) return;
+  try { localStorage.setItem("mokja-theme", b.dataset.theme); } catch {}
+  applyTheme(b.dataset.theme);
+});
+try { matchMedia("(prefers-color-scheme: light)").addEventListener("change", () => { if (themePref() === "system") applyTheme("system"); }); } catch {}
+applyTheme(themePref());
+
+/* 27단계 — 셀 고르는 칸: 셀 번호 아래 늘 셀리더 이름 */
+function cellLeadName(c) {
+  try { const e = cellLeadEntries(c)[0]; return e ? ((e.m && e.m.name) || e.p.name || "") : ""; } catch { return ""; }
+}
+function cellChipIn(c) {
+  const n = cellLeadName(c);
+  return `<span>${esc(c.name)}</span>${n ? `<small>${esc(n)}</small>` : ""}`;
+}
+
+/* 27단계 — 셀 보고 옆 칸: 셀 하나 → 셀리더 · 출석 그래프 · 셀모임 캘린더 / 모든 셀 → 셀별 출석률 막대 */
+const repTone = (rate) => rate == null ? "" : rate >= 75 ? "" : rate >= 50 ? "mid" : "low";
+function renderRepSide() {
+  const f = state.repF || {}, rows = (state.reps || []).filter(r => r.date && r.date <= todayStr());
+  const side = $("rep-side"), wrap = $("rep-wrap");
+  if (!rows.length) { side.innerHTML = ""; wrap.classList.remove("has-side"); return; }
+  wrap.classList.add("has-side");
+  if (!f.cellId) {
+    const by = {};
+    rows.forEach(r => { const c = repCount(r); const o = by[r.cellId] = by[r.cellId] || { n: 0, ok: 0, all: 0 }; o.n++; o.ok += c.ok; o.all += c.all; });
+    const cells = repCells().filter(c => by[c.id]);
+    side.innerHTML = `<div class="rs-card"><div class="rs-h"><b>셀별 출석률</b><span>최근 ${REP_MONTHS}달 보고</span></div>
+      ${cells.map(c => { const o = by[c.id], rate = o.all ? Math.round(o.ok / o.all * 100) : null;
+        return `<div class="hbar2 ${repTone(rate)}" data-repc2="${c.id}" title="${esc(c.name)} — 보고 ${o.n}건">
+          <span class="nm">${esc(c.name)}<small>${esc(cellLeadName(c))} · ${o.n}번</small></span>
+          <span class="tr"><i style="width:${rate || 0}%"></i></span><span class="v">${rate == null ? "—" : rate + "%"}</span></div>`; }).join("")}
+      <p class="hint" style="margin-top:8px">셀을 누르면 그 셀의 출석 그래프와 캘린더가 보여요.</p></div>`;
+    return;
+  }
+  const c = state.cells.find(x => x.id === f.cellId) || { id: f.cellId, name: cellNameOf(f.cellId) };
+  const asc = rows.slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  const last = asc.slice(-16);
+  const recent = asc.filter(r => r.date >= ymd(new Date(Date.now() - 92 * 864e5)));
+  let ok = 0, all = 0; recent.forEach(r => { const k = repCount(r); ok += k.ok; all += k.all; });
+  const rate = all ? Math.round(ok / all * 100) : null, avg = recent.length ? Math.round(ok / recent.length * 10) / 10 : null;
+  const max = Math.max(1, ...last.map(r => repCount(r).all));
+  const md = (d) => { const p = String(d).split("-"); return `${Number(p[1])}/${Number(p[2])}`; };
+  const lead = cellLeadName(c);
+  const ym = state.repCalYm && rows.some(r => ymOf(r.date) === state.repCalYm) ? state.repCalYm : (state.repCalYm || ymOf(asc[asc.length - 1].date));
+  state.repCalYm = ym;
+  side.innerHTML = `
+    <div class="rs-card">
+      <div class="rs-lead"><span class="cbadge">${esc(c.name)}</span><div><p class="nm">${lead ? esc(lead) + " 셀리더" : "셀리더 미정"}</p>
+        <p class="sub">보고 ${rows.length}건 · 첫 보고 ${fmtDate(asc[0].date)}</p></div></div>
+      <div class="rs-kpi"><div><p>최근 3달 셀모임</p><b>${recent.length}번</b></div>
+        <div><p>평균 출석</p><b>${avg == null ? "—" : avg + "명"}</b></div>
+        <div><p>출석률</p><b style="color:${rate == null ? "inherit" : rate >= 75 ? "var(--ok-tx)" : rate >= 50 ? "var(--warn-tx)" : "var(--rose-tx)"}">${rate == null ? "—" : rate + "%"}</b></div></div>
+    </div>
+    <div class="rs-card"><div class="rs-h"><b>출석 그래프</b><span>최근 셀모임 ${last.length}번 · 초록 = 출석, 회색 = 기록한 인원</span></div>
+      <div class="vbars">${last.map(r => { const k = repCount(r), lowc = k.all && k.ok / k.all < .5;
+        return `<div class="vb${lowc ? " low" : ""}" title="${esc(fmtDate(r.date, true))} 출석 ${k.ok}/${k.all}">
+          <i class="all" style="height:${k.all / max * 100}%"></i><i class="ok" style="height:${k.ok / max * 100}%"></i></div>`; }).join("")}</div>
+      <div class="vlabels">${last.map((r, i) => `<span>${i % 2 === (last.length - 1) % 2 ? md(r.date) : ""}</span>`).join("")}</div>
+    </div>
+    <div class="rs-card" id="rep-cal">${repCalHTML(ym, rows)}</div>`;
+}
+function repCalHTML(ym, rows) {
+  const [y, m] = ym.split("-").map(Number);
+  const first = new Date(y, m - 1, 1).getDay(), days = new Date(y, m, 0).getDate();
+  const byDay = {}; rows.filter(r => ymOf(r.date) === ym).forEach(r => { byDay[Number(r.date.slice(8, 10))] = r; });
+  const cells = [];
+  for (let i = 0; i < first; i++) cells.push(`<span></span>`);
+  for (let d = 1; d <= days; d++) {
+    const r = byDay[d], ds = `${ym}-${pad2(d)}`;
+    if (r) { const k = repCount(r), lowc = k.all && k.ok / k.all < .5;
+      cells.push(`<button type="button" class="d on${lowc ? " low" : ""}${ds === todayStr() ? " today" : ""}" data-repday="${r.date}" title="${esc(fmtDate(r.date, true))} 출석 ${k.ok}/${k.all}">✓<small>${d} · ${k.ok}명</small></button>`); }
+    else cells.push(`<span class="d${ds === todayStr() ? " today" : ""}">${d}</span>`);
+  }
+  const n = Object.keys(byDay).length;
+  return `<div class="rcal-nav"><button type="button" data-repym="-1" aria-label="이전 달">‹</button>
+      <b>${y}년 ${m}월 <span class="muted" style="font-weight:400;font-size:12px">셀모임 ${n}번</span></b>
+      <button type="button" data-repym="1" aria-label="다음 달">›</button></div>
+    <div class="rcal">${["일","월","화","수","목","금","토"].map(w => `<span class="wd">${w}</span>`).join("")}${cells.join("")}</div>`;
+}
+$("rep-side").addEventListener("click", async (ev) => {
+  const nav = ev.target.closest("[data-repym]");
+  if (nav) { const [y, m] = state.repCalYm.split("-").map(Number); const d = new Date(y, m - 1 + Number(nav.dataset.repym), 1);
+    state.repCalYm = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
+    $("rep-cal").innerHTML = repCalHTML(state.repCalYm, (state.reps || []).filter(r => r.date && r.date <= todayStr())); return; }
+  const day = ev.target.closest("[data-repday]");
+  if (day) { const row = $("rep-list").querySelector(`[data-repdate="${day.dataset.repday}"]`);
+    if (row) { row.scrollIntoView({ behavior: "smooth", block: "center" }); row.classList.add("flash"); setTimeout(() => row.classList.remove("flash"), 1600); } return; }
+  const c2 = ev.target.closest("[data-repc2]");
+  if (c2) { const b = $("rep-chips").querySelector(`[data-repc="${c2.dataset.repc2}"]`); if (b) b.click(); }
+});
+
+/* 27단계 — 셀 건강 그래프: 출석률 고리 · 8주 출석 막대 · 사람별 출석 줄 */
+function healthViz(c, h) {
+  const ms = cellMeetings(c.id).filter(m => { const n = daysSince(m.date); return n !== null && n >= 0 && n < 56; })
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  const R = 34, C = 2 * Math.PI * R, rate = h.rate;
+  const col = rate == null ? "var(--faint)" : rate >= 75 ? "var(--ok-strong)" : rate >= 50 ? "var(--warn-tx)" : "var(--brand)";
+  const ring = `<svg viewBox="0 0 84 84" width="96" height="96" aria-label="출석률 ${rate == null ? "기록 없음" : rate + "%"}">
+      <circle cx="42" cy="42" r="${R}" fill="none" style="stroke:var(--track)" stroke-width="9"/>
+      ${rate == null ? "" : `<circle cx="42" cy="42" r="${R}" fill="none" style="stroke:${col}" stroke-width="9" stroke-linecap="round"
+        stroke-dasharray="${C * rate / 100} ${C}" transform="rotate(-90 42 42)"/>`}
+      <text x="42" y="44" text-anchor="middle" style="fill:var(--text);font-size:17px;font-weight:600">${rate == null ? "—" : rate + "%"}</text>
+      <text x="42" y="58" text-anchor="middle" style="fill:var(--dim);font-size:8.5px">출석률</text></svg>`;
+  const cnt = (m) => { const v = Object.values(m.attendance || {}); return { ok: v.filter(x => x && x !== "absent").length, all: v.filter(Boolean).length }; };
+  const max = Math.max(1, ...ms.map(m => cnt(m).all));
+  const md = (d) => { const p = String(d).split("-"); return `${Number(p[1])}/${Number(p[2])}`; };
+  const bars = ms.length ? `<div class="vbars" style="height:96px">${ms.map(m => { const k = cnt(m);
+      return `<div class="vb${k.all && k.ok / k.all < .5 ? " low" : ""}" title="${esc(fmtDate(m.date, true))} 출석 ${k.ok}/${k.all}">
+        <i class="all" style="height:${k.all / max * 100}%"></i><i class="ok" style="height:${k.ok / max * 100}%"></i></div>`; }).join("")}</div>
+      <div class="vlabels">${ms.map(m => `<span>${md(m.date)}</span>`).join("")}</div>`
+    : `<p class="muted" style="font-size:12px;padding:30px 0;text-align:center">최근 8주 셀모임 기록이 없어요</p>`;
+  const people = h.people;
+  const prow = people.length && ms.length ? `<div class="hppl">${people.map(s => {
+      const k = attKey(s), cells = ms.map(m => (m.attendance || {})[k] || "");
+      const okn = cells.filter(v => v && v !== "absent").length, rec = cells.filter(Boolean).length;
+      return `<div class="hp"><span class="nm">${esc(s.name)}${s.intern ? ` <span class="tpill" style="font-size:9.5px;padding:0 6px">인턴</span>` : ""}</span>
+        <span class="dd">${cells.map((v, i) => `<i class="${v || "nr"}" title="${esc(md(ms[i].date))} ${v ? ATT[v] : "기록 없음"}"></i>`).join("")}</span>
+        <span class="v">${rec ? Math.round(okn / rec * 100) + "%" : "—"}</span></div>`; }).join("")}</div>` : "";
+  return `<div class="hviz"><div class="hring">${ring}</div><div class="hbw">${bars}</div></div>
+    <div class="hm">
+      <div><p>8주 모임</p><b>${h.ms}회</b></div>
+      <div><p>평균 출석</p><b>${h.avg === null ? "—" : h.avg + "명"}</b></div>
+      <div><p>새 방문자</p><b>${h.visitors}명</b></div>
+      <div><p>연달아 결석</p><b style="color:${h.care ? "var(--warn-tx)" : "inherit"}">${h.care}명</b></div>
+    </div>
+    ${prow ? `<p class="tag" style="margin-top:14px;font-size:12px;color:var(--dim)">사람별 출석 — 최근 8주 (초록 출석 · 파랑 온라인 · 빨강 결석)</p>${prow}` : ""}`;
+}
+
+/* 27단계 — 같은 진 다른 셀 활동 통계 (셀 보고 사본 + 캘린더 공유의 횟수 · 종류만) */
+const stOther = () => !!state.stWho && state.stWho !== uid();
+async function loadOtherStats(id) {
+  const R = await otherReps(id); if (!R) { state.stWho = ""; return; }
+  let items = [], off = false;
+  try { const d = await getDoc(doc(db, "calShare", id)); if (d.exists()) { items = d.data().items || []; off = d.data().on === false; } } catch {}
+  state.stOtherData = { u: R.u, reps: R.reps, items, off };
+}
+function renderOtherStats() {
+  const D = state.stOtherData; if (!D) return;
+  const from = statsFrom(state.st.per), to = todayStr(), inP = (d) => !!d && d >= from && d <= to;
+  const reps = D.reps.filter(r => inP(r.date)).sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  let ok = 0, all = 0; reps.forEach(r => { const k = repCount(r); ok += k.ok; all += k.all; });
+  const meets = D.items.filter(x => !x.p && inP(x.d));
+  const kinds = {}; meets.forEach(x => { kinds[x.k || "만남"] = (kinds[x.k || "만남"] || 0) + 1; });
+  const krows = [{ label: "셀모임", n: reps.length, cell: true }, ...Object.entries(kinds).map(([label, n]) => ({ label, n })).sort((a, b) => b.n - a.n)];
+  const kmax = Math.max(1, ...krows.map(k => k.n));
+  /* 달마다 — 셀모임 · 만남 */
+  const months = {}; reps.forEach(r => { const m = ymOf(r.date); (months[m] = months[m] || { c: 0, m: 0 }).c++; });
+  meets.forEach(x => { const m = ymOf(x.d); (months[m] = months[m] || { c: 0, m: 0 }).m++; });
+  const mk = Object.keys(months).sort().slice(-12), mmax = Math.max(1, ...mk.map(k => months[k].c + months[k].m));
+  $("st-tiles").innerHTML = `
+    <div class="tiles" style="margin-top:14px;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">
+      ${tile("셀모임", reps.length + "회")}
+      ${tile("평균 출석률", all ? Math.round(ok / all * 100) + "%" : "—")}
+      ${tile("평균 출석", reps.length ? Math.round(ok / reps.length * 10) / 10 + "명" : "—")}
+      ${tile("만남 · 1:1 등", D.off ? "공유 꺼짐" : meets.length + "회")}
+    </div>`;
+  $("st-kinds").innerHTML = `
+    <div class="card" style="margin-top:14px">
+      <h3 style="font-size:13px;font-weight:600">종류별 모임 횟수</h3>
+      <p class="muted" style="font-size:12px;margin-top:4px">${D.off ? "이 셀리더는 만남 일정 공유를 꺼 두어서 셀모임만 보여요." : "만남은 셀리더가 공유한 날짜 · 종류로만 셉니다."}</p>
+      <div style="margin-top:10px">${krows.map(k => `
+        <div class="kbar" title="${esc(k.label)} ${k.n}회"><span>${esc(k.label)}</span>
+          <div><div class="t" style="width:${Math.max(1, k.n / kmax * 100)}%;background:${k.cell ? "var(--c-cell)" : "var(--c-one)"}"></div></div>
+          <span style="text-align:right;font-variant-numeric:tabular-nums">${k.n}</span></div>`).join("")}</div>
+    </div>
+    ${mk.length ? `<div class="card" style="margin-top:12px">
+      <h3 style="font-size:13px;font-weight:600">달마다 — <span style="color:var(--c-cell)">셀모임</span> · <span style="color:var(--c-one)">만남</span></h3>
+      <div class="vbars" style="height:110px;margin-top:10px">${mk.map(k => { const o = months[k];
+        return `<div class="vb" title="${k} 셀모임 ${o.c} · 만남 ${o.m}"><i class="ok" style="height:${o.m / mmax * 100}%;background:var(--c-one);border-radius:0"></i><i class="ok" style="height:${o.c / mmax * 100}%;background:var(--c-cell)"></i></div>`; }).join("")}</div>
+      <div class="vlabels">${mk.map(k => `<span>${Number(k.slice(5))}월</span>`).join("")}</div></div>` : ""}`;
+}
+$("st-who").addEventListener("click", async (ev) => {
+  const b = ev.target.closest("[data-who]"); if (!b) return;
+  state.stWho = b.dataset.who || "";
+  if (stOther()) { b.disabled = true; await loadOtherStats(state.stWho); b.disabled = false; }
+  renderStats();
+});
+
+/* ════════ 27단계 — 구글 캘린더 자동 넣기 ════════
+   셀리더가 한 번 '연결'하면, 그 사람 구글 캘린더에 앱이 만든 '목자의 삶' 캘린더가 생기고
+   셀모임 · 만남 · 예정 · 훈련 · 기념일이 들어갑니다. 앱에서 고치거나 지우면 구글 캘린더도 따라 바뀌어요.
+   권한은 '앱이 만든 캘린더만' (calendar.app.created) — 다른 캘린더는 못 보고 못 건드려요.
+   내용(만남 기록 · 기도)은 넣지 않고 제목 · 시간 · 장소만 넣습니다.
+   서버가 없어서 구글 허락(토큰)이 1시간이면 끝나요 — 그 뒤엔 한 번 눌러 다시 맞춥니다. */
+const GCAL_SCOPE = "https://www.googleapis.com/auth/calendar.app.created";
+const GAPI = "https://www.googleapis.com/calendar/v3";
+state.gcal = { doc: null, token: "", exp: 0, busy: false, need: false, last: "", err: "" };
+function gcalTok() {
+  const g = state.gcal;
+  if (g.token && Date.now() < g.exp - 60000) return g.token;
+  try { const o = JSON.parse(sessionStorage.getItem("mokja-gtok") || "null");
+    if (o && o.uid === uid() && Date.now() < o.exp - 60000) { g.token = o.t; g.exp = o.exp; return o.t; } } catch {}
+  return "";
+}
+function gcalSetTok(t) {
+  state.gcal.token = t; state.gcal.exp = Date.now() + 55 * 60 * 1000;
+  try { sessionStorage.setItem("mokja-gtok", JSON.stringify({ uid: uid(), t, exp: state.gcal.exp })); } catch {}
+}
+async function gcalDoc(force) {
+  if (!force && state.gcal.doc !== null) return state.gcal.doc;
+  try { const d = await getDoc(doc(db, "gcal", uid())); state.gcal.doc = d.exists() ? d.data() : false; }
+  catch { state.gcal.doc = false; }
+  return state.gcal.doc;
+}
+/* 반드시 누른 순간에 불러야 해요 (팝업) */
+function gcalConnect() {
+  const u = auth.currentUser;
+  if (!u || !(u.providerData || []).some(p => p.providerId === "google.com"))
+    return Promise.reject(new Error("구글 계정으로 로그인한 분만 연결할 수 있어요."));
+  const p = new GoogleAuthProvider(); p.addScope(GCAL_SCOPE);
+  p.setCustomParameters({ login_hint: (state.me && state.me.email) || u.email || "" });
+  return reauthenticateWithPopup(u, p).then(res => {
+    const cred = GoogleAuthProvider.credentialFromResult(res);
+    if (!cred || !cred.accessToken) throw new Error("구글 캘린더 허락을 받지 못했어요.");
+    gcalSetTok(cred.accessToken);
+  }).catch(e => {
+    if (e && e.code === "auth/user-mismatch") throw new Error("앱에 로그인한 구글 계정으로 골라 주세요.");
+    if (e && (e.code === "auth/popup-closed-by-user" || e.code === "auth/cancelled-popup-request")) throw new Error("연결을 취소했어요.");
+    if (e && e.code === "auth/popup-blocked") throw new Error("팝업이 막혔어요. 브라우저에서 팝업을 허용해 주세요.");
+    throw e;
+  });
+}
+async function gapi(method, path, body) {
+  const r = await fetch(GAPI + path, { method, headers: { Authorization: "Bearer " + gcalTok(), "Content-Type": "application/json" },
+    body: body ? JSON.stringify(body) : undefined });
+  if (r.status === 401) {
+    state.gcal.token = ""; state.gcal.exp = 0; try { sessionStorage.removeItem("mokja-gtok"); } catch {}
+    const e = new Error("구글 연결 시간이 끝났어요"); e.code = 401; throw e;
+  }
+  if (!r.ok) { const t = await r.text().catch(() => ""); const e = new Error(`구글 캘린더 오류 ${r.status}`); e.code = r.status; e.detail = t.slice(0, 200); throw e; }
+  return r.status === 204 ? null : r.json().catch(() => null);
+}
+function fnvHex(str) {
+  let h1 = 0x811c9dc5, h2 = 0x9747b28c;
+  for (const ch of String(str)) { const c = ch.codePointAt(0); h1 = Math.imul(h1 ^ c, 16777619) >>> 0; h2 = Math.imul(h2 ^ c, 2246822507) >>> 0; }
+  return h1.toString(16).padStart(8, "0") + h2.toString(16).padStart(8, "0");
+}
+const GC_COLOR = { meeting: "11", record: "10", plan: "5", anniv: "6", train: "3" };
+function gcalAlarms(kind) {
+  if (kind === "anniv") return [{ method: "popup", minutes: 15 * 60 }];   // 하루 종일 일정 — 전날 오전 9시
+  return (ALARM[kind] || ["-PT1H"]).map(t => {
+    const m = /-P(?:T)?(\d+)([DHM])/.exec(t); if (!m) return null;
+    const n = Number(m[1]); return { method: "popup", minutes: m[2] === "D" ? n * 1440 : m[2] === "H" ? n * 60 : n };
+  }).filter(Boolean);
+}
+/* 구글 캘린더로 갈 일정 — 60일 전 ~ 400일 뒤 (기념일은 해마다 반복) */
+function gcalWant() {
+  const saveM = state.calMonth, saveW = state.calWho;
+  state.calMonth = `${new Date().getFullYear()}-01`; state.calWho = "";
+  let ev; try { ev = calEvents(); } finally { state.calMonth = saveM; state.calWho = saveW; }
+  const lo = ymd(new Date(Date.now() - 60 * 864e5)), hi = ymd(new Date(Date.now() + 400 * 864e5));
+  const out = [], seen = new Set();
+  for (const e of ev) {
+    if (!e.date || (e.kind !== "anniv" && (e.date < lo || e.date > hi))) continue;
+    const soul = e.soulId ? state.souls.find(x => x.id === e.soulId) : null;
+    const lunar = e.kind === "anniv" && soul && soul.lunar && /생일$/.test(e.title);
+    const key = e.kind === "meeting" ? `m|${e.id}`
+      : (e.kind === "record" || e.kind === "plan") ? `r|${e.r.groupId || (e.r.soulId + "/" + e.r.id)}`
+      : e.kind === "anniv" ? `a|${e.soulId}|${e.title}${lunar ? "|" + e.date : ""}`
+      : `t|${e.soulId}|${e.title}|${e.date}`;
+    if (seen.has(key)) continue; seen.add(key);
+    const id = "mj" + fnvHex(key);
+    let start, end;
+    if (e.time) {
+      const st = `${e.date}T${e.time}:00`, en = endStamp(e);
+      start = { dateTime: st, timeZone: "Asia/Seoul" };
+      end = { dateTime: `${en.slice(0, 4)}-${en.slice(4, 6)}-${en.slice(6, 8)}T${en.slice(9, 11)}:${en.slice(11, 13)}:00`, timeZone: "Asia/Seoul" };
+    } else {
+      const nx = new Date(e.date + "T00:00:00"); nx.setDate(nx.getDate() + 1);
+      start = { date: e.date }; end = { date: ymd(nx) };
+    }
+    const body = { id, summary: e.title + (lunar ? " (음력)" : ""), start, end,
+      description: "목자의 삶 앱이 넣은 일정이에요. 내용은 앱에서 봐요.\nhttps://artist4rhythm-hub.github.io/mokyang-note/",
+      colorId: GC_COLOR[e.kind] || "8", reminders: { useDefault: false, overrides: gcalAlarms(e.kind) },
+      extendedProperties: { private: { mokja: "1" } } };
+    if (e.place) body.location = e.place;
+    if (e.kind === "anniv" && !lunar) body.recurrence = ["RRULE:FREQ=YEARLY"];
+    out.push({ id, h: fnvHex(JSON.stringify(body)), body });
+  }
+  return out;
+}
+async function gcalPool(items, n, fn) {
+  let i = 0; const errs = [];
+  await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => {
+    while (i < items.length) { const it = items[i++]; try { await fn(it); } catch (e) { errs.push(e); if (e.code === 401) return; } }
+  }));
+  return errs;
+}
+async function gcalSync(again) {
+  const g = state.gcal; if (g.busy) return;
+  const D = await gcalDoc(); if (!D || !D.on) return;
+  if (!gcalTok()) { g.need = true; renderGcal(); return; }
+  g.busy = true; g.err = ""; renderGcal();
+  try {
+    await Promise.all([loadMeetings(), loadSouls()]); await loadAllRecords(); await loadAllTrainings();
+    let calId = D.calId;
+    if (!calId) {
+      const c = await gapi("POST", "/calendars", { summary: "목자의 삶", description: "목자의 삶 앱이 넣는 셀모임 · 만남 일정", timeZone: "Asia/Seoul" });
+      calId = c.id; D.map = {};
+    }
+    const cal = encodeURIComponent(calId), map = D.map || {}, want = gcalWant(), next = {};
+    const out = { ...map };   // 성공한 것만 고쳐 적어요 — 실패한 건 다음에 다시
+    let add = 0, upd = 0, del = 0, gone = false;
+    const todo = want.filter(w => { next[w.id] = w.h; return map[w.id] !== w.h; });
+    const e1 = await gcalPool(todo, 4, async (w) => {
+      if (map[w.id]) {
+        try { await gapi("PUT", `/calendars/${cal}/events/${w.id}`, w.body); upd++; out[w.id] = w.h; return; }
+        catch (e) { if (e.code !== 404 && e.code !== 410) throw e; }
+      }
+      try { await gapi("POST", `/calendars/${cal}/events`, w.body); add++; out[w.id] = w.h; }
+      catch (e) {
+        if (e.code === 409) { await gapi("PUT", `/calendars/${cal}/events/${w.id}`, w.body); upd++; out[w.id] = w.h; }
+        else { if (e.code === 404) gone = true; throw e; }
+      }
+    });
+    if (gone && !again && !add && !upd) {   // 구글에서 '목자의 삶' 캘린더를 지운 경우 — 새로 만들어 다시
+      D.calId = ""; D.map = {}; g.busy = false; return gcalSync(true);
+    }
+    const stale = Object.keys(map).filter(id => !next[id]);
+    const e2 = await gcalPool(stale, 4, async (id) => {
+      try { await gapi("DELETE", `/calendars/${cal}/events/${id}`); } catch (e) { if (e.code !== 404 && e.code !== 410) throw e; }
+      del++; delete out[id];
+    });
+    const errs = [...e1, ...e2];
+    D.calId = calId; D.map = out; D.syncedAt = new Date().toISOString(); D.on = true;
+    await setDoc(doc(db, "gcal", uid()), { calId, on: true, map: out, syncedAt: D.syncedAt, email: (state.me && state.me.email) || "" });
+    g.need = errs.some(e => e.code === 401);
+    g.last = add || upd || del ? `새로 ${add} · 바뀜 ${upd} · 지움 ${del}` : "바뀐 것 없음";
+    if (errs.length && !g.need) g.err = `${errs.length}개는 못 넣었어요 — 다음에 다시 해요 (${errs[0].message})`;
+  } catch (e) {
+    if (e.code === 401) g.need = true; else g.err = msgOf(e);
+  } finally { g.busy = false; renderGcal(); }
+}
+let gcalT = 0;
+function gcalSoon() {
+  clearTimeout(gcalT);
+  gcalT = setTimeout(() => { if (state.me && state.gcal.doc && state.gcal.doc.on) gcalSync().catch(() => {}); }, 2500);
+}
+function gcalPendingCount() {
+  const D = state.gcal.doc; if (!D || !D.on || !state.allRecords) return 0;
+  try { const map = D.map || {}, want = gcalWant(), ids = new Set(want.map(w => w.id));
+    return want.filter(w => map[w.id] !== w.h).length + Object.keys(map).filter(id => !ids.has(id)).length; } catch { return 0; }
+}
+function renderGcal() {
+  const box = $("gcal-box"); if (!box) return;
+  const g = state.gcal, D = g.doc, me = state.me;
+  const lead = me && (canLead() || (state.souls || []).length);
+  if (!lead || calOther()) { box.hidden = true; $("home-gcal").innerHTML = ""; return; }
+  box.hidden = false;
+  const icon = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 9.5h17M8 3v4m8-4v4"/><path d="m9 14.5 2 2 4-4"/></svg>`;
+  if (!D || !D.on) {
+    box.className = "gcal";
+    box.innerHTML = `<div class="gh">${icon}<b>내 구글 캘린더에 자동으로 넣기</b></div>
+      <p class="t">한 번 연결하면 셀모임 · 만남 · 예정 · 훈련 · 기념일이 내 구글 캘린더의 <b>'목자의 삶'</b> 캘린더에 들어가요.
+        앱에서 고치거나 지우면 구글 캘린더도 따라 바뀌고, 알림도 구글 캘린더가 울려줘요.
+        만남 기록 · 기도 내용은 넣지 않아요 (제목 · 시간 · 장소만).</p>
+      <div class="acts"><button class="btn" id="gcal-on" style="max-width:260px">구글 캘린더 연결하기</button></div>
+      <p class="err" id="gcal-err">${esc(g.err || "")}</p>`;
+  } else {
+    const pend = gcalPendingCount();
+    const when = D.syncedAt ? new Date(D.syncedAt) : null;
+    const whenTxt = when ? `${when.getMonth() + 1}월 ${when.getDate()}일 ${pad2(when.getHours())}:${pad2(when.getMinutes())}` : "아직";
+    box.className = "gcal" + (g.need && pend ? " need" : "");
+    box.innerHTML = `<div class="gh">${icon}<b>구글 캘린더 연결됨</b> <span class="chip ok" style="margin-left:auto">'목자의 삶' 캘린더</span></div>
+      <p class="t">${g.busy ? "구글 캘린더에 맞추는 중…" : `마지막으로 맞춘 때 ${whenTxt} · 일정 ${Object.keys(D.map || {}).length}개${g.last ? " · " + esc(g.last) : ""}`}
+        ${!g.busy && pend ? `<br><b style="color:var(--warn-tx)">아직 안 보낸 변경 ${pend}개</b>${g.need ? " — 구글 허락이 1시간마다 끝나서, 눌러서 다시 맞춰 주세요." : ""}` : ""}</p>
+      <div class="acts"><button class="btn-sm" id="gcal-sync" ${g.busy ? "disabled" : ""}>${g.need || !gcalTok() ? "다시 연결하고 맞추기" : "지금 맞추기"}</button>
+        <button class="btn-sm danger" id="gcal-off" ${g.busy ? "disabled" : ""}>연결 끊기</button></div>
+      <p class="err" id="gcal-err">${esc(g.err || "")}</p>`;
+  }
+  /* 홈 — 보낼 변경이 있는데 허락이 끝났으면 한 줄로 */
+  const pendH = D && D.on && g.need ? gcalPendingCount() : 0;
+  $("home-gcal").innerHTML = pendH ? `<div class="gstrip"><span>구글 캘린더에 아직 안 보낸 일정 변경이 ${pendH}개 있어요</span>
+    <button class="btn-sm" data-gcalgo="1">맞추기</button></div>` : "";
+}
+async function gcalTap(fn) {
+  state.gcal.err = "";
+  const p = gcalTok() ? Promise.resolve() : gcalConnect();   // 팝업은 누른 그 순간에
+  try { await p; await fn(); }
+  catch (e) { state.gcal.err = msgOf(e); renderGcal(); }
+}
+document.addEventListener("click", (ev) => {
+  const t = ev.target.closest("#gcal-on, #gcal-sync, #gcal-off, [data-gcalgo]"); if (!t) return;
+  if (t.id === "gcal-on") gcalTap(async () => {
+    state.gcal.doc = { on: true, calId: (state.gcal.doc && state.gcal.doc.calId) || "", map: (state.gcal.doc && state.gcal.doc.map) || {} };
+    await setDoc(doc(db, "gcal", uid()), { on: true, calId: state.gcal.doc.calId, map: state.gcal.doc.map, syncedAt: "", email: state.me.email || "" });
+    await gcalSync(); toast("구글 캘린더에 넣었어요. 구글 캘린더 앱에서 '목자의 삶'을 확인해 보세요.");
+  });
+  if (t.id === "gcal-sync" || t.dataset.gcalgo) gcalTap(() => gcalSync());
+  if (t.id === "gcal-off") {
+    if (!confirm("구글 캘린더 연결을 끊을까요?\n'목자의 삶' 캘린더와 그 안의 일정도 구글 캘린더에서 지워요.")) return;
+    const D = state.gcal.doc || {};
+    gcalTap(async () => {
+      if (D.calId) { try { await gapi("DELETE", `/calendars/${encodeURIComponent(D.calId)}`); } catch (e) { if (e.code !== 404 && e.code !== 410) throw e; } }
+      await setDoc(doc(db, "gcal", uid()), { on: false, calId: "", map: {}, syncedAt: "", email: state.me.email || "" });
+      state.gcal.doc = { on: false, calId: "", map: {} }; state.gcal.last = ""; renderGcal(); toast("연결을 끊었어요.");
+    });
   }
 });
