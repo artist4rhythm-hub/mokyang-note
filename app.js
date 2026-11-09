@@ -24,7 +24,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
 const APP_NAME = "목자의 삶";
-const APP_VERSION = "25.0 (2026-11-09)";
+const APP_VERSION = "26.0 (2026-11-09)";
 
 /* 사진 크기 — 얼굴을 알아볼 수 있는 선에서 가장 작게.
    얼굴 하나가 가로 80px은 되어야 알아보는데, 여럿이 한 줄로 선
@@ -771,6 +771,7 @@ async function homeBackground() {
       await loadAllRecords();
       if (onHome()) { renderCare(); renderRooms(); }
       planAlarms();
+      syncCalShare().catch(e => console.warn("캘린더 공유", e));
     }
   } catch (e) { console.warn("홈 뒤 작업", e); }
 }
@@ -2746,9 +2747,12 @@ async function openCal() {
   await loadAllRecords(); await loadAllTrainings();
   if (!state.calMonth) { const d=new Date(); state.calMonth = `${d.getFullYear()}-${pad2(d.getMonth()+1)}`; }
   state.calPick = state.calPick || todayStr();
+  if (calOther()) await loadOtherCal(state.calWho);
   renderCal(); markSide("cal"); show("s-cal");
+  if (canLead()) syncCalShare().catch(e => console.warn("캘린더 공유", e));
 }
 function calEvents() {
+  if (calOther()) return otherCalEvents();
   const ev = [];
   state.meetings.forEach(m=>{
     const c = state.cells.find(x=>x.id===m.cellId);
@@ -2795,6 +2799,7 @@ function calEvents() {
   return ev;
 }
 function renderCal() {
+  renderCalWho();
   const [y,m] = state.calMonth.split("-").map(Number);
   $("cal-title").textContent = `${y}년 ${m}월`;
   const first = new Date(y, m-1, 1), last = new Date(y, m, 0);
@@ -2824,6 +2829,9 @@ function renderCalDay() {
     .sort((a,b)=>String(a.time||"").localeCompare(String(b.time||"")));
   $("cal-day-title").textContent = `${fmtDate(ds,true)} — ${list.length}건`;
   $("btn-cal-add").textContent = ds > todayStr() ? "＋ 이 날 예정" : "＋ 이 날 기록";
+  $("btn-cal-add").hidden = calOther() || !canLead();
+  $("btn-ics").hidden = calOther();
+  if (calOther()) { renderOtherDay(list); return; }
   $("cal-day-list").innerHTML = list.length ? list.map((e,i)=>`
     <div class="row">
       <i style="width:8px;height:8px;border-radius:999px;background:${e.color};flex-shrink:0"></i>
@@ -4434,7 +4442,7 @@ async function putMeetShots(meetingId, cellId) {
   for (const p of (state.meeting.shots || [])) {
     if (p.id) { out.push({ id:p.id, thumb:p.thumb }); continue; }
     const ref = await addDoc(collection(db,"meetingPhotos"), {
-      meetingId, cellId, jinId: state.me.jinId, leaderUid: state.me.id,
+      meetingId, cellId, jinId: state.me.jinId, leaderUid: state.me.id, peers: repPhotos(),
       data: p.full, by: uid(), createdAt: serverTimestamp()
     });
     out.push({ id: ref.id, thumb: p.thumb });
@@ -4600,6 +4608,7 @@ async function openPhotos() {
   await loadOrg(); await loadSouls(); await loadMeetings(); await loadAllRecords();
   await backfillThumbs();
   state.phCell = state.phCell || "all"; state.phTab = state.phTab || "all";
+  if (phOther()) await loadOtherPhotos(state.phWho);
   renderPhotos(); show("s-photos");
 }
 function photoSets(cellId) {
@@ -4626,6 +4635,9 @@ function photoSets(cellId) {
   return { faces, cellShots, meets, nCell, nMeet };
 }
 function renderPhotos() {
+  renderPhWho();
+  if (phOther()) { renderOtherPhotos(); return; }
+  $("ph-cells").hidden = false; document.querySelector('#ph-tabs [data-pht="meet"]').hidden = false;
   const ids = [...new Set([...state.souls.map(cellOfSoul), ...state.meetings.map(m=>m.cellId)]
     .filter(Boolean))];
   const cells = ids.map(id=>state.cells.find(c=>c.id===id)).filter(Boolean);
@@ -5039,6 +5051,12 @@ async function backfillThumbs() {
    올릴 때마다 version.json 도 같이 올립니다. 앱은 열 때 · 다시 볼 때 · 10분마다
    그 파일만 살짝 확인해서(아주 작은 파일), 지금 버전보다 새것이면 위에 알림을 띄웁니다. */
 const CHANGELOG = [
+  { v:"26.0", d:"2026-11-09", items:[
+    "교회 명부 — 화면 넓이에 맞춰 1 · 2 · 3줄 (컴퓨터 · 패드 · 휴대폰), 셀리더 · 셀원 카드 크기를 고르게",
+    "카드마다 칸이 정해진 정보 — 생년 · 생일 · 연락처 · 수료 훈련 · 최근 3개월 출석률",
+    "명부 카드를 누르면 — 출석률 · 최근 셀모임 12번 출석 줄 · 연속 결석 · 기본 사항을 칸마다 깔끔하게",
+    "캘린더 · 사진 — 같은 진 셀리더 · 코치 · 진장이 서로의 캘린더(셀모임 · 만남 일정)와 셀모임 사진을 봐요",
+    "만남 일정은 날짜 · 시간 · 종류만 (누구와 · 내용은 안 보임), 공유 설정에서 끌 수 있어요" ] },
   { v:"25.0", d:"2026-11-09", items:[
     "셀이 어디서나 번호 순서대로 (1B01 · 1B03 · 1B05 …)",
     "셀 관리 — 셀마다 담당 셀리더 카드 (사진 · 몇 년생 · 생일 · 연락처 · 가족 · 수료 훈련)",
@@ -5755,7 +5773,7 @@ const handPendingFor = (m) => (state.handovers||[]).some(h => h.status === "pend
 const DROLES = [["all","전체"],["lead","리더들"],["member","셀원"],["new","목양 카드 없음"]];
 function renderDir() {
   const me = state.me, pool = dirPool(), cells = dirCellsShown();
-  const LM = leadMemberMap(cells);                       // 셀리더 명부 카드 → 그 셀 (가입 전이라 셀이 비어 있어도)
+  const LM = leadMemberMap(cells); state.dirLM = LM;      // 셀리더 명부 카드 → 그 셀 (가입 전이라 셀이 비어 있어도)
   const cellOfM = (m) => (m.cellId && cells.some(c => c.id === m.cellId)) ? m.cellId : (LM.get(m.id) || "");
   const kw = $("dir-search").value.trim(), kwd = kw.replace(/\D/g, "");
   const hasNone = pool.some(m => !cellOfM(m));
@@ -5778,55 +5796,40 @@ function renderDir() {
   const grouped = !kw && state.dirRole === "all" && state.dirCell !== "none";
   const showCells = state.dirCell === "all" ? cells : cells.filter(c => c.id === state.dirCell);
   $("dir-count").textContent = `${list.length}명${state.dirCell === "all" && !kw ? ` · 셀 ${cells.length}개` : ""}`;
-  const chipsOf = (m) => {
-    const chips = [];
-    if (m.uid === me.id) chips.push(`<span class="chip rose">나</span>`);
-    if (pendingInvite(m)) chips.push(`<span class="chip warn">초대 중</span>`);
-    if (handPendingFor(m)) chips.push(`<span class="chip warn">카드 넘어가는 중</span>`);
-    return chips.join(" ");
-  };
-  const row = (m, inTree) => {
-    const bd = mdText(m.birthMD, m.lunar), cn = cellNameOf(cellOfM(m));
-    const badge = LM.has(m.id) ? "셀리더" : (ROLEBADGE[m.role] || "셀원");
-    const showBadge = !inTree || (m.role && m.role !== "member");
-    return `<div class="row${inTree ? " twig" : ""}" data-mem="${m.id}" style="cursor:pointer">
-      ${avatar(m, inTree ? 38 : 0)}
-      <div class="grow"><p class="nm">${esc(m.name||"")} ${chipsOf(m)}</p>
-        <p class="sub">${[inTree ? "" : cn, bd ? "🎂 " + bd : "", m.phone].filter(Boolean).map(esc).join(" · ") || "&nbsp;"}</p>
-        ${(m.trainingsDone||[]).length ? `<p class="sub2">수료 ${esc(m.trainingsDone.join(" · "))}</p>` : ""}</div>
-      ${showBadge ? `<span class="chip ${isLead(m) ? "rose" : ""}">${esc(badge)}</span>` : ""}
-    </div>`;
-  };
+  const card = (m, o) => memCardHTML(m, { ...o, cellName: cellNameOf(cellOfM(m)), lead: LM.has(m.id) ? "셀리더" : "" });
   if (grouped) {
     const jinName = (c) => me.role === "super" && state.jins.length > 1 ? ((state.jins.find(j => j.id === c.jinId) || {}).name || "") : "";
     const none = state.dirCell === "all" ? list.filter(m => !cellOfM(m)) : [];
     const secs = showCells.map(c => {
-        const ents = cellLeadEntries(c);
-        const lids = new Set(ents.map(e => e.m && e.m.id).filter(Boolean));
-        const ms = list.filter(m => cellOfM(m) === c.id && !lids.has(m.id));
-        return `<section class="cgrp">
-          <div class="cgh"><span class="cbadge">${esc(c.name)}</span>
-            <span class="cgm">${esc(jinName(c))}</span><span class="cgc">셀원 ${ms.length}명</span></div>
-          ${ents.length ? ents.map(e => leadCardHTML(e, { dir: true })).join("")
-            : `<div class="lcard empty"><span class="ava" style="width:56px;height:56px">?</span>
-                <div class="grow"><p class="lk">셀리더</p><p class="sub">아직 정해지지 않았어요</p></div></div>`}
-          ${ms.length ? `<div class="twigs">${ms.map(m => row(m, true)).join("")}</div>`
-            : `<p class="muted twig-empty">아직 등록된 셀원이 없어요.</p>`}
-        </section>`;
-      });
+      const ents = cellLeadEntries(c);
+      const lids = new Set(ents.map(e => e.m && e.m.id).filter(Boolean));
+      const ms = list.filter(m => cellOfM(m) === c.id && !lids.has(m.id));
+      return `<section class="cgrp">
+        <div class="cgh"><span class="cbadge">${esc(c.name)}</span>
+          <span class="cgm">${esc(jinName(c))}</span><span class="cgc" data-cellatt="${c.id}">셀원 ${ms.length}명</span></div>
+        ${ents.length ? ents.map(e => e.m ? card(e.m, { leadEnt: e }) : leadGhostHTML(e)).join("")
+          : `<div class="mcard lead empty"><span class="ava" style="width:52px;height:52px">?</span>
+              <div class="mc-body"><p class="mc-role">셀리더</p><p class="mc-nm" style="color:var(--dim);font-weight:500">아직 정해지지 않았어요</p></div></div>`}
+        ${ms.length ? `<div class="twigs">${ms.map(m => card(m, { twig: true })).join("")}</div>`
+          : `<p class="muted twig-empty">아직 등록된 셀원이 없어요.</p>`}
+      </section>`;
+    });
     if (none.length) secs.push(`<section class="cgrp">
-          <div class="cgh"><span class="cbadge plain">셀 없음</span><span class="cgm">진장 · 코치 등</span><span class="cgc">${none.length}명</span></div>
-          <div class="list">${none.map(m => row(m, false)).join("")}</div></section>`);
-    /* 넓은 화면은 두 줄 — 왼쪽 1B01 · 오른쪽 1B03 · 왼쪽 1B05 … 번호가 왼→오로 읽히게. 좁은 화면은 order로 한 줄 */
-    const sec = (h, i) => h.replace('<section class="cgrp">', `<section class="cgrp" style="order:${i}">`);
-    $("dir-list").innerHTML = `<div class="ctree${secs.length <= 1 ? " one" : ""}">
-      <div class="ccol">${secs.map(sec).filter((_, i) => i % 2 === 0).join("")}</div>
-      <div class="ccol">${secs.map(sec).filter((_, i) => i % 2 === 1).join("")}</div></div>`;
-    fillLeadPriv($("dir-list"));
+        <div class="cgh"><span class="cbadge plain">셀 없음</span><span class="cgm">진장 · 코치 등</span><span class="cgc">${none.length}명</span></div>
+        <div class="mlist">${none.map(m => card(m, {})).join("")}</div></section>`);
+    /* 화면 넓이에 맞춰 1 · 2 · 3줄 — 번호가 왼→오로 읽히게 차례로 나눠 담아요 */
+    const n = secs.length <= 1 ? 1 : dirCols();
+    state.dirColsNow = n;
+    const cols = Array.from({ length: n }, () => []);
+    secs.forEach((h, i) => cols[i % n].push(h.replace('<section class="cgrp">', `<section class="cgrp" style="order:${i}">`)));
+    $("dir-list").innerHTML = `<div class="ctree${n === 1 && secs.length <= 1 ? " one" : ""}" style="--cols:${n}">${cols.map(c => `<div class="ccol">${c.join("")}</div>`).join("")}</div>`;
   } else {
-    $("dir-list").innerHTML = `<div class="list" style="margin-top:10px">${list.map(m => row(m, false)).join("")
-      || `<p class="muted">${kw ? "찾는 사람이 없어요." : "이 조건에 맞는 사람이 없어요."}</p>`}</div>`;
+    state.dirColsNow = 0;
+    $("dir-list").innerHTML = list.length ? `<div class="mgrid">${list.map(m => card(m, { showCell: true })).join("")}</div>`
+      : `<p class="muted" style="margin-top:10px">${kw ? "찾는 사람이 없어요." : "이 조건에 맞는 사람이 없어요."}</p>`;
   }
+  fillCardsPriv($("dir-list"));
+  loadAttReps().then(() => fillAtt($("dir-list"))).catch(() => {});
 }
 $("dir-search").oninput = () => renderDir();
 $("dir-cells").addEventListener("click", (ev) => { const b = ev.target.closest("[data-dc]"); if (!b) return;
@@ -5875,8 +5878,11 @@ function openMember(id) {
     ["목양 담당", m.careUid ? (m.careUid === me.id ? "나" : userName(m.careUid)) : ""],
     ["초대 이메일", canGiveRole() && !m.uid ? m.linkedEmail : ""]
   ].filter(([,v]) => v);
-  $("mb-rows").innerHTML = rows.length ? `<div class="kv">${rows.map(([k,v]) => `<span>${k}</span><span>${esc(v)}</span>`).join("")}</div>`
-    : `<p class="muted" style="margin-top:12px">아직 적힌 기본 사항이 없어요.</p>`;
+  const trs = m.trainingsDone || [];
+  $("mb-rows").innerHTML = `<p class="mb-sec">기본 사항</p>` + (rows.length ? `<div class="fgrid">${rows.filter(([k]) => k !== "수료한 훈련")
+      .map(([k,v]) => fbox(k, v)).join("")}${trs.length ? `<div class="fbox fwide"><p class="fk">수료한 훈련</p><p class="fv">${trs.map(t => `<span class="tpill">${esc(t)}</span>`).join("")}</p></div>` : ""}</div>`
+    : `<p class="muted">아직 적힌 기본 사항이 없어요.</p>`);
+  showMbAtt(m);
   showPriv(m);
   const sv = !mine && soulOfMember(m);
   $("mb-note").textContent = mine
@@ -6360,9 +6366,9 @@ function renderCellMgr() {
       <div class="cmh"><span class="cbadge">${esc(c.name)}</span>
         <div class="grow"><p class="sub" style="margin:0">${jn ? esc(jn) + " · " : ""}셀원 ${ms.length}명</p></div>
         <button class="btn-sm" data-cmview="${c.id}">명부</button></div>
-      ${ents.length ? ents.map(e => leadCardHTML(e, { mgr: true })).join("")
-        : `<div class="lcard empty"><span class="ava" style="width:56px;height:56px">?</span>
-            <div class="grow"><p class="lk">담당 셀리더</p><p class="sub" style="color:var(--warn-tx)">없음 — '담당 바꾸기'나 셀리더 명단에서 넣어 주세요</p></div></div>`}
+      ${ents.length ? ents.map(e => e.m ? memCardHTML(e.m, { leadEnt: e, mgr: true, cellId: c.id }) : leadGhostHTML(e)).join("")
+        : `<div class="mcard lead empty"><span class="ava" style="width:52px;height:52px">?</span>
+            <div class="mc-body"><p class="mc-role">담당 셀리더</p><p class="mc-nm" style="color:var(--warn-tx);font-size:13px;font-weight:500">없음 — '담당 바꾸기'나 셀리더 명단에서 넣어 주세요</p></div></div>`}
       <div class="acts">
         <button class="btn-sm" data-cmlead="${c.id}">담당 바꾸기</button>
         <button class="btn-sm" data-cmsplit="${c.id}">분가</button>
@@ -6370,7 +6376,8 @@ function renderCellMgr() {
         <button class="btn-sm danger" data-cmclose="${c.id}">보관</button>
       </div></div>`;
   }).join("") || `<p class="muted">아직 셀이 없어요. 오른쪽 위 '＋ 새 셀'로 만들어요.</p>`;
-  fillLeadPriv($("cm-list"));
+  fillCardsPriv($("cm-list"));
+  loadAttReps().then(() => fillAtt($("cm-list"))).catch(() => {});
 }
 $("btn-cm-new").onclick = () => openSplit(null);
 $("s-cellmgr").addEventListener("click", async (ev) => {
@@ -7321,6 +7328,8 @@ function openShare() {
         <p class="hint">기록할 때마다 바꿀 수 있어요. 받은 마음은 늘 '나만 보기'로 시작해요.</p></div>
       ${ck("sh-peers", P.meetPeers !== false, "셀모임 나눔(사람별 근황 · 기도제목)을 같은 진 셀리더 · 코치 · 진장에게 보이기")}
       <p class="hint" style="margin-top:4px">출석 · 주제는 늘 같은 진에 보여요. 나눔 속 그 사람 본인에게는 어떤 경우에도 안 보여요.</p>
+      ${ck("sh-photos", P.meetPhotos !== false, "셀모임 사진을 같은 진 셀리더 · 코치 · 진장에게 보이기")}
+      ${ck("sh-cal", P.calPeers !== false, "내 캘린더의 만남 일정을 같은 진에 보이기 (날짜 · 시간 · 종류만 — 누구와 · 내용은 안 보여요)")}
       ${ck("sh-meet", P.meetPastor, "셀모임(출석 · 나눔 · 보고)을 담당 교역자에게 보이기")}
       ${ck("sh-soul", P.soulPastor, "내 영혼 카드(기본 사항 · 출석)를 담당 교역자에게 보이기")}
       <p class="hint" style="margin-top:6px">카드를 보여도 기록은 '교역자까지'로 적은 것만 보여요.</p>
@@ -7354,7 +7363,8 @@ $("btn-home-share").onclick = () => openShare();
 $("btn-share-save").onclick = async () => {
   const P = { ...sharePrefs() };
   if ($("sh-rec")) Object.assign(P, { recScope: $("sh-rec").value, meetPastor: $("sh-meet").checked,
-    meetPeers: $("sh-peers").checked, soulPastor: $("sh-soul").checked });
+    meetPeers: $("sh-peers").checked, soulPastor: $("sh-soul").checked,
+    meetPhotos: $("sh-photos").checked, calPeers: $("sh-cal").checked });
   if ($("sh-lcoach")) Object.assign(P, { leaderCoach: $("sh-lcoach").checked, leaderPastor: $("sh-lpastor").checked });
   $("btn-share-save").disabled = true;
   try {
@@ -7373,9 +7383,11 @@ $("btn-share-save").onclick = async () => {
         await updateDoc(doc(db, "meetings", m.id), { share: P.meetPastor ? "pastor" : "" });
       state.meetingsAt = 0;
     }
-    if (canLead() && (before.meetPastor !== P.meetPastor || before.meetPeers !== P.meetPeers)) {
+    if (canLead() && (before.meetPastor !== P.meetPastor || before.meetPeers !== P.meetPeers
+        || (before.meetPhotos !== false) !== (P.meetPhotos !== false))) {
       await loadMeetings(true); await syncMyReports(true);
     }
+    if (canLead() && (before.calPeers !== false) !== (P.calPeers !== false)) await syncCalShare(true);
     toast("공유 설정을 저장했어요."); openHome();
   } catch (e) { $("share-err").textContent = msgOf(e); }
   finally { $("btn-share-save").disabled = false; }
@@ -7544,6 +7556,7 @@ $("ps-del").onclick = async () => {
 const REP_MONTHS = 3;
 const ymOf = (d) => String(d || "").slice(0, 7);
 const repPeers = () => sharePrefs().meetPeers !== false;
+const repPhotos = () => sharePrefs().meetPhotos !== false;
 const repKeyOfSoul = (s) => s.memberId || ("s_" + s.id);
 function recentYms(n) {
   const out = [], d = new Date(); d.setDate(1);
@@ -7586,13 +7599,19 @@ async function syncReport(mid, m) {
   let before = [];
   try { const o = await getDoc(ref); if (o.exists()) before = o.data().peopleIds || []; } catch {}
   await setDoc(ref, { jinId: m.jinId, cellId: m.cellId, cellName: cellNameOf(m.cellId), date: m.date || "",
-    ym: ymOf(m.date), topic: m.topic || "", place: m.place || "", visitors: m.visitors || "",
+    ym: ymOf(m.date), time: m.time || "", timeEnd: m.timeEnd || "",
+    photos: repPhotos() ? (m.photos || []).filter(p => p && p.id && p.thumb).map(p => ({ id: p.id, thumb: p.thumb })) : [],
+    topic: m.topic || "", place: m.place || "", visitors: m.visitors || "",
     note: repPeers() ? (m.note || "") : "", leaderUid: uid(), leaderMemberId: myM ? myM.id : "",
     leaderName: state.me.name || "", att, names, peopleIds: Object.keys(people), peers: repPeers(),
     share: m.share || "", imported: false, src: "app", updatedAt: serverTimestamp() });
   for (const k of before.filter(k => !people[k])) { try { await deleteDoc(doc(db, "reports", mid, "people", k)); } catch {} }
   for (const [k, p] of Object.entries(people)) await setDoc(doc(db, "reports", mid, "people", k), p);
-  state.repAt = 0;
+  /* 26단계 — 셀모임 큰 사진도 공유 설정대로 (같은 진에게 보이기 · 안 보이기) */
+  for (const ph of (m.photos || []).filter(x => x && x.id)) {
+    try { await updateDoc(doc(db, "meetingPhotos", ph.id), { peers: repPhotos() }); } catch (e) { console.warn("사진 공유 표시", e); }
+  }
+  state.repAt = 0; state.attAt = 0;
 }
 async function dropReport(mid) {
   try {
@@ -7606,7 +7625,7 @@ async function dropReport(mid) {
 /* 22단계로 처음 열 때 — 지금까지 적은 내 셀모임을 한 번에 사본으로 (한 기기에서 한 번) */
 async function syncMyReports(force) {
   if (!canLead() || !state.me || !state.me.jinId) return;
-  const key = "mokja-rep22-" + uid();
+  const key = "mokja-rep26-" + uid();   // 26단계 — 시간 · 사진을 더해 한 번 더
   try { if (!force && localStorage.getItem(key)) return; } catch {}
   await loadMeetings(); await loadSouls();
   const mine = state.meetings.filter(m => m.leaderUid === uid());
@@ -7970,9 +7989,9 @@ async function showPriv(m) {
     ["기도제목", (P.prayers || []).length ? `${P.prayers.length}개 (목양 카드에 들어가요)` : ""]
   ].filter(([, v]) => v);
   if (!rows.length) return;
-  box.innerHTML = `<div class="card" style="margin-top:12px">
-      <h3 style="font-size:13px;font-weight:600">노션 명단 <span class="muted" style="font-weight:400;font-size:12px">· 셀리더 · 진장 · 코치만 보여요</span></h3>
-      <div class="kv" style="margin-top:6px">${rows.map(([k, v]) => `<span>${k}</span><span>${esc(v)}</span>`).join("")}</div></div>`;
+  const wide = new Set(["자녀", "비고", "침례 · 간증"]);
+  box.innerHTML = `<p class="mb-sec">노션 명단 <span>🔒 셀리더 · 진장 · 코치만 보여요</span></p>
+      <div class="fgrid lock">${rows.map(([k, v]) => fbox(k, v, wide.has(k) ? "fwide" : "")).join("")}</div>`;
 }
 /* 셀리더 — 내 목양 카드의 빈 칸을 명단으로 채우기 (한 번씩, 다시 가져오면 새것만) */
 async function fillFromNotion() {
@@ -8169,28 +8188,6 @@ function leadMemberMap(cells) {
   for (const c of cells) for (const e of cellLeadEntries(c)) if (e.m && !mp.has(e.m.id)) mp.set(e.m.id, c.id);
   return mp;
 }
-function leadCardHTML(e, o) {
-  const { p, m } = e, me = state.me;
-  const name = (m && m.name) || p.name || "";
-  const st = p.t === "acc" ? (o.mgr ? `<span class="chip ok">가입함</span>` : "")
-    : p.t === "inv" ? `<span class="chip warn">초대 중</span>` : `<span class="chip lock">가입 전</span>`;
-  const mine = m && m.uid === me.id ? `<span class="chip rose">나</span>` : "";
-  const sub = p.sub ? `<span class="chip">${esc(p.sub)}</span>` : "";
-  const bd = m ? mdText(m.birthMD, m.lunar) : "";
-  const ava = m ? avatar(m, 56) : `<span class="ava" style="width:56px;height:56px;font-size:21px">${esc(initial(name))}</span>`;
-  const tr = m && (m.trainingsDone || []).length ? m.trainingsDone.join(" · ") : "";
-  return `<div class="lcard"${m ? ` data-mem="${m.id}"` : ""}>
-    ${ava}
-    <div class="grow">
-      <p class="lk">셀리더 ${st} ${sub}</p>
-      <p class="nm">${esc(name)} ${mine}</p>
-      <p class="sub"${m ? ` data-lby="${m.id}"` : ""} data-bd="${esc(bd)}">${bd ? "🎂 " + esc(bd) : "&nbsp;"}</p>
-      ${m && m.phone ? `<p class="sub">${esc(m.phone)}</p>` : p.t === "inv" ? `<p class="sub">${esc(p.email || "")}</p>` : ""}
-      ${m ? `<p class="sub2" data-lfam="${m.id}" hidden></p>` : ""}
-      ${tr ? `<p class="sub2">수료 ${esc(tr)}</p>` : ""}
-    </div>
-  </div>`;
-}
 state.privCache = state.privCache || {};
 function privOf(m) {
   if (!canSeePriv(m) || !m.notionAt) return Promise.resolve(null);
@@ -8199,21 +8196,314 @@ function privOf(m) {
     .then(d => d.exists() ? d.data() : null).catch(() => null);
   return state.privCache[k];
 }
-async function fillLeadPriv(root) {
-  const els = [...root.querySelectorAll("[data-lby]")];
-  await Promise.all(els.map(async el => {
-    const m = memberById(el.dataset.lby); if (!m) return;
-    const P = await privOf(m); if (!P || !el.isConnected) return;
-    const y = String(P.birth || "").slice(0, 4), bd = el.dataset.bd;
-    const parts = [/^(19|20)\d\d$/.test(y) ? `${y}년생` : "", bd ? "🎂 " + bd : ""].filter(Boolean);
-    if (parts.length) el.textContent = parts.join(" · ");
-    const fe = root.querySelector(`[data-lfam="${m.id}"]`);
-    const kids = (P.children || []).filter(k => k.name);
-    const fam = [P.spouse ? `배우자 ${P.spouse}` : "", kids.length ? `자녀 ${kids.map(k => k.name).join(", ")}` : ""].filter(Boolean);
-    if (fe && fam.length) { fe.textContent = "가족 " + fam.join(" · "); fe.hidden = false; }
-  }));
-}
 $("cm-list").addEventListener("click", (ev) => {
   if (ev.target.closest("button")) return;
   const r = ev.target.closest("[data-mem]"); if (r) openMember(r.dataset.mem);
+});
+
+/* ════════ 26단계 — 화면 넓이에 맞춘 명부 · 칸이 정해진 카드 · 출석 · 진 안에서 캘린더 · 사진 보기 ════════ */
+/* 명부 줄 수 — 휴대폰 1줄 · 패드 2줄 · 넓은 컴퓨터 3줄 */
+function dirCols() {
+  const el = $("dir-list");
+  const w = (el && el.clientWidth) || Math.min(1600, window.innerWidth - (window.innerWidth >= 880 ? 224 : 0) - 40);
+  return w >= 1180 ? 3 : w >= 700 ? 2 : 1;
+}
+let dirRz = 0;
+window.addEventListener("resize", () => {
+  clearTimeout(dirRz);
+  dirRz = setTimeout(() => {
+    if (!$("s-dir").hidden && state.dirColsNow && dirCols() !== state.dirColsNow) renderDir();
+  }, 180);
+});
+const fbox = (k, v, cls) => v ? `<div class="fbox ${cls || ""}"><p class="fk">${esc(k)}</p><p class="fv">${esc(v)}</p></div>` : "";
+
+/* 카드 한 장 — 자리가 정해진 칸: [생년] [생일] [연락처] (+ 셀) · 수료 훈련 · 출석률 */
+const MI_ICON = {
+  yr: "",
+  bd: `<svg class="mic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h16M5 20v-6a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v6M8 12V9m4 3V9m4 3V9M8 6.5v.01M12 6.5v.01M16 6.5v.01"/></svg>`,
+  ph: `<svg class="mic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 3.5h3l1.5 4-2 1.3a10 10 0 0 0 6.2 6.2l1.3-2 4 1.5v3a2 2 0 0 1-2 2A16.5 16.5 0 0 1 4.5 5.5a2 2 0 0 1 2-2z"/></svg>`,
+  cl: `<svg class="mic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="9" r="3"/><circle cx="16.5" cy="10.5" r="2.3"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0M14 19a4 4 0 0 1 7 0"/></svg>`
+};
+function memCardHTML(m, o) {
+  const me = state.me, e = o.leadEnt, lead = !!e || !!o.lead;
+  const chips = [];
+  if (e) {
+    if (e.p.t === "inv") chips.push(`<span class="chip warn">초대 중</span>`);
+    else if (e.p.t === "noe") chips.push(`<span class="chip lock">가입 전</span>`);
+    else if (o.mgr) chips.push(`<span class="chip ok">가입함</span>`);
+    if (e.p.sub) chips.push(`<span class="chip">${esc(e.p.sub)}</span>`);
+  }
+  if (m.uid === me.id) chips.push(`<span class="chip rose">나</span>`);
+  if (!e && pendingInvite(m)) chips.push(`<span class="chip warn">초대 중</span>`);
+  if (handPendingFor(m)) chips.push(`<span class="chip warn">카드 넘어가는 중</span>`);
+  const role = lead ? "셀리더" : (m.role && m.role !== "member" ? (ROLEBADGE[m.role] || "") : "");
+  const bd = mdText(m.birthMD, m.lunar);
+  const yr = canSeePriv(m) && !!m.notionAt;
+  const slot = (cls, k, v, attr) => `<div class="mi ${cls}"${attr || ""} title="${k}">${cls in MI_ICON ? MI_ICON[cls] : `<span class="mk">${k}</span>`}<span class="mv">${v ? esc(v) : "<em>—</em>"}</span>${cls === "yr" ? `<span class="mk">년생</span>` : ""}</div>`;
+  const cellId = o.cellId || (state.dirLM && state.dirLM.get(m.id)) || m.cellId || "";
+  const trs = (m.trainingsDone || []).map(t => `<span class="tpill">${esc(t)}</span>`).join("");
+  return `<div class="mcard${lead ? " lead" : ""}${o.twig ? " twig" : ""}" data-mem="${m.id}" data-cell="${cellId}">
+    ${avatar(m, lead ? 52 : 44)}
+    <div class="mc-body">
+      <div class="mc-top">
+        <div class="mc-id">${role ? `<p class="mc-role">${esc(role)}${chips.length ? " " + chips.join(" ") : ""}</p>` : ""}
+          <p class="mc-nm">${esc(m.name || "")}${!role && chips.length ? " " + chips.join(" ") : ""}</p></div>
+        <div class="mc-att" data-att="${m.id}"></div>
+      </div>
+      <div class="mc-info">
+        ${yr ? slot("yr", "생년", "…", ` data-yr="${m.id}"`) : ""}${slot("bd", "생일", bd)}${slot("ph", "연락처", m.phone)}${o.showCell ? slot("cl", "셀", o.cellName) : ""}
+      </div>
+      ${lead ? `<p class="mc-fam" data-fam="${m.id}" hidden></p>` : ""}
+      <div class="mc-tags" data-tags="${m.id}">${trs}</div>
+    </div>
+  </div>`;
+}
+/* 명부 카드가 아직 없는 초대 (이름 · 이메일만) */
+function leadGhostHTML(e) {
+  return `<div class="mcard lead">
+    <span class="ava" style="width:52px;height:52px;font-size:20px">${esc(initial(e.p.name || ""))}</span>
+    <div class="mc-body"><div class="mc-top"><div class="mc-id">
+      <p class="mc-role">셀리더 <span class="chip warn">초대 중</span></p><p class="mc-nm">${esc(e.p.name || "")}</p></div></div>
+      <div class="mc-info"><div class="mi ph"><span class="mk">초대 이메일</span><span class="mv">${esc(e.p.email || "")}</span></div></div></div>
+  </div>`;
+}
+/* 잠긴 칸에서 오는 생년 · 가족 — 볼 수 있는 사람에게만 (본인 · 다른 셀 셀리더는 안 읽어요) */
+async function fillCardsPriv(root) {
+  const ids = [...new Set([...root.querySelectorAll("[data-yr],[data-fam]")].map(el => el.dataset.yr || el.dataset.fam))];
+  await Promise.all(ids.map(async id => {
+    const m = memberById(id); if (!m) return;
+    const P = await privOf(m); if (!root.isConnected) return;
+    const y = String((P && P.birth) || "").slice(0, 4), okY = /^(19|20)\d\d$/.test(y);
+    root.querySelectorAll(`[data-yr="${id}"] .mv`).forEach(el => { el.innerHTML = okY ? `${y}` : "<em>—</em>"; });
+    if (!P) return;
+    const kids = (P.children || []).filter(k => k.name);
+    const fam = [P.spouse ? `배우자 ${P.spouse}` : "", kids.length ? `자녀 ${kids.map(k => k.name).join(", ")}` : ""].filter(Boolean);
+    root.querySelectorAll(`[data-fam="${id}"]`).forEach(el => { if (fam.length) { el.innerHTML = `<span class="mk">가족</span>${esc(fam.join(" · "))}`; el.hidden = false; } });
+  }));
+}
+
+/* ── 출석 — 셀 보고 사본(같은 진이 원래 보는 것)에서 셈 ── */
+const ATT_DAYS = 92;
+async function loadAttReps(force) {
+  const me = state.me; if (!me || me.role === "pastor") return [];
+  if (!force && state.attRep && Date.now() - (state.attAt || 0) < 10 * 60 * 1000) return state.attRep;
+  if (state.attP) return state.attP;
+  const jins = me.role === "super" ? [...new Set(dirCellsShown().map(c => c.jinId))] : (me.jinId ? [me.jinId] : []);
+  state.attP = (async () => {
+    const col = collection(db, "reports"), yms = recentYms(6);
+    const rs = await Promise.all(jins.flatMap(j => yms.map(ym =>
+      getDocs(query(col, where("jinId", "==", j), where("ym", "==", ym))).then(pack).catch(() => []))));
+    const seen = {};
+    state.attRep = rs.flat().filter(r => seen[r.id] ? false : (seen[r.id] = true));
+    state.attAt = Date.now();
+    return state.attRep;
+  })();
+  try { return await state.attP; } finally { state.attP = null; }
+}
+const daysAgo26 = (ds) => Math.round((new Date(todayStr()) - new Date(ds)) / 864e5);
+const agoText26 = (ds) => { const d = daysAgo26(ds); return d <= 0 ? "오늘" : d < 7 ? `${d}일 전` : d < 60 ? `${Math.round(d / 7)}주 전` : `${Math.round(d / 30)}달 전`; };
+function attStats(mid, cellId) {
+  const today = todayStr(), from = ymd(new Date(Date.now() - ATT_DAYS * 864e5));
+  const reps = (state.attRep || []).filter(r => r.date && r.date <= today
+      && ((cellId && r.cellId === cellId) || (r.att && r.att[mid])))
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  const rec = reps.filter(r => r.att && r.att[mid]);
+  const recent = rec.filter(r => r.date >= from);
+  const ok = recent.filter(r => r.att[mid] !== "absent").length;
+  let streak = 0; for (const r of rec) { if (r.att[mid] === "absent") streak++; else break; }
+  const last = rec.find(r => r.att[mid] !== "absent");
+  return { n: recent.length, ok, ab: recent.length - ok, rate: recent.length ? Math.round(ok / recent.length * 100) : null,
+    streak, last: last ? last.date : "", strip: reps.slice(0, 12).reverse().map(r => ({ date: r.date, v: (r.att || {})[mid] || "" })) };
+}
+const attTone = (rate) => rate == null ? "none" : rate >= 75 ? "good" : rate >= 50 ? "mid" : "low";
+function fillAtt(root) {
+  if (!state.attRep || !root.isConnected) return;
+  root.querySelectorAll("[data-att]").forEach(el => {
+    const card = el.closest("[data-cell]"), id = el.dataset.att;
+    const st = attStats(id, card ? card.dataset.cell : "");
+    el.className = `mc-att ${attTone(st.rate)}`;
+    el.innerHTML = st.rate == null ? `<span class="at-none">출석 기록 없음</span>`
+      : `<span class="at-row"><small>${st.ok}/${st.n}</small><b>${st.rate}%</b></span><span class="at-bar"><i style="width:${st.rate}%"></i></span>`;
+    el.title = st.rate == null ? "최근 3개월 셀모임 출석 기록이 없어요" : `최근 3개월 셀모임 ${st.n}번 중 ${st.ok}번 출석`;
+    const tg = root.querySelector(`[data-tags="${id}"]`);
+    if (tg && st.streak >= 2 && !tg.querySelector(".streak"))
+      tg.insertAdjacentHTML("afterbegin", `<span class="tpill streak">${st.streak}번 연속 결석</span>`);
+  });
+  root.querySelectorAll("[data-cellatt]").forEach(el => {
+    const cid = el.dataset.cellatt, from = ymd(new Date(Date.now() - ATT_DAYS * 864e5));
+    const reps = state.attRep.filter(r => r.cellId === cid && r.date && r.date >= from && r.date <= todayStr());
+    let ok = 0, all = 0;
+    reps.forEach(r => Object.values(r.att || {}).forEach(v => { if (!v) return; all++; if (v !== "absent") ok++; }));
+    const base = el.textContent.split(" · ")[0];
+    if (reps.length) { el.textContent = `${base} · 셀모임 ${reps.length}번 · 평균 출석 ${Math.round(ok / Math.max(all, 1) * 100)}%`; el.classList.remove("warn"); return; }
+    const lastRep = state.attRep.filter(r => r.cellId === cid && r.date && r.date <= todayStr()).sort((a, b) => String(b.date).localeCompare(String(a.date)))[0];
+    const md = lastRep ? lastRep.date.split("-") : null;
+    el.textContent = `${base} · 최근 3개월 셀 보고 없음${md ? ` (마지막 ${Number(md[1])}/${Number(md[2])})` : ""}`;
+    el.classList.add("warn");
+  });
+}
+/* 명부 카드 — 출석 현황 */
+async function showMbAtt(m) {
+  const box = $("mb-att"); if (!box) return;
+  box.innerHTML = "";
+  if (state.me.role === "pastor") return;
+  const cellId = m.cellId || (state.dirLM && state.dirLM.get(m.id)) || "";
+  box.innerHTML = `<p class="mb-sec">셀모임 출석 <span>최근 3개월</span></p><p class="muted" style="font-size:12px">불러오는 중…</p>`;
+  await loadAttReps();
+  if (!state.mb || state.mb.id !== m.id) return;
+  const st = attStats(m.id, cellId);
+  if (!st.strip.length && !st.n) { box.innerHTML = `<p class="mb-sec">셀모임 출석</p><p class="muted" style="font-size:12px">아직 셀모임 출석 기록이 없어요.</p>`; return; }
+  const lab = { present: "출석", online: "온라인", absent: "결석", "": "기록 없음" };
+  const md = (d) => { const p = String(d).split("-"); return `${Number(p[1])}/${Number(p[2])}`; };
+  box.innerHTML = `<p class="mb-sec">셀모임 출석 <span>최근 3개월</span></p>
+    <div class="atiles">
+      <div class="atile ${attTone(st.rate)}"><p class="k">출석률</p><p class="v">${st.rate == null ? "—" : st.rate + "%"}</p><p class="s">${st.n ? `${st.ok} / ${st.n}번` : "기록 없음"}</p></div>
+      <div class="atile"><p class="k">마지막 출석</p><p class="v">${st.last ? md(st.last) : "—"}</p><p class="s">${st.last ? agoText26(st.last) : "&nbsp;"}</p></div>
+      <div class="atile ${st.streak >= 2 ? "low" : ""}"><p class="k">연속 결석</p><p class="v">${st.streak}번</p><p class="s">${st.streak >= 2 ? "연락해 볼 때예요" : "&nbsp;"}</p></div>
+    </div>
+    <div class="astrip" aria-label="최근 셀모임 ${st.strip.length}번 출석">
+      ${st.strip.map(x => `<span class="ad ${x.v || "nr"}" title="${esc(fmtDate(x.date, true))} ${lab[x.v] || ""}"><i></i><small>${md(x.date)}</small></span>`).join("")}
+    </div>
+    <p class="alegend"><span class="ad present"><i></i></span>출석 <span class="ad online"><i></i></span>온라인 <span class="ad absent"><i></i></span>결석 <span class="ad nr"><i></i></span>기록 없음</p>`;
+}
+
+/* ── 진 안에서 서로의 캘린더 · 사진 ──
+   셀모임은 셀 보고 사본(같은 진이 원래 보는 것)에서, 만남 일정은 calShare(날짜 · 시간 · 종류만)에서.
+   목양 카드 · 기록 · 1:1 만남 사진은 그대로 맡은 사람만 봐요. */
+function peerLeaders() {
+  const me = state.me; if (!me || me.role === "pastor") return [];
+  return (state.members || []).filter(u => u.active !== false && u.id !== me.id && u.jinId
+      && (u.role === "leader" || u.isLeader === true) && (me.role === "super" || u.jinId === me.jinId))
+    .sort((a, b) => cellOrder({ name: cellNameOf(a.cellId) || "~" }, { name: cellNameOf(b.cellId) || "~" })
+      || (a.name || "").localeCompare(b.name || "", "ko"));
+}
+function whoChips(elId, hintId, cur, mineLabel, hint) {
+  const ps = peerLeaders(), el = $(elId), h = $(hintId);
+  if (!ps.length) { el.hidden = true; h.hidden = true; return; }
+  el.hidden = false;
+  const on = (id) => (id ? cur === id : (!cur || cur === uid())) ? " on" : "";
+  el.innerHTML = `<button type="button" data-who="" class="${on("")}">${mineLabel}</button>`
+    + ps.map(u => `<button type="button" data-who="${u.id}" class="${on(u.id)}">${esc(cellNameOf(u.cellId) || "")} ${esc(u.name || "")}</button>`).join("");
+  const u = cur && cur !== uid() ? userOf(cur) : null;
+  h.hidden = !u; if (u) h.textContent = hint(u);
+}
+async function otherReps(id, force) {
+  state.otherReps = state.otherReps || {};
+  const c = state.otherReps[id];
+  if (!force && c && Date.now() - c.at < 5 * 60 * 1000) return c;
+  const u = userOf(id); if (!u) return null;
+  const col = collection(db, "reports");
+  let reps = [];
+  try {
+    reps = pack(await getDocs(u.cellId ? query(col, where("jinId", "==", u.jinId), where("cellId", "==", u.cellId))
+      : query(col, where("jinId", "==", u.jinId), where("leaderUid", "==", u.id))));
+  } catch (e) { toast(msgOf(e)); }
+  return (state.otherReps[id] = { at: Date.now(), u, reps });
+}
+/* 캘린더 */
+const calOther = () => !!state.calWho && state.calWho !== uid();
+async function loadOtherCal(id) {
+  const R = await otherReps(id); if (!R) { state.calWho = ""; return; }
+  let items = [], off = false;
+  try { const d = await getDoc(doc(db, "calShare", id)); if (d.exists()) { items = d.data().items || []; off = d.data().on === false; } } catch {}
+  state.calOtherData = { u: R.u, reps: R.reps, items, off };
+}
+function otherCalEvents() {
+  const D = state.calOtherData; if (!D) return [];
+  const ev = [];
+  D.reps.forEach(r => ev.push({ date: r.date, kind: "meeting", color: "#F24557", title: `${r.cellName || cellNameOf(r.cellId)} 셀모임`,
+    sub: r.topic || "", time: r.time || "", timeEnd: r.timeEnd || "", place: r.place || "", rep: r }));
+  D.items.forEach(x => ev.push({ date: x.d, kind: x.p ? "plan" : "record", color: x.p ? "#E8B473" : "#7FCB9B",
+    title: `${x.p ? "[예정] " : ""}${x.k || "만남"}`, sub: "", time: x.t || "", timeEnd: x.te || "", place: "" }));
+  const y = Number(state.calMonth.split("-")[0]);
+  if (D.u.cellId) (state.dir || []).filter(m => m.active !== false && m.cellId === D.u.cellId && m.birthMD).forEach(m => {
+    const [mm, dd] = String(m.birthMD).split("-");
+    ev.push({ date: `${y}-${mm}-${dd}`, kind: "anniv", color: "#E8B473", title: `${m.name} 생일${m.lunar ? " (음력)" : ""}`, sub: "" });
+  });
+  return ev;
+}
+function renderCalWho() {
+  whoChips("cal-who", "cal-who-hint", state.calWho, canLead() ? "내 캘린더" : "나",
+    (u) => `${cellNameOf(u.cellId) || ""} ${u.name} 님 캘린더 — 셀모임 · 만남 일정 · 셀원 생일. 만남은 날짜 · 시간 · 종류만 보여요.`
+      + (state.calOtherData && state.calOtherData.off ? " (만남 일정 공유는 꺼 두셨어요)" : ""));
+}
+function renderOtherDay(list) {
+  $("cal-day-list").innerHTML = list.length ? list.map(e => `
+    <div class="row">
+      <i style="width:8px;height:8px;border-radius:999px;background:${e.color};flex-shrink:0"></i>
+      <div class="grow"><p class="nm">${esc(e.title)}</p>
+        <p class="sub">${[fmtSpan(e.time, e.timeEnd), e.place, e.sub].filter(Boolean).map(esc).join(" · ") || "&nbsp;"}</p></div>
+      ${e.rep ? `<button class="btn-sm" data-gorep="${e.rep.cellId}">보고 보기</button>` : ""}
+    </div>`).join("") : `<p class="muted">이 날은 일정이 없어요.</p>`;
+}
+$("cal-who").addEventListener("click", async (ev) => {
+  const b = ev.target.closest("[data-who]"); if (!b) return;
+  state.calWho = b.dataset.who || "";
+  if (calOther()) { b.disabled = true; await loadOtherCal(state.calWho); b.disabled = false; }
+  renderCal();
+});
+$("cal-day-list").addEventListener("click", (ev) => {
+  const r = ev.target.closest("[data-gorep]"); if (r) openReports(r.dataset.gorep);
+});
+/* 내 만남 일정 → calShare (날짜 · 시간 · 종류만, 120일 전 ~ 240일 뒤) */
+async function syncCalShare(force) {
+  const me = state.me; if (!me || !canLead() || !me.jinId || !state.allRecords) return;
+  const on = sharePrefs().calPeers !== false;
+  const lo = ymd(new Date(Date.now() - 120 * 864e5)), hi = ymd(new Date(Date.now() + 240 * 864e5));
+  const seen = new Set(), items = [];
+  if (on) for (const r of state.allRecords) {
+    if (r.type !== "meet" || r.by !== uid() || r.away || r.meetingId || r.scope === "private" || !r.date || r.date < lo || r.date > hi) continue;
+    const k = r.groupId || (r.soulId + "|" + r.id); if (seen.has(k)) continue; seen.add(k);
+    items.push({ d: r.date, t: r.time || "", te: r.timeEnd || "", k: String(meetLabel(r) || "만남").slice(0, 40), p: r.planned ? 1 : 0 });
+  }
+  items.sort((a, b) => (a.d + a.t).localeCompare(b.d + b.t));
+  const out = items.slice(-400), key = JSON.stringify([me.jinId, on, out]);
+  if (!force && state.calShareKey === key) return;
+  const ref = doc(db, "calShare", uid());
+  try { const o = await getDoc(ref);
+    if (o.exists()) { const d = o.data(); if (JSON.stringify([d.jinId, d.on, d.items || []]) === key) { state.calShareKey = key; return; } } } catch {}
+  await setDoc(ref, { jinId: me.jinId, name: me.name || "", cellId: me.cellId || "", items: out, on, updatedAt: serverTimestamp() });
+  state.calShareKey = key;
+}
+/* 사진 */
+const phOther = () => !!state.phWho && state.phWho !== uid();
+async function loadOtherPhotos(id) { const R = await otherReps(id); if (!R) state.phWho = ""; else state.phOtherData = R; }
+function renderPhWho() {
+  whoChips("ph-who", "ph-who-hint", state.phWho, canLead() ? "내 사진" : "나",
+    (u) => `${cellNameOf(u.cellId) || ""} ${u.name} 님 셀 — 셀원 얼굴(명부 사진) · 셀모임 사진. 1:1 만남 사진은 맡은 사람만 봐요.`);
+}
+function renderOtherPhotos() {
+  const D = state.phOtherData; if (!D) return;
+  $("ph-cells").hidden = true;
+  const mt = document.querySelector('#ph-tabs [data-pht="meet"]'); mt.hidden = true;
+  if (state.phTab === "meet") state.phTab = "all";
+  $("ph-tabs").querySelectorAll("[data-pht]").forEach(b => b.classList.toggle("on", b.dataset.pht === state.phTab));
+  const faces = D.u.cellId ? (state.dir || []).filter(m => m.active !== false && m.cellId === D.u.cellId && m.thumb) : [];
+  const shots = D.reps.filter(r => (r.photos || []).length).sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  const nShot = shots.reduce((n, r) => n + r.photos.length, 0);
+  $("ph-sum").innerHTML = `<div class="tiles" style="margin-top:14px">${tile("얼굴", faces.length + "명")}${tile("셀모임", nShot + "장")}${tile("셀모임 횟수", shots.length + "번")}</div>`;
+  const T = state.phTab, parts = [];
+  if ((T === "all" || T === "face") && faces.length) parts.push(`
+    <div class="gset"><p class="gh"><span>셀원 얼굴 (명부 사진)</span><span>${faces.length}명</span></p>
+      <div class="faces">${faces.map(m => `<button type="button" data-mface="${m.id}" aria-label="${esc(m.name)} 얼굴 크게 보기">${avatar(m, 60)}<span>${esc(m.name)}</span></button>`).join("")}</div></div>`);
+  if (T === "all" || T === "cell") shots.forEach(r => parts.push(`
+    <div class="gset"><p class="gh"><span>${fmtDate(r.date, true)} · ${esc(r.cellName || cellNameOf(r.cellId))} 셀모임${r.topic ? " · " + esc(r.topic) : ""}</span><span>${r.photos.length}장</span></p>
+      <div class="gal">${r.photos.map((p, i) => `<button type="button" data-rpph="${r.id}|${i}" style="background-image:url(${p.thumb})" aria-label="셀모임 사진 ${i + 1} 크게 보기"></button>`).join("")}</div></div>`));
+  $("ph-body").innerHTML = parts.join("")
+    || `<p class="muted" style="margin-top:18px">아직 볼 수 있는 사진이 없어요. (셀모임 사진이 없거나, 셀리더가 사진 공유를 꺼 두었을 수 있어요)</p>`;
+}
+$("ph-who").addEventListener("click", async (ev) => {
+  const b = ev.target.closest("[data-who]"); if (!b) return;
+  state.phWho = b.dataset.who || "";
+  if (phOther()) { b.disabled = true; await loadOtherPhotos(state.phWho); b.disabled = false; }
+  renderPhotos();
+});
+$("ph-body").addEventListener("click", (ev) => {
+  const f = ev.target.closest("[data-mface]");
+  if (f) { const m = memberById(f.dataset.mface); if (m) { $("pv-img").src = m.thumb; $("photo-view").showModal(); } return; }
+  const r = ev.target.closest("[data-rpph]");
+  if (r && state.phOtherData) {
+    const [rid, i] = r.dataset.rpph.split("|"); const rep = state.phOtherData.reps.find(x => x.id === rid);
+    if (rep && rep.photos[Number(i)]) showMeetPhoto(rep.photos[Number(i)]);
+  }
 });

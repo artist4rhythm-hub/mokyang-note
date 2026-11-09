@@ -444,6 +444,13 @@
     textarea{min-height:110px}
   }
   @media (max-width:879px){ .only-wide{display:none !important} }
+  /* 26단계 — 패드(세로) : 폰 한 줄(430px)이 아니라 화면을 넓게 */
+  @media (min-width:600px) and (max-width:879px){
+    #app{max-width:none}
+    .screen{max-width:760px;margin:0 auto;width:100%}
+    #s-dir,#s-cellmgr,#s-photos,#s-leaders{max-width:none}
+    .pad{padding:0 24px}
+  }
   /* 19단계 — 조직 구성 */
   .seat{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
   .seat:first-child{border-top:none}
@@ -472,39 +479,94 @@
   .cbadge{display:inline-flex;align-items:center;height:28px;padding:0 12px;border-radius:999px;
     background:var(--rose-bg);color:var(--rose-tx);font-size:14px;font-weight:600;letter-spacing:.02em;flex-shrink:0}
   .cbadge.plain{background:var(--surface2);color:var(--text)}
-  .lcard{display:flex;align-items:flex-start;gap:12px;padding:12px;border-radius:14px;cursor:pointer;
-    background:linear-gradient(135deg,#2A161A 0%,var(--surface2) 70%);border:1px solid #4A2229;position:relative}
-  .lcard + .lcard{margin-top:8px}
-  .lcard.empty{cursor:default;background:var(--surface);border-style:dashed;border-color:var(--line)}
-  .lcard .grow{flex-grow:1;min-width:0}
-  .lcard .lk{font-size:11px;color:var(--rose-tx);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-  .lcard .lk .chip{padding:2px 8px;font-size:10px}
-  .lcard .nm{font-size:16px;font-weight:600;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .lcard .sub{font-size:12px;color:#CFC5C3;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .lcard .sub2{font-size:12px;color:var(--dim);margin-top:2px;line-height:1.5}
-  .lcard .ava{border:2px solid #5A2A32}
-  .ctree{display:flex;flex-direction:column;gap:14px;margin-top:12px}
-  .ccol{display:contents}
-  @media (min-width:1100px){
-    .ctree:not(.one){flex-direction:row;align-items:flex-start}
-    .ctree:not(.one) .ccol{display:flex;flex-direction:column;gap:14px;flex:1 1 0;min-width:0}
-  }
+  .ctree{display:flex;gap:14px;align-items:flex-start;margin-top:12px}
+  .ccol{flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:14px}
   .cgrp{background:var(--surface);
     border:1px solid var(--line);border-radius:18px;padding:12px}
   .cgh{display:flex;align-items:center;gap:8px;margin:0 0 10px}
   .cgh .cgm{flex-grow:1;min-width:0;font-size:12px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .cgh .cgc{font-size:12px;color:var(--dim);flex-shrink:0}
+  .cgh .cgc.warn{color:var(--warn-tx)}
+  /* 26단계 — 카드 한 장: 칸이 정해진 정보 */
+  .mcard{display:flex;align-items:flex-start;gap:12px;padding:10px 12px;border-radius:14px;cursor:pointer;
+    background:var(--surface2);border:1px solid transparent;position:relative;transition:border-color .15s}
+  .mcard:hover{border-color:#3A3132}
+  .mcard.lead{background:linear-gradient(135deg,#2A161A 0%,var(--surface2) 75%);border-color:#4A2229}
+  .mcard.lead .ava{border:2px solid #5A2A32}
+  .mcard.empty{cursor:default;background:var(--surface);border:1px dashed var(--line)}
+  .mcard + .mcard.lead{margin-top:8px}
+  .mc-body{flex:1 1 auto;min-width:0}
+  .mc-top{display:flex;align-items:flex-start;gap:10px}
+  .mc-id{flex:1 1 auto;min-width:0}
+  .mc-role{font-size:11px;color:var(--rose-tx);display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-bottom:2px}
+  .mc-role .chip,.mc-nm .chip{padding:2px 8px;font-size:10px}
+  .mc-nm{font-size:15px;font-weight:600;display:flex;align-items:center;gap:6px;flex-wrap:wrap;line-height:1.35}
+  .mcard.lead .mc-nm{font-size:16px}
+  .mc-info{display:flex;flex-wrap:wrap;gap:3px 12px;margin-top:5px}
+  .mi{display:flex;align-items:baseline;gap:5px;min-width:0}
+  .mi.yr{min-width:58px}.mi.bd{min-width:80px}.mi.cl{min-width:52px}
+  .mic{width:13px;height:13px;flex-shrink:0;fill:none;stroke:var(--dim);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;align-self:center}
+  .mk{font-size:10.5px;color:var(--dim);letter-spacing:.02em;flex-shrink:0}
+  .mv{font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+  .mv em{font-style:normal;color:#5C5354}
+  .mc-fam{font-size:12px;color:#CFC5C3;margin-top:7px;line-height:1.5}
+  .mc-fam .mk{margin-right:8px}
+  .mc-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+  .mc-tags:empty{display:none}
+  .tpill{display:inline-flex;align-items:center;font-size:11px;padding:1px 9px;border-radius:999px;background:#1E2A22;color:var(--ok-tx)}
+  .fv .tpill{margin:0 4px 4px 0}
+  .tpill.streak{background:var(--rose-bg);color:var(--rose-tx)}
+  .mc-att{flex-shrink:0;width:84px;display:flex;flex-direction:column;align-items:stretch;gap:4px;padding-top:2px}
+  .mc-att:empty{display:none}
+  .at-row{display:flex;align-items:baseline;justify-content:flex-end;gap:6px}
+  .mc-att b{font-size:14px;font-weight:600;line-height:1}
+  .mc-att small{font-size:10.5px;color:var(--dim)}
+  .at-bar{width:100%;height:4px;border-radius:9px;background:#2E2727;overflow:hidden;display:block}
+  .at-bar i{display:block;height:100%;border-radius:9px;background:currentColor}
+  .mc-att.good{color:var(--ok-tx)}.mc-att.mid{color:var(--warn-tx)}.mc-att.low{color:var(--rose-tx)}
+  .at-none{font-size:10.5px;color:#5C5354;text-align:right}
+  /* 가지 */
   .twigs{margin:0 0 0 39px;padding:8px 0 0 20px;display:flex;flex-direction:column;gap:6px}
-  .twig{position:relative;padding:9px 10px;background:var(--surface2);border-color:transparent}
-  .twig::before{content:"";position:absolute;left:-20px;top:-6px;bottom:0;border-left:2px solid #4A2229}
-  .twig:first-child::before{top:-14px}
-  .twig::after{content:"";position:absolute;left:-20px;top:50%;width:16px;border-top:2px solid #4A2229}
-  .twig:last-child::before{bottom:50%;width:16px;border-bottom:2px solid #4A2229;border-bottom-left-radius:10px}
-  .twig:last-child::after{display:none}
-  .twig .nm{font-size:14px}
+  .mcard.twig::before{content:"";position:absolute;left:-21px;top:-6px;bottom:0;border-left:2px solid #4A2229}
+  .mcard.twig:first-child::before{top:-14px}
+  .mcard.twig::after{content:"";position:absolute;left:-21px;top:32px;width:17px;border-top:2px solid #4A2229}
+  .mcard.twig:last-child::before{bottom:auto;height:calc(32px + 6px);border-bottom:2px solid #4A2229;width:17px;border-bottom-left-radius:10px}
+  .mcard.twig:first-child:last-child::before{height:calc(32px + 14px)}
+  .mcard.twig:last-child::after{display:none}
   .twig-empty{font-size:12px;margin:8px 0 0 4px}
-  .ctree.one .twigs{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));margin-left:0;padding-left:0;padding-top:10px}
-  .ctree.one .twigs .twig::after,.ctree.one .twigs .twig::before{display:none}
+  .ctree.one .twigs{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));margin-left:0;padding-left:0;padding-top:10px}
+  .ctree.one .mcard.twig::after,.ctree.one .mcard.twig::before{display:none}
+  .mlist{display:flex;flex-direction:column;gap:6px}
+  .mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:8px;margin-top:10px}
+  @media (max-width:520px){ .twigs{margin-left:20px;padding-left:14px} .mcard.twig::before,.mcard.twig::after{left:-15px}
+    .mcard.twig::after{width:11px} .mcard.twig:last-child::before{width:11px} .mgrid{grid-template-columns:1fr}
+    .mcard{padding:10px 11px;gap:10px} .mc-att{width:80px} }
+  /* 넓은 화면 — 명부 · 셀 관리 · 사진은 화면을 넓게 */
+  @media (min-width:880px){ #s-dir,#s-cellmgr,#s-photos,#s-leaders{max-width:1640px} }
+  /* 명부 카드 (눌렀을 때) */
+  #dlg-member{width:min(94vw,720px)}
+  .mb-sec{font-size:12px;font-weight:600;color:var(--text);margin:18px 0 8px;display:flex;align-items:baseline;gap:8px}
+  .mb-sec span{font-weight:400;color:var(--dim);font-size:11px}
+  .fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+  .fbox{background:var(--surface2);border-radius:12px;padding:9px 12px;min-width:0}
+  .fbox.fwide{grid-column:1/-1}
+  .fk{font-size:11px;color:var(--dim)}
+  .fv{font-size:14px;margin-top:3px;word-break:keep-all;overflow-wrap:anywhere;line-height:1.5}
+  .fgrid.lock .fbox{background:#1F1A1B;border:1px solid #2E2727}
+  .atiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  .atile{background:var(--surface2);border-radius:12px;padding:10px 12px}
+  .atile .k{font-size:11px;color:var(--dim)}
+  .atile .v{font-size:20px;font-weight:600;margin-top:4px;font-variant-numeric:tabular-nums}
+  .atile .s{font-size:11px;color:var(--dim);margin-top:2px}
+  .atile.good .v{color:var(--ok-tx)}.atile.mid .v{color:var(--warn-tx)}.atile.low .v{color:var(--rose-tx)}
+  .astrip{display:flex;gap:4px;margin-top:10px;overflow-x:auto;padding-bottom:2px}
+  .ad{display:inline-flex;flex-direction:column;align-items:center;gap:4px;min-width:32px}
+  .ad i{display:block;width:14px;height:14px;border-radius:999px;background:#2E2727}
+  .ad.present i{background:var(--ok-tx)}.ad.online i{background:#7FA8E8}.ad.absent i{background:var(--brand)}
+  .ad.nr i{background:transparent;border:1.5px dashed #5C5354}
+  .ad small{font-size:10px;color:var(--dim);font-variant-numeric:tabular-nums}
+  .alegend{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11px;color:var(--dim);margin-top:8px}
+  .alegend .ad{min-width:0}.alegend .ad i{width:9px;height:9px}.alegend .ad.nr i{width:8px;height:8px}
   #cm-list.cmgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px}
   .cmc{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:12px;display:flex;flex-direction:column;gap:10px}
   .cmc .acts{margin-top:0}
@@ -866,6 +928,8 @@
       </button>
     </div>
     <div class="pad">
+      <div class="seg" id="cal-who" hidden style="margin:0 0 8px"></div>
+      <p class="hint" id="cal-who-hint" hidden style="margin:0 0 10px"></p>
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
         <button class="btn-sm" id="cal-prev" style="width:44px">‹</button>
         <h2 style="font-size:17px;font-weight:600" id="cal-title">—</h2>
@@ -1252,6 +1316,8 @@
       <span style="width:44px"></span>
     </div>
     <div class="scroll pad">
+      <div class="seg" id="ph-who" hidden style="margin:0 0 8px"></div>
+      <p class="hint" id="ph-who-hint" hidden style="margin:0 0 10px"></p>
       <div class="seg" style="margin:0" id="ph-cells"></div>
       <div class="seg" style="margin:10px 0 0" id="ph-tabs">
         <button type="button" data-pht="all">전부</button>
@@ -1606,14 +1672,15 @@
 
 <!-- 명부 카드 보기 -->
 <dialog id="dlg-member">
-  <div style="display:flex;align-items:center;gap:12px">
-    <span class="ava" id="mb-ava" style="width:56px;height:56px;font-size:20px;flex-shrink:0"></span>
+  <div style="display:flex;align-items:center;gap:14px">
+    <span class="ava" id="mb-ava" style="width:72px;height:72px;font-size:26px;flex-shrink:0"></span>
     <div style="min-width:0">
-      <h3 id="mb-name" style="margin:0"></h3>
+      <h3 id="mb-name" style="margin:0;font-size:20px"></h3>
       <div id="mb-chips" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"></div>
     </div>
   </div>
   <div id="mb-contact" style="margin-top:14px"></div>
+  <div id="mb-att"></div>
   <div id="mb-rows"></div>
   <div id="mb-priv"></div>
   <p class="hint" id="mb-note" style="margin-top:12px"></p>
