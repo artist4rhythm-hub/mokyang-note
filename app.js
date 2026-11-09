@@ -24,7 +24,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
 const APP_NAME = "목자의 삶";
-const APP_VERSION = "27.0 (2026-11-09)";
+const APP_VERSION = "28.0 (2026-11-09)";
 
 /* 사진 크기 — 얼굴을 알아볼 수 있는 선에서 가장 작게.
    얼굴 하나가 가로 80px은 되어야 알아보는데, 여럿이 한 줄로 선
@@ -62,7 +62,7 @@ const SCREENS = ["s-loading","s-login","s-verify","s-setup","s-accept","s-pendin
                  "s-home","s-souls","s-cal","s-meet","s-meeting","s-log","s-soul",
                  "s-edit","s-train","s-search","s-mine","s-usage","s-more","s-manage",
                  "s-photos","s-stats","s-inbox","s-dir","s-cellmgr","s-org","s-consent","s-share",
-                 "s-reports","s-report","s-import","s-leaders"];
+                 "s-reports","s-report","s-import","s-leaders","s-health"];
 const show = (id) => {
   SCREENS.forEach(s => $(s).hidden = (s !== id));
   if (id !== "s-loading" && typeof bump === "function") bump(id.replace(/^s-/, ""), "screen");
@@ -125,7 +125,7 @@ const PLACES = ["카페","식사","집","교회","전화","산책"];
 const RELS   = ["배우자","아버지","어머니","아들","딸","형제","자매"];
 
 function msgOf(e) {
-  const c = (e && e.code) || "";
+  const c = String((e && e.code) || "");   // 구글 캘린더 오류처럼 숫자 코드도 와요
   if (c.includes("invalid-credential") || c.includes("wrong-password") || c.includes("user-not-found"))
     return "이메일이나 비밀번호가 맞지 않아요.";
   if (c.includes("email-already-in-use")) return "이미 가입된 이메일이에요. 로그인해 주세요.";
@@ -734,7 +734,9 @@ async function openHome() {
   const cell = state.cells.find(c=>c.id===me.cellId);
   const where1 = (me.role==="super" && !me.isLeader) ? "전체" : (cell?cell.name:(jin?jin.name:""));
   $("home-where").textContent = where1; $("home-where").hidden = !where1;
-  $("side-who").innerHTML = `${esc(me.name||"")}<br>${esc(ROLE[me.role]||"")}${where1?" · "+esc(where1):""}`;
+  $("side-who").innerHTML = `${esc(me.name||"")}<br>${esc(ROLE[me.role]||"")}${where1?" · "+esc(where1):""}`
+    + `<br><button type="button" id="side-ver" style="background:none;border:none;padding:0;margin-top:4px;color:var(--faint);font:inherit;font-size:11px;cursor:pointer">버전 ${esc(APP_VERSION)}</button>`;
+  $("home-ver").textContent = `버전 ${APP_VERSION.split(" ")[0]}`;
   $("btn-quick-add").hidden = !canLead();
 
   if (canLead()) { renderPray(); renderCare(); }
@@ -5057,6 +5059,11 @@ async function backfillThumbs() {
    올릴 때마다 version.json 도 같이 올립니다. 앱은 열 때 · 다시 볼 때 · 10분마다
    그 파일만 살짝 확인해서(아주 작은 파일), 지금 버전보다 새것이면 위에 알림을 띄웁니다. */
 const CHANGELOG = [
+  { v:"28.0", d:"2026-11-09", items:[
+    "구글 캘린더 — 오류가 'c.includes…'로 가려지던 문제 고침, 무엇이 빠졌는지(API 켜기 · 캘린더 허용) 그대로 알려줘요",
+    "셀 건강 — 창이 아니라 화면으로, 고리 + 숫자 4칸 + 8주 출석 막대, 자주 빠지는 사람이 위로, 인턴은 눌러서",
+    "캘린더 · 사진 · 활동 통계 — 같은 진 셀이 모두 보이고, 아직 가입 전인 셀리더는 흐리게",
+    "홈 위 · 사이드바 아래에 버전" ] },
   { v:"27.0", d:"2026-11-09", items:[
     "다크 · 라이트 두 가지 화면 (더보기 › 화면 — 기기 설정 따르기도)",
     "셀 고르는 칸을 깔끔한 탭 상자로 — 셀 번호 아래 늘 셀리더 이름",
@@ -7031,29 +7038,66 @@ function cellHealth(cellId) {
 async function openHealth() {
   if (!canLead() && !["coach", "jinjang", "pastor"].includes(state.me.role)) { toast("셀을 맡은 분과 코치 · 진장 · 담당 교역자가 볼 수 있어요."); return; }
   await Promise.all([loadSouls(), loadMeetings()]);
-  renderHealth(); $("hl-err").textContent = ""; $("dlg-health").showModal();
+  renderHealth(); $("hl-err").textContent = ""; markSide("health"); show("s-health");
 }
 function renderHealth() {
   const own = new Set(ownCells().map(c => c.id));
   const cells = canLead() && !["coach", "jinjang", "pastor"].includes(state.me.role) ? ownCells() : seenCells();
-  $("hl-body").innerHTML = cells.map(c => {
-    const h = cellHealth(c.id), mine = own.has(c.id);
-    const canTick = mine && h.people.some(isLeaderOf);
-    return `<div class="card hcell">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-        <span class="cbadge">${esc(c.name)}</span>
-        <span class="muted" style="font-size:12px">${esc(cellLeadName(c) ? cellLeadName(c) + " 셀리더" : leaderLabel(c.id))}</span></div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">${h.notes.map(([k, t]) =>
-        `<span class="chip ${k}">${esc(t)}</span>`).join("") || `<span class="chip">기록이 더 쌓이면 보여요</span>`}</div>
-      ${healthViz(c, h)}
-      <p class="tag" style="margin-top:12px;font-size:12px;color:var(--dim)">인턴 (예비 셀리더) ${h.interns.length}명${
-        canTick ? " — 체크해서 세워요" : ""}</p>
-      ${canTick ? `<div class="ints">${h.people.filter(isLeaderOf).map(s => `
-        <label><input type="checkbox" data-intern="${s.id}" ${s.intern ? "checked" : ""}>
-          <span>${esc(s.name)}</span>${s.intern && s.internSince ? `<span class="muted" style="font-size:12px">${fmtDate(s.internSince)}부터</span>` : ""}</label>`).join("")}</div>`
-        : `<p style="font-size:14px;margin-top:6px">${h.interns.map(s => esc(s.name)).join(", ") || "아직 없어요"}</p>`}
-    </div>`;
-  }).join("") || `<p class="muted">볼 수 있는 셀이 없어요.</p>`;
+  $("hl-body").innerHTML = cells.map(c => healthCard(c, cellHealth(c.id), own.has(c.id))).join("")
+    || `<p class="muted">볼 수 있는 셀이 없어요.</p>`;
+}
+/* 28단계 — 셀 하나 = 카드 하나: [고리 + 숫자 4칸] [8주 출석 막대] / 사람별 출석 / 인턴 */
+function healthCard(c, h, mine) {
+  const ms = cellMeetings(c.id).filter(m => { const n = daysSince(m.date); return n !== null && n >= 0 && n < 56; })
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  const R = 34, C = 2 * Math.PI * R, rate = h.rate;
+  const col = rate == null ? "var(--faint)" : rate >= 75 ? "var(--ok-strong)" : rate >= 50 ? "var(--warn-tx)" : "var(--brand)";
+  const ring = `<svg viewBox="0 0 84 84" width="104" height="104" style="flex-shrink:0" aria-label="출석률 ${rate == null ? "기록 없음" : rate + "%"}">
+      <circle cx="42" cy="42" r="${R}" fill="none" style="stroke:var(--track)" stroke-width="9"/>
+      ${rate == null ? "" : `<circle cx="42" cy="42" r="${R}" fill="none" style="stroke:${col}" stroke-width="9" stroke-linecap="round"
+        stroke-dasharray="${C * rate / 100} ${C}" transform="rotate(-90 42 42)"/>`}
+      <text x="42" y="45" text-anchor="middle" style="fill:var(--text);font-size:18px;font-weight:600">${rate == null ? "—" : rate + "%"}</text>
+      <text x="42" y="59" text-anchor="middle" style="fill:var(--dim);font-size:8.5px">출석률</text></svg>`;
+  const cnt = (m) => { const v = Object.values(m.attendance || {}); return { ok: v.filter(x => x && x !== "absent").length, all: v.filter(Boolean).length }; };
+  const max = Math.max(1, ...ms.map(m => cnt(m).all));
+  const md = (d) => { const p = String(d).split("-"); return `${Number(p[1])}/${Number(p[2])}`; };
+  const chart = ms.length ? `<div class="vbars" style="height:130px">${ms.map(m => { const k = cnt(m);
+      return `<div class="vb${k.all && k.ok / k.all < .5 ? " low" : ""}" title="${esc(fmtDate(m.date, true))} 출석 ${k.ok}/${k.all}">
+        <i class="all" style="height:${k.all / max * 100}%"></i><i class="ok" style="height:${k.ok / max * 100}%"></i></div>`; }).join("")}</div>
+      <div class="vlabels">${ms.map(m => `<span>${md(m.date)} · ${cnt(m).ok}명</span>`).join("")}</div>`
+    : `<p class="muted" style="font-size:12px;padding:46px 0;text-align:center">최근 8주 셀모임 기록이 없어요</p>`;
+  const ppl = h.people.map(s => {
+    const k = attKey(s), cells = ms.map(m => (m.attendance || {})[k] || "");
+    const okn = cells.filter(v => v && v !== "absent").length, rec = cells.filter(Boolean).length;
+    const r = rec ? Math.round(okn / rec * 100) : null, tone = r == null ? "" : r >= 75 ? "good" : r >= 50 ? "mid" : "low";
+    return { s, cells, r, tone };
+  }).sort((a, b) => (a.r == null ? 101 : a.r) - (b.r == null ? 101 : b.r));   // 빠지는 사람이 위로
+  const canTick = mine && h.people.some(isLeaderOf);
+  return `<div class="hc">
+    <div class="hc-h"><span class="cbadge">${esc(c.name)}</span>
+      <span class="who">${esc(cellLeadName(c) ? cellLeadName(c) + " 셀리더" : leaderLabel(c.id))}</span>
+      <span class="notes">${h.notes.map(([k, t]) => `<span class="chip ${k}">${esc(t)}</span>`).join("") || `<span class="chip">기록이 더 쌓이면 보여요</span>`}</span></div>
+    <div class="hc-top">
+      <div class="hc-sum">${ring}
+        <div class="hc-kpi">
+          <div><p>8주 셀모임</p><b>${h.ms}회</b></div>
+          <div><p>평균 출석</p><b>${h.avg === null ? "—" : h.avg + "명"}</b></div>
+          <div><p>새 방문자</p><b>${h.visitors}명</b></div>
+          <div><p>연달아 결석</p><b style="color:${h.care ? "var(--warn-tx)" : "inherit"}">${h.care}명</b></div>
+        </div></div>
+      <div class="hc-chart"><p class="t"><b>8주 출석</b><span>초록 = 온 사람 · 회색 = 체크한 인원</span></p>${chart}</div>
+    </div>
+    ${ppl.length && ms.length ? `<p class="hc-sec">사람별 출석 <span>최근 8주 · 자주 빠지는 사람이 위에</span></p>
+      <div class="hppl">${ppl.map(p => `<div class="hp ${p.tone}">
+        <span class="nm" title="${esc(p.s.name)}">${esc(p.s.name)}</span>
+        <span class="dd">${p.cells.map((v, i) => `<i class="${v || "nr"}" title="${esc(md(ms[i].date))} ${v ? ATT[v] : "기록 없음"}"></i>`).join("")}</span>
+        <span class="rt"><b>${p.r == null ? "—" : p.r + "%"}</b><span class="at-bar"><i style="width:${p.r || 0}%"></i></span></span></div>`).join("")}</div>
+      <p class="hlegend"><span><i style="background:var(--ok-strong)"></i>출석</span><span><i style="background:#7FA8E8"></i>온라인</span><span><i style="background:var(--brand)"></i>결석</span><span><i style="box-shadow:inset 0 0 0 1.5px var(--line3)"></i>기록 없음</span></p>` : ""}
+    <p class="hc-sec">인턴 (예비 셀리더) ${h.interns.length}명 <span>${canTick ? "눌러서 세우거나 빼요" : ""}</span></p>
+    ${canTick ? `<div class="hints">${h.people.filter(isLeaderOf).map(s => `
+        <label class="${s.intern ? "on" : ""}"><input type="checkbox" data-intern="${s.id}" ${s.intern ? "checked" : ""}>${esc(s.name)}${s.intern && s.internSince ? `<span class="muted" style="font-size:11px">${fmtDate(s.internSince)}~</span>` : ""}</label>`).join("")}</div>`
+      : `<p style="font-size:14px">${h.interns.map(s => esc(s.name)).join(", ") || "아직 없어요"}</p>`}
+  </div>`;
 }
 $("hl-body").addEventListener("change", async (ev) => {
   const cb = ev.target.closest("[data-intern]"); if (!cb) return;
@@ -7065,7 +7109,7 @@ $("hl-body").addEventListener("change", async (ev) => {
   catch (e) { cb.checked = !cb.checked; $("hl-err").textContent = msgOf(e); }
   finally { cb.disabled = false; }
 });
-$("hl-close").onclick = () => $("dlg-health").close();
+$("hl-close").onclick = () => openHome();
 
 /* ════════ 민감 메모 ════════
    기록과 따로 둡니다(souls/{id}/alerts). 검색 · 캘린더 · 통계 어디에도 섞이지 않고,
@@ -8390,16 +8434,33 @@ function peerLeaders() {
     .sort((a, b) => cellOrder({ name: cellNameOf(a.cellId) || "~" }, { name: cellNameOf(b.cellId) || "~" })
       || (a.name || "").localeCompare(b.name || "", "ko"));
 }
+/* 28단계 — 같은 진 셀마다 한 칸: 가입한 셀리더는 눌러서 보기, 가입 전은 흐리게 ('가입 전') */
+function peerCells() {
+  const me = state.me; if (!me || me.role === "pastor") return [];
+  return activeCells().filter(c => me.role === "super" || c.jinId === me.jinId).map(c => {
+    let e = null; try { e = cellLeadEntries(c)[0]; } catch {}
+    if (!e) return null;
+    const lu = e.p.t === "acc" ? e.p.uid : "";
+    if (lu && lu === me.id) return null;          // 내 셀은 '내 …'
+    return { c, uid: lu, name: (e.m && e.m.name) || e.p.name || "", st: e.p.t };
+  }).filter(Boolean);
+}
 function whoChips(elId, hintId, cur, mineLabel, hint) {
-  const ps = peerLeaders(), el = $(elId), h = $(hintId);
+  const ps = peerCells(), el = $(elId), h = $(hintId);
   if (!ps.length) { el.hidden = true; h.hidden = true; return; }
   el.hidden = false;
-  const on = (id) => (id ? cur === id : (!cur || cur === uid())) ? " on" : "";
-  el.innerHTML = `<button type="button" data-who="" class="${on("")}">${mineLabel}</button>`
-    + ps.map(u => `<button type="button" data-who="${u.id}" class="${on(u.id)}">${esc(cellNameOf(u.cellId) || "")} ${esc(u.name || "")}</button>`).join("");
-  const u = cur && cur !== uid() ? userOf(cur) : null;
+  const mine = !cur || cur === uid();
+  el.innerHTML = `<button type="button" data-who="" class="${mine ? "on" : ""}"><span>${mineLabel}</span></button>`
+    + ps.map(p => p.uid
+      ? `<button type="button" data-who="${p.uid}" class="${cur === p.uid ? "on" : ""}"><span>${esc(p.c.name)}</span><small>${esc(p.name)}</small></button>`
+      : `<button type="button" class="wait" data-whowait="${esc(p.name)}" title="${esc(p.name)} 셀리더 — 아직 가입 전"><span>${esc(p.c.name)}</span><small>${esc(p.name)} · ${p.st === "inv" ? "초대 중" : "가입 전"}</small></button>`).join("");
+  const u = !mine ? userOf(cur) : null;
   h.hidden = !u; if (u) h.textContent = hint(u);
 }
+document.addEventListener("click", (ev) => {
+  const w = ev.target.closest("[data-whowait]"); if (!w) return;
+  toast(`${w.dataset.whowait} 셀리더가 아직 앱에 가입 전이에요. 셀리더 명단에서 초대하고, 그분이 로그인하면 볼 수 있어요.`);
+});
 async function otherReps(id, force) {
   state.otherReps = state.otherReps || {};
   const c = state.otherReps[id];
@@ -8622,43 +8683,6 @@ $("rep-side").addEventListener("click", async (ev) => {
   if (c2) { const b = $("rep-chips").querySelector(`[data-repc="${c2.dataset.repc2}"]`); if (b) b.click(); }
 });
 
-/* 27단계 — 셀 건강 그래프: 출석률 고리 · 8주 출석 막대 · 사람별 출석 줄 */
-function healthViz(c, h) {
-  const ms = cellMeetings(c.id).filter(m => { const n = daysSince(m.date); return n !== null && n >= 0 && n < 56; })
-    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
-  const R = 34, C = 2 * Math.PI * R, rate = h.rate;
-  const col = rate == null ? "var(--faint)" : rate >= 75 ? "var(--ok-strong)" : rate >= 50 ? "var(--warn-tx)" : "var(--brand)";
-  const ring = `<svg viewBox="0 0 84 84" width="96" height="96" aria-label="출석률 ${rate == null ? "기록 없음" : rate + "%"}">
-      <circle cx="42" cy="42" r="${R}" fill="none" style="stroke:var(--track)" stroke-width="9"/>
-      ${rate == null ? "" : `<circle cx="42" cy="42" r="${R}" fill="none" style="stroke:${col}" stroke-width="9" stroke-linecap="round"
-        stroke-dasharray="${C * rate / 100} ${C}" transform="rotate(-90 42 42)"/>`}
-      <text x="42" y="44" text-anchor="middle" style="fill:var(--text);font-size:17px;font-weight:600">${rate == null ? "—" : rate + "%"}</text>
-      <text x="42" y="58" text-anchor="middle" style="fill:var(--dim);font-size:8.5px">출석률</text></svg>`;
-  const cnt = (m) => { const v = Object.values(m.attendance || {}); return { ok: v.filter(x => x && x !== "absent").length, all: v.filter(Boolean).length }; };
-  const max = Math.max(1, ...ms.map(m => cnt(m).all));
-  const md = (d) => { const p = String(d).split("-"); return `${Number(p[1])}/${Number(p[2])}`; };
-  const bars = ms.length ? `<div class="vbars" style="height:96px">${ms.map(m => { const k = cnt(m);
-      return `<div class="vb${k.all && k.ok / k.all < .5 ? " low" : ""}" title="${esc(fmtDate(m.date, true))} 출석 ${k.ok}/${k.all}">
-        <i class="all" style="height:${k.all / max * 100}%"></i><i class="ok" style="height:${k.ok / max * 100}%"></i></div>`; }).join("")}</div>
-      <div class="vlabels">${ms.map(m => `<span>${md(m.date)}</span>`).join("")}</div>`
-    : `<p class="muted" style="font-size:12px;padding:30px 0;text-align:center">최근 8주 셀모임 기록이 없어요</p>`;
-  const people = h.people;
-  const prow = people.length && ms.length ? `<div class="hppl">${people.map(s => {
-      const k = attKey(s), cells = ms.map(m => (m.attendance || {})[k] || "");
-      const okn = cells.filter(v => v && v !== "absent").length, rec = cells.filter(Boolean).length;
-      return `<div class="hp"><span class="nm">${esc(s.name)}${s.intern ? ` <span class="tpill" style="font-size:9.5px;padding:0 6px">인턴</span>` : ""}</span>
-        <span class="dd">${cells.map((v, i) => `<i class="${v || "nr"}" title="${esc(md(ms[i].date))} ${v ? ATT[v] : "기록 없음"}"></i>`).join("")}</span>
-        <span class="v">${rec ? Math.round(okn / rec * 100) + "%" : "—"}</span></div>`; }).join("")}</div>` : "";
-  return `<div class="hviz"><div class="hring">${ring}</div><div class="hbw">${bars}</div></div>
-    <div class="hm">
-      <div><p>8주 모임</p><b>${h.ms}회</b></div>
-      <div><p>평균 출석</p><b>${h.avg === null ? "—" : h.avg + "명"}</b></div>
-      <div><p>새 방문자</p><b>${h.visitors}명</b></div>
-      <div><p>연달아 결석</p><b style="color:${h.care ? "var(--warn-tx)" : "inherit"}">${h.care}명</b></div>
-    </div>
-    ${prow ? `<p class="tag" style="margin-top:14px;font-size:12px;color:var(--dim)">사람별 출석 — 최근 8주 (초록 출석 · 파랑 온라인 · 빨강 결석)</p>${prow}` : ""}`;
-}
-
 /* 27단계 — 같은 진 다른 셀 활동 통계 (셀 보고 사본 + 캘린더 공유의 횟수 · 종류만) */
 const stOther = () => !!state.stWho && state.stWho !== uid();
 async function loadOtherStats(id) {
@@ -8760,7 +8784,19 @@ async function gapi(method, path, body) {
     state.gcal.token = ""; state.gcal.exp = 0; try { sessionStorage.removeItem("mokja-gtok"); } catch {}
     const e = new Error("구글 연결 시간이 끝났어요"); e.code = 401; throw e;
   }
-  if (!r.ok) { const t = await r.text().catch(() => ""); const e = new Error(`구글 캘린더 오류 ${r.status}`); e.code = r.status; e.detail = t.slice(0, 200); throw e; }
+  if (!r.ok) {
+    const t = await r.text().catch(() => ""); let j = null; try { j = JSON.parse(t); } catch {}
+    const er = (j && j.error) || {}, why = JSON.stringify(er);
+    let msg = `구글 캘린더 오류 ${r.status}${er.message ? " — " + er.message : ""}`;
+    if (/SERVICE_DISABLED|accessNotConfigured|has not been used/.test(why))
+      msg = "구글 클라우드에서 'Google Calendar API'가 아직 꺼져 있어요. 설정 안내 ①번([사용] 누르기)을 해 주세요. 켠 뒤 몇 분 지나 다시 눌러 주세요.";
+    else if (/SCOPE_INSUFFICIENT|insufficientPermissions|insufficient authentication scopes/.test(why)) {
+      msg = "구글 창에서 '캘린더' 허용 체크가 빠졌어요. [다시 연결하고 맞추기]를 눌러 캘린더 칸을 체크해 주세요. (설정 안내 ②번 — 범위 추가도 확인)";
+      state.gcal.token = ""; state.gcal.exp = 0; try { sessionStorage.removeItem("mokja-gtok"); } catch {}
+    }
+    else if (r.status === 403 && /rateLimit|quota/i.test(why)) msg = "구글이 잠시 쉬어 가래요. 1분 뒤 다시 눌러 주세요.";
+    const e = new Error(msg); e.code = r.status; e.detail = t.slice(0, 300); throw e;
+  }
   return r.status === 204 ? null : r.json().catch(() => null);
 }
 function fnvHex(str) {
@@ -8862,6 +8898,8 @@ async function gcalSync(again) {
     if (errs.length && !g.need) g.err = `${errs.length}개는 못 넣었어요 — 다음에 다시 해요 (${errs[0].message})`;
   } catch (e) {
     if (e.code === 401) g.need = true; else g.err = msgOf(e);
+    if (!gcalTok()) g.need = true;
+    console.warn("구글 캘린더", e.code, e.detail || e.message);
   } finally { g.busy = false; renderGcal(); }
 }
 let gcalT = 0;
@@ -8930,3 +8968,6 @@ document.addEventListener("click", (ev) => {
     });
   }
 });
+
+/* 28단계 — 홈 위 · 사이드바 아래에도 버전 */
+document.addEventListener("click", (ev) => { if (ev.target.closest("#home-ver, #side-ver")) $("btn-ver").click(); });

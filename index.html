@@ -181,6 +181,7 @@
   .seg button.on{background:var(--seg-on);color:var(--text);font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.22)}
   .seg button.on::after{content:"";position:absolute;left:30%;right:30%;bottom:3px;height:2px;border-radius:2px;background:var(--brand)}
   .seg button small{font-size:10.5px;font-weight:400;color:var(--dim);margin-top:1px}
+  .seg button.wait{opacity:.45}
   .seg button.on small{color:var(--rose-tx)}
   .card,.row,.room,.cgrp,.cmc,.scard{box-shadow:var(--card-shadow)}
 
@@ -756,20 +757,45 @@
   .hbar2.mid .tr i{background:var(--warn-tx)}.hbar2.low .tr i{background:var(--brand)}
   .hbar2 .v{font-size:12px;text-align:right;font-variant-numeric:tabular-nums}
   .row.flash{outline:2px solid var(--brand);outline-offset:2px}
-  /* 27단계 — 셀 건강 그래프 */
-  #dlg-health{width:min(96vw,1120px)}
-  @media (min-width:880px){ #hl-body{display:grid;grid-template-columns:repeat(auto-fill,minmax(440px,1fr));gap:12px;align-items:start} #hl-body .hcell{margin:0} }
-  .hviz{display:flex;align-items:center;gap:14px;margin-top:12px}
-  .hring{flex-shrink:0}
-  .hbw{flex:1 1 auto;min-width:0}
-  .hppl{display:flex;flex-direction:column;gap:2px;margin-top:6px}
-  .hp{display:grid;grid-template-columns:96px minmax(0,1fr) 40px;align-items:center;gap:8px;min-height:28px}
-  .hp .nm{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .hp .dd{display:flex;gap:4px}
-  .hp .dd i{width:14px;height:14px;border-radius:4px;background:var(--track);flex-shrink:0}
+  /* 28단계 — 셀 건강 화면 */
+  @media (min-width:1280px){ #s-health{max-width:1440px} }
+  #hl-body{display:flex;flex-direction:column;gap:14px}
+  .hc{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:16px;box-shadow:var(--card-shadow)}
+  .hc-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .hc-h .who{font-size:14px;font-weight:600}
+  .hc-h .notes{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
+  .hc-top{display:grid;grid-template-columns:1fr;gap:14px;margin-top:14px}
+  @media (min-width:760px){ .hc-top{grid-template-columns:minmax(300px,380px) minmax(0,1fr)} }
+  .hc-sum{display:flex;align-items:center;gap:14px;background:var(--surface2);border-radius:14px;padding:12px}
+  .hc-kpi{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;flex:1}
+  .hc-kpi div{background:var(--surface);border-radius:10px;padding:8px 10px}
+  .hc-kpi p{font-size:10.5px;color:var(--dim)} .hc-kpi b{font-size:17px;font-weight:600;font-variant-numeric:tabular-nums}
+  .hc-chart{background:var(--surface2);border-radius:14px;padding:12px 14px}
+  .hc-chart .t{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;color:var(--dim);margin-bottom:6px}
+  .hc-chart .t b{color:var(--text);font-size:13px;font-weight:600}
+  .hc-chart .vbars,.hc-chart .vlabels{justify-content:center}
+  .hc-chart .vb,.hc-chart .vlabels span{max-width:72px}
+  .hc-sec{font-size:12px;font-weight:600;margin:16px 2px 8px;display:flex;align-items:baseline;gap:8px}
+  .hc-sec span{font-weight:400;color:var(--dim);font-size:11px}
+  .hppl{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:6px}
+  .hp{display:grid;grid-template-columns:72px minmax(0,1fr) 78px;align-items:center;gap:10px;background:var(--surface2);border-radius:10px;padding:8px 10px}
+  .hp .nm{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hp .dd{display:flex;gap:4px;flex-wrap:nowrap}
+  .hp .dd i{width:16px;height:16px;border-radius:5px;background:var(--track);flex-shrink:0}
   .hp .dd i.present{background:var(--ok-strong)}.hp .dd i.online{background:#7FA8E8}.hp .dd i.absent{background:var(--brand)}
   .hp .dd i.nr{background:transparent;box-shadow:inset 0 0 0 1.5px var(--line3)}
-  .hp .v{font-size:12px;text-align:right;color:var(--dim);font-variant-numeric:tabular-nums}
+  .hp .rt{display:flex;flex-direction:column;align-items:flex-end;gap:3px}
+  .hp .rt b{font-size:12px;font-weight:600;font-variant-numeric:tabular-nums}
+  .hp .rt .at-bar{width:100%}
+  .hp.good .rt b{color:var(--ok-tx)}.hp.mid .rt b{color:var(--warn-tx)}.hp.low .rt b{color:var(--rose-tx)}
+  .hp.good .at-bar i{background:var(--ok-tx)}.hp.mid .at-bar i{background:var(--warn-tx)}.hp.low .at-bar i{background:var(--rose-tx)}
+  .hlegend{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--dim);margin:8px 2px 0}
+  .hlegend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+  .hints{display:flex;flex-wrap:wrap;gap:6px}
+  .hints label{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 12px;border-radius:10px;border:1px solid var(--line);
+    font-size:13px;cursor:pointer;background:var(--surface)}
+  .hints label.on{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok-tx)}
+  .hints input{width:16px;height:16px;accent-color:var(--ok-strong)}
   /* 27단계 — 구글 캘린더 연결 */
   .gcal{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 16px;max-width:640px;box-shadow:var(--card-shadow)}
   .gcal .gh{display:flex;align-items:center;gap:10px}
@@ -933,6 +959,21 @@
 
 
   <!-- 22단계 — 셀 보고 모아보기 -->
+  <!-- 28단계 — 셀 건강 (화면) -->
+  <section class="screen" id="s-health" hidden>
+    <div class="topbar">
+      <button class="icon-btn" id="hl-close" aria-label="뒤로"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5m6-6-6 6 6 6"/></svg></button>
+      <h2 style="font-size:17px;font-weight:600">셀 건강</h2>
+      <span style="width:44px"></span>
+    </div>
+    <div class="scroll pad">
+      <p class="hint" id="hl-sub" style="margin:0 2px 12px">최근 8주 셀모임 기록으로 셈해요.</p>
+      <div id="hl-body"></div>
+      <p class="err" id="hl-err"></p>
+      <div style="height:24px"></div>
+    </div>
+    <nav class="tabbar" data-nav="home"></nav>
+  </section>
   <section class="screen" id="s-reports" hidden>
     <div class="topbar">
       <button class="icon-btn" id="rep-back" aria-label="뒤로"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5m6-6-6 6 6 6"/></svg></button>
@@ -1013,6 +1054,7 @@
       <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">
         <span class="chip" id="home-role">—</span>
         <span class="chip" id="home-where"></span>
+        <button type="button" class="chip" id="home-ver" style="border:none;cursor:pointer;font-family:inherit;margin-left:auto">버전</button>
       </div>
       <div id="home-gcal"></div>
       <div id="home-hand"></div>
@@ -1042,7 +1084,7 @@
           </details>
         </div>
       </div>
-      <button type="button" class="row" id="btn-ver" style="margin-top:16px;width:100%;text-align:left;cursor:pointer;max-width:520px">
+      <button type="button" class="row" id="btn-ver" style="margin:20px auto 8px;width:100%;text-align:left;cursor:pointer;max-width:520px">
         <span class="grow"><span class="nm" style="display:block" id="ver-now">버전</span>
           <span class="sub" style="display:block" id="ver-state">바뀐 것 보기</span></span>
         <span class="muted" style="font-size:12px">기록 ›</span>
@@ -2256,13 +2298,7 @@
 </dialog>
 
 <!-- 20단계 — 셀 건강 · 인턴 -->
-<dialog id="dlg-health">
-  <h3>셀 건강</h3>
-  <p class="muted" style="margin-bottom:12px" id="hl-sub">최근 8주 셀모임 기록으로 셈해요.</p>
-  <div id="hl-body"></div>
-  <p class="err" id="hl-err"></p>
-  <div class="dlg-btns"><button class="btn" id="hl-close">닫기</button></div>
-</dialog>
+
 
 <!-- 20단계 — 민감 메모 -->
 <dialog id="dlg-alert">
