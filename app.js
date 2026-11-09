@@ -24,7 +24,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
 const APP_NAME = "목자의 삶";
-const APP_VERSION = "22.0 (2026-11-09)";
+const APP_VERSION = "23.0 (2026-11-09)";
 
 /* 사진 크기 — 얼굴을 알아볼 수 있는 선에서 가장 작게.
    얼굴 하나가 가로 80px은 되어야 알아보는데, 여럿이 한 줄로 선
@@ -765,6 +765,7 @@ async function homeBackground() {
     await Promise.all([ensureDirectory(), loadHandovers()]);
     if (onHome()) renderHomeHand();
     if (canLead()) syncMyReports().catch(e => console.warn("보고 사본", e));
+    if (canLead()) fillFromNotion().catch(e => console.warn("명단 채우기", e));
     if (canLead()) {
       await loadAllRecords();
       if (onHome()) { renderCare(); renderRooms(); }
@@ -5035,6 +5036,11 @@ async function backfillThumbs() {
    올릴 때마다 version.json 도 같이 올립니다. 앱은 열 때 · 다시 볼 때 · 10분마다
    그 파일만 살짝 확인해서(아주 작은 파일), 지금 버전보다 새것이면 위에 알림을 띄웁니다. */
 const CHANGELOG = [
+  { v:"23.0", d:"2026-11-09", items:[
+    "보고서 가져오기에 명단도 — 연락처 · 생일 · 수료 훈련은 명부에, 가족 · 차량 · 기도제목은 잠긴 칸에",
+    "잠긴 칸은 그 셀 셀리더 · 진장 · 코치 · 수퍼만 (본인과 다른 셀 셀리더는 못 봄 — 보안 규칙)",
+    "셀리더가 앱을 열면 목양 카드에 생년월일 · 가족 · 메모 · 인턴 표시 · 기도제목이 저절로 채워져요 (빈 칸만)",
+    "명부 카드에 '노션 명단' 칸 (볼 수 있는 사람에게만)" ] },
   { v:"22.0", d:"2026-11-09", items:[
     "셀 보고 모아보기 — 같은 진 셀리더 · 코치 · 진장이 다른 셀 보고(출석 · 주제 · 나눔)도 봐요",
     "사람별 나눔은 그 사람이 나중에 계정을 받아도 본인에게는 안 보여요 (보안 규칙)",
@@ -5832,6 +5838,7 @@ function openMember(id) {
   ].filter(([,v]) => v);
   $("mb-rows").innerHTML = rows.length ? `<div class="kv">${rows.map(([k,v]) => `<span>${k}</span><span>${esc(v)}</span>`).join("")}</div>`
     : `<p class="muted" style="margin-top:12px">아직 적힌 기본 사항이 없어요.</p>`;
+  showPriv(m);
   const sv = !mine && soulOfMember(m);
   $("mb-note").textContent = mine
     ? "진장 · 코치가 나를 위해 적는 목양 카드는 나에게 보이지 않아요. 여기는 교회 명부에 보이는 내 기본 사항이에요."
@@ -7729,6 +7736,7 @@ function renderImport() {
     <div class="card" style="margin-top:12px;font-size:14px;line-height:1.8">
       <p>기간: ${dates.length ? `${dates[0]} ~ ${dates[dates.length - 1]}` : "—"}</p>
       <p>새로 만들 셀: ${newCells.length ? newCells.map(esc).join(", ") : "없음 (모두 있는 셀)"}</p>
+      ${(J.people || []).length ? `<p>명단: ${J.people.length}명 — 연락처 · 생일 · 가족 · 차량 · 기도제목 ${J.people.reduce((n, p) => n + (p.prayers || []).length, 0)}개</p>` : ""}
       ${(J.renames || []).length ? `<p>이름 바꾸기: ${(J.renames || []).map(x => `${esc(x.from)} → ${esc(x.to)}`).join(", ")}</p>` : ""}
       <p class="muted" style="font-size:12px;margin-top:6px">같은 파일을 다시 넣어도 보고서가 두 번 생기지 않고 그 자리에 고쳐져요.</p>
     </div>
@@ -7809,6 +7817,15 @@ $("btn-imp-run").onclick = async () => {
       const cell = cellOf[c.name]; if (!cell) continue;
       for (const n of (c.members || [])) { if (n && n !== c.leader) await memFor(n, cell, false); }
     }
+    /* ②-1 명단 — 연락처 · 생일 · 수료 훈련은 명부에, 가족 · 차량 · 기도제목 같은 나머지는 잠긴 칸에 */
+    st.priv = 0;
+    for (const p of (J.people || [])) {
+      const cell = cellOf[p.cell]; if (!cell || !p.name) continue;
+      if (st.priv % 5 === 0) impLog(`명단 넣는 중… ${st.priv} / ${J.people.length}`);
+      const lead = (J.cells || []).some(c => c.name === p.cell && c.leader === p.name);
+      const m = await memFor(p.name, cell, lead);
+      try { await applyPerson(m, p); st.priv++; } catch (e) { console.warn("명단", p.name, e); }
+    }
     /* ③ 보고서 */
     let i = 0;
     for (const r of J.reports) {
@@ -7843,9 +7860,122 @@ $("btn-imp-run").onclick = async () => {
       st.reps++;
     }
     await log("보고서 가져오기", (state.jins.find(j => j.id === jinId) || {}).name || "",
-      `보고 ${st.reps} · 셀 ${st.cells} · 명부 ${st.members} · 이름만 자리 ${st.seats}`);
-    impLog(`끝났어요 — 보고서 ${st.reps}건 · 나눔 ${st.people}개 · 새 셀 ${st.cells} · 새 명부 ${st.members}명 · 이름만 자리 ${st.seats}${st.ren ? ` · 이름 바꿈 ${st.ren}` : ""}`);
+      `보고 ${st.reps} · 셀 ${st.cells} · 명부 ${st.members} · 이름만 자리 ${st.seats} · 명단 ${st.priv || 0}`);
+    impLog(`끝났어요 — 보고서 ${st.reps}건 · 나눔 ${st.people}개 · 새 셀 ${st.cells} · 새 명부 ${st.members}명 · 이름만 자리 ${st.seats}${st.priv ? ` · 명단 ${st.priv}명` : ""}${st.ren ? ` · 이름 바꿈 ${st.ren}` : ""}`);
     state.orgAt = 0; state.repAt = 0; toast("가져왔어요.");
   } catch (e) { $("imp-err").textContent = msgOf(e); }
   finally { $("btn-imp-run").disabled = false; }
 };
+
+/* ════════ 23단계 — 노션 명단 (연락처 · 가족 · 차량 · 기도제목) ════════
+   명부(members)는 같은 진이면 누구나 읽어요. 그래서 거기엔 원래 보이던 것(연락처 · 생일 · 수료 훈련)만 넣고,
+   가족 · 차량 · 생년 · 정회원 · 침례 · 셀역할 · 비고 · 기도제목은 members/{id}/private/notion 에 둡니다.
+   그 칸은 보안 규칙이 막아요 — 그 셀 셀리더(또는 목양 담당) · 진장 · 코치 · 수퍼만, 본인은 못 봄.
+   셀리더가 앱을 열면 자기 목양 카드의 빈 칸을 이 내용으로 채웁니다. */
+const NT_TRAIN = { "새로운삶": "새로운 삶", "새로운 삶": "새로운 삶", "제자의삶": "제자의 삶", "제자의 삶": "제자의 삶" };
+async function applyPerson(m, p) {
+  const at = new Date().toISOString();
+  const patch = { notionAt: at, updatedAt: serverTimestamp() };
+  if (p.phone && !m.phone) patch.phone = fmtPhone(p.phone);
+  if (p.birth && !m.birthMD) { const md = mdOf(p.birth); if (md) patch.birthMD = md; }
+  const tr = (p.trainings || []).map(t => NT_TRAIN[t]).filter(Boolean);
+  const merged = [...new Set([...(m.trainingsDone || []), ...tr])];
+  if (merged.length !== (m.trainingsDone || []).length) patch.trainingsDone = merged;
+  const self = m.uid === uid() || (m.linkedEmail && m.linkedEmail === myEmail());
+  if (!self) await setDoc(doc(db, "members", m.id, "private", "notion"), {
+    birth: p.birth || "", cars: p.cars || [], spouse: p.spouse || "", children: p.children || [],
+    membership: p.membership || "", baptism: p.baptism || [], roles: p.roles || [],
+    trainings: p.trainings || [], memo: p.memo || "",
+    prayers: (p.prayers || []).map(x => ({ id: String(x.id || ""), date: x.date || "", title: x.title || "", body: x.body || "" })),
+    at, by: uid(), updatedAt: serverTimestamp() });
+  await updateDoc(doc(db, "members", m.id), patch);
+  Object.assign(m, patch);
+}
+/* 명부 카드 '노션 명단' — 볼 수 있는 사람에게만 (못 보면 규칙이 거절 → 조용히 비움) */
+function canSeePriv(m) {
+  const me = state.me; if (!m || !me) return false;
+  if (m.uid === me.id || (m.linkedEmail && m.linkedEmail === myEmail())) return false;
+  if (me.role === "super") return true;
+  if (["jinjang", "coach"].includes(me.role) && m.jinId === me.jinId) return true;
+  return canLead() && m.jinId === me.jinId && ((!!me.cellId && m.cellId === me.cellId) || m.careUid === me.id);
+}
+function notionLines(P) {
+  const L = [];
+  if ((P.cars || []).length) L.push(`차량 ${P.cars.join(" / ")}`);
+  const st = [P.membership, ...(P.baptism || [])].filter(Boolean);
+  if (st.length) L.push(st.join(" · "));
+  const rl = (P.roles || []).filter(r => r !== "셀 리더");
+  if (rl.length) L.push(`셀역할 ${rl.join(", ")}`);
+  const drop = (P.trainings || []).filter(t => !NT_TRAIN[t]);
+  if (drop.length) L.push(drop.join(", "));
+  if (P.memo) L.push(P.memo);
+  return L;
+}
+const kidText = (k) => `${k.name}${k.note ? ` (${k.note})` : ""}${k.relation && k.relation !== "자녀" ? ` · ${k.relation}` : ""}`;
+async function showPriv(m) {
+  const box = $("mb-priv"); if (!box) return;
+  box.innerHTML = "";
+  if (!canSeePriv(m) || !m.notionAt) return;
+  let P;
+  try { const d = await getDoc(doc(db, "members", m.id, "private", "notion")); if (!d.exists()) return; P = d.data(); }
+  catch { return; }
+  if (!state.mb || state.mb.id !== m.id) return;
+  const rows = [
+    ["생년월일", P.birth ? fmtDate(P.birth, true) : ""], ["배우자", P.spouse],
+    ["자녀", (P.children || []).map(kidText).join(", ")], ["차량", (P.cars || []).join(" / ")],
+    ["정회원", P.membership], ["침례 · 간증", (P.baptism || []).join(" · ")],
+    ["셀역할", (P.roles || []).join(", ")], ["비고", P.memo],
+    ["기도제목", (P.prayers || []).length ? `${P.prayers.length}개 (목양 카드에 들어가요)` : ""]
+  ].filter(([, v]) => v);
+  if (!rows.length) return;
+  box.innerHTML = `<div class="card" style="margin-top:12px">
+      <h3 style="font-size:13px;font-weight:600">노션 명단 <span class="muted" style="font-weight:400;font-size:12px">· 셀리더 · 진장 · 코치만 보여요</span></h3>
+      <div class="kv" style="margin-top:6px">${rows.map(([k, v]) => `<span>${k}</span><span>${esc(v)}</span>`).join("")}</div></div>`;
+}
+/* 셀리더 — 내 목양 카드의 빈 칸을 명단으로 채우기 (한 번씩, 다시 가져오면 새것만) */
+async function fillFromNotion() {
+  const me = state.me; if (!me) return;
+  let n = 0;
+  for (const s of (state.souls || [])) {
+    if (s.active === false || s.leaderUid !== me.id || !s.memberId || s.kind === "leader") continue;
+    const m = memberById(s.memberId);
+    if (!m || !m.notionAt || s.notionAt === m.notionAt) continue;
+    if (m.uid === me.id || (m.linkedEmail && m.linkedEmail === myEmail())) continue;
+    let P;
+    try { const d = await getDoc(doc(db, "members", m.id, "private", "notion")); if (!d.exists()) continue; P = d.data(); }
+    catch { continue; }
+    const patch = { notionAt: m.notionAt };
+    if (P.birth && (!s.birth || String(s.birth).startsWith("0000-"))) patch.birth = P.birth;
+    if (!s.phone && m.phone) patch.phone = m.phone;
+    const fam = [...(s.family || [])], has = (nm) => fam.some(f => f.name === nm);
+    if (P.spouse && !has(P.spouse)) fam.push({ relation: "배우자", name: P.spouse, birth: "", faith: "", note: "" });
+    for (const k of (P.children || [])) if (k.name && !has(k.name))
+      fam.push({ relation: k.relation || "자녀", name: k.name, birth: "", faith: "", note: k.note || "" });
+    if (fam.length !== (s.family || []).length) patch.family = fam;
+    const lines = notionLines(P).filter(l => !String(s.memo || "").includes(l));
+    if (lines.length) patch.memo = [s.memo || "", ...lines].filter(Boolean).join("\n");
+    if ((P.roles || []).includes("인턴") && !s.intern) { patch.intern = true; patch.internSince = todayStr(); }
+    /* 기도제목 → 기도 기록 (이미 넣은 것은 건너뜀) */
+    const done = new Set(s.notionPray || []), added = [];
+    for (const pr of (P.prayers || [])) {
+      if (!pr.id || done.has(pr.id)) continue;
+      const body = [pr.title, pr.body].filter(Boolean).join("\n");
+      if (!body) continue;
+      try {
+        await setDoc(doc(db, "souls", s.id, "records", "np_" + pr.id.replace(/[^A-Za-z0-9_-]/g, "")), {
+          type: "pray", scope: sharePrefs().recScope || "leader", date: pr.date || todayStr(), body,
+          prayStatus: "praying", by: uid(), byName: me.name || "", fromNotion: true, createdAt: serverTimestamp() });
+        done.add(pr.id); added.push({ date: pr.date || todayStr(), text: body });
+      } catch (e) { console.warn("기도제목", s.name, e); }
+    }
+    if (added.length) {
+      patch.notionPray = [...done];
+      patch.prayOpen = (s.prayOpen || 0) + added.length;
+      const oldest = added.sort((a, b) => String(a.date).localeCompare(String(b.date)))[0];
+      if (!s.prayTop || String(oldest.date) < String(s.prayTop.since || "9999")) patch.prayTop = { text: oldest.text, since: oldest.date };
+    }
+    try { await updateDoc(doc(db, "souls", s.id), patch); Object.assign(s, patch); n++; }
+    catch (e) { console.warn("명단 → 카드", s.name, e); }
+  }
+  if (n) { invalidate(); if (!$("s-home").hidden) renderRooms(); }
+}
