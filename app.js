@@ -24,7 +24,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
 const APP_NAME = "목자의 삶";
-const APP_VERSION = "23.0 (2026-11-09)";
+const APP_VERSION = "24.0 (2026-11-09)";
 
 /* 사진 크기 — 얼굴을 알아볼 수 있는 선에서 가장 작게.
    얼굴 하나가 가로 80px은 되어야 알아보는데, 여럿이 한 줄로 선
@@ -62,7 +62,7 @@ const SCREENS = ["s-loading","s-login","s-verify","s-setup","s-accept","s-pendin
                  "s-home","s-souls","s-cal","s-meet","s-meeting","s-log","s-soul",
                  "s-edit","s-train","s-search","s-mine","s-usage","s-more","s-manage",
                  "s-photos","s-stats","s-inbox","s-dir","s-cellmgr","s-org","s-consent","s-share",
-                 "s-reports","s-report","s-import"];
+                 "s-reports","s-report","s-import","s-leaders"];
 const show = (id) => {
   SCREENS.forEach(s => $(s).hidden = (s !== id));
   if (id !== "s-loading" && typeof bump === "function") bump(id.replace(/^s-/, ""), "screen");
@@ -748,6 +748,7 @@ async function openHome() {
   $("btn-home-cellmgr").hidden = !isManager();
   $("btn-home-org").hidden = me.role !== "super";
   $("btn-home-import").hidden = me.role !== "super";
+  $("btn-home-leaders").hidden = me.role !== "super";
   $("drawer-sub").textContent = [
     me.role==="super" ? "조직 구성" : "", isManager() ? "셀 관리" : "",
     (me.role==="super"||me.role==="jinjang") ? "리더 관리" : "", "교회 명부 · 알림 · 설정"
@@ -763,7 +764,7 @@ async function homeBackground() {
   const onHome = () => !$("s-home").hidden;
   try {
     await Promise.all([ensureDirectory(), loadHandovers()]);
-    if (onHome()) renderHomeHand();
+    if (onHome()) { renderHomeHand(); renderRooms(); }
     if (canLead()) syncMyReports().catch(e => console.warn("보고 사본", e));
     if (canLead()) fillFromNotion().catch(e => console.warn("명단 채우기", e));
     if (canLead()) {
@@ -1026,10 +1027,11 @@ function renderRooms() {
       + room("reports","셀 보고 모아보기", "진", "모든 셀 보고")
       + room("cal","캘린더", weekEv(), "이번 주 일정")
       + room("health","셀 건강", interns(), "인턴")
-      + room("dir","교회 명부", state.members.length, `셀 ${state.cells.length}개`)
+      + room("dir","교회 명부", dirCountTxt(), `셀 ${state.cells.length}개`)
       + room("train","훈련 현황", state.courses.length, "과정")
       + room("stats","활동 통계", monthMeets, "이번 달 만남")
-      + room("photos","사진", "보기", "셀모임 · 만남 사진");
+      + room("photos","사진", "보기", "셀모임 · 만남 사진")
+      + (me.role === "super" ? room("leaders","셀리더 명단", leaderSeatStats().n, leaderSeatStats().txt, leaderSeatStats().noe > 0) : "");
   } else if (["coach","jinjang","pastor"].includes(me.role)) {
     const pastor = me.role === "pastor";
     const wait = state.meetings.filter(m=>m.reportedAt && (pastor || !m.check) && m.leaderUid!==uid()).length;
@@ -1038,12 +1040,13 @@ function renderRooms() {
       + room("meet","셀 보고", wait, pastor?"공유된 보고":wait?"확인 기다림":"기다리는 보고 없음", !pastor && wait>0)
       + room("reports","셀 보고 모아보기", "진", pastor ? "공유된 셀 보고" : "모든 셀 보고")
       + room("health","셀 건강", seenCells().length, `셀 · 인턴 ${interns()}`)
-      + room("dir","교회 명부", state.members.length, `셀 ${state.cells.length}개`)
+      + room("dir","교회 명부", dirCountTxt(), `셀 ${state.cells.length}개`)
       + room("train","훈련 현황", state.courses.length, "과정")
       + room("cal","캘린더", weekEv(), "이번 주 셀모임");
   } else {
     const pendingN = state.invites.filter(i=>i.status==="pending").length;
-    html = room("dir","교회 명부", state.members.length, "명")
+    html = room("dir","교회 명부", dirCountTxt(), "명")
+      + room("leaders","셀리더 명단", leaderSeatStats().n, leaderSeatStats().txt, leaderSeatStats().noe > 0)
       + room("org","조직 구성", state.cells.length, `셀 · 초대 중 ${pendingN}`, pendingN>0)
       + room("cellmgr","셀 관리", state.jins.length, "진")
       + room("reports","셀 보고 모아보기", "보기", "모든 진 셀 보고")
@@ -1069,7 +1072,7 @@ $("s-home").addEventListener("click", async (ev) => {
     const k = rm.dataset.room;
     ({ souls:openSouls, meet:openMeet, cal:openCal, health:openHealth, dir:openDir, train:openTrainBoard,
        stats:openStats, photos:openPhotos, org:openOrg, cellmgr:openCellMgr, usage:openUsage,
-       reports:()=>openReports("") }[k] || (()=>{}))();
+       reports:()=>openReports(""), leaders:openLeaders }[k] || (()=>{}))();
     return;
   }
   const more = ev.target.closest("[data-cmore]");
@@ -5036,6 +5039,10 @@ async function backfillThumbs() {
    올릴 때마다 version.json 도 같이 올립니다. 앱은 열 때 · 다시 볼 때 · 10분마다
    그 파일만 살짝 확인해서(아주 작은 파일), 지금 버전보다 새것이면 위에 알림을 띄웁니다. */
 const CHANGELOG = [
+  { v:"24.0", d:"2026-11-09", items:[
+    "셀리더 명단 (수퍼) — 셀마다 셀리더 · 가입 상태를 한눈에, 구글 이메일을 넣고 한꺼번에 초대",
+    "초대받은 셀리더가 그 구글 계정으로 로그인하면 바로 그 셀 셀리더로 — 셀원 목양 카드가 생기고 노션 명단으로 채워져요",
+    "홈 '교회 명부' 숫자가 가입한 계정 수가 아니라 명부 사람 수로" ] },
   { v:"23.0", d:"2026-11-09", items:[
     "보고서 가져오기에 명단도 — 연락처 · 생일 · 수료 훈련은 명부에, 가족 · 차량 · 기도제목은 잠긴 칸에",
     "잠긴 칸은 그 셀 셀리더 · 진장 · 코치 · 수퍼만 (본인과 다른 셀 셀리더는 못 봄 — 보안 규칙)",
@@ -7979,3 +7986,130 @@ async function fillFromNotion() {
   }
   if (n) { invalidate(); if (!$("s-home").hidden) renderRooms(); }
 }
+
+/* ════════ 24단계 — 셀리더 명단 (수퍼) ════════
+   셀마다 셀리더 자리를 한 줄로: 가입함 · 초대 보냄 · 이메일 없음 · 비어 있음.
+   이메일 칸에 구글 이메일을 넣고 [초대 보내기]를 누르면 조직 구성의 '자리에 사람 넣기'와 똑같이 초대가 걸립니다.
+   그분이 그 구글 계정으로 로그인하면 바로 그 셀 셀리더가 되고, 셀원 목양 카드가 생기며 노션 명단으로 채워져요. */
+function dirCountTxt() { return (state.dir && state.dir.length) ? dirPool().length : "—"; }
+function leaderSeatCells() {
+  const jins = state.jins.filter(j => j.active !== false).map(j => j.id);
+  return activeCells().filter(c => jins.includes(c.jinId) && (state.me.role === "super" || c.jinId === state.me.jinId))
+    .sort((a, b) => (a.name || "").localeCompare(b.name || "", "ko", { numeric: true }));
+}
+function leaderSeatStats() {
+  const st = { n: 0, acc: 0, inv: 0, noe: 0, none: 0 };
+  for (const c of leaderSeatCells()) {
+    st.n++;
+    const ls = seatList("leader", c.jinId, c.id);
+    if (!ls.length) st.none++;
+    else if (ls.some(p => p.t === "acc")) st.acc++;
+    else if (ls.some(p => p.t === "inv")) st.inv++;
+    else st.noe++;
+  }
+  st.txt = st.n ? `가입 ${st.acc} · 초대 ${st.inv} · 이메일 없음 ${st.noe + st.none}` : "셀이 아직 없어요";
+  return st;
+}
+async function openLeaders() {
+  if (!state.me || state.me.role !== "super") { toast("셀리더 명단은 수퍼 관리자가 해요."); return; }
+  show("s-loading");
+  await loadOrg(true);
+  $("ld-err").textContent = ""; $("ld-log").textContent = "";
+  renderLeaders(); show("s-leaders");
+}
+function renderLeaders() {
+  const st = leaderSeatStats();
+  $("ld-sum").innerHTML = `${tile("셀", st.n + "개")}${tile("가입", st.acc + "명")}${tile("초대 보냄", st.inv + "명")}${tile("이메일 없음", (st.noe + st.none) + "곳")}`;
+  state.ldRows = [];
+  const jins = state.jins.filter(j => j.active !== false);
+  $("ld-list").innerHTML = jins.map(j => {
+    const cells = leaderSeatCells().filter(c => c.jinId === j.id);
+    if (!cells.length) return "";
+    return `<div class="card" style="margin-top:12px">
+      <h3 style="font-size:15px;font-weight:600;margin-bottom:4px">${esc(j.name)} <span class="muted" style="font-size:12px;font-weight:400">셀 ${cells.length}개</span></h3>
+      ${cells.map(c => {
+        const ls = seatList("leader", j.id, c.id);
+        const n = (state.dir || []).filter(m => m.cellId === c.id && m.active !== false).length;
+        const entries = ls.length ? ls : [{ t: "none", name: "" }];
+        return entries.map((p, k) => {
+          const i = state.ldRows.push({ ...p, jinId: j.id, cellId: c.id }) - 1;
+          const head = `<span class="cn">${k ? "" : esc(c.name)}</span>`;
+          if (p.t === "acc") return `<div class="lrow">${head}<div class="grow"><p class="nm">${esc(p.name)} <span class="chip ok">가입함</span>${p.sub ? ` <span class="chip">${esc(p.sub)}</span>` : ""}</p>
+              <p class="sub">${esc((userOf(p.uid) || {}).email || "")}</p></div><span class="cnt">${k ? "" : n + "명"}</span></div>`;
+          if (p.t === "inv") return `<div class="lrow">${head}<div class="grow"><p class="nm">${esc(p.name)} <span class="chip warn">초대 보냄</span></p>
+              <p class="sub">${esc(p.email)} · 이 구글 계정으로 로그인하면 바로 들어와요</p></div><span class="cnt">${k ? "" : n + "명"}</span></div>`;
+          return `<div class="lrow">${head}<div class="grow ld-in">
+              <input data-ldname="${i}" value="${esc(p.name || "")}" placeholder="셀리더 이름" aria-label="${esc(c.name)} 셀리더 이름">
+              <input data-ldmail="${i}" type="email" inputmode="email" autocomplete="off" placeholder="구글 이메일" aria-label="${esc(c.name)} 셀리더 구글 이메일">
+              <p class="muted" style="font-size:12px">${p.t === "noe" ? "가입 전 — 이메일을 넣으면 초대돼요" : "셀리더 자리가 비어 있어요"}</p>
+            </div><span class="cnt">${k ? "" : n + "명"}</span></div>`;
+        }).join("");
+      }).join("")}
+    </div>`;
+  }).join("") || `<p class="muted" style="margin-top:14px">아직 셀이 없어요. 조직 구성에서 셀을 만들어 주세요.</p>`;
+  syncLeadersBtn();
+}
+function leaderEdits() {
+  const out = [];
+  document.querySelectorAll("#ld-list [data-ldname]").forEach(inp => {
+    const i = +inp.dataset.ldname, r = state.ldRows[i];
+    const name = inp.value.trim(), email = document.querySelector(`#ld-list [data-ldmail="${i}"]`).value.trim().toLowerCase();
+    if (!name && !email) return;
+    if (!email && r.t === "noe" && name === (r.name || "")) return;   // 바뀐 게 없음
+    out.push({ i, r, name, email });
+  });
+  return out;
+}
+function syncLeadersBtn() {
+  const ed = leaderEdits(), inv = ed.filter(e => e.email).length, only = ed.length - inv;
+  $("btn-ld-run").hidden = !ed.length;
+  $("btn-ld-run").textContent = inv ? `초대 보내기 (${inv}명)${only ? ` · 이름만 ${only}` : ""}` : `이름만 넣기 (${only})`;
+}
+$("ld-list").addEventListener("input", () => syncLeadersBtn());
+$("ld-back").onclick = () => openHome();
+$("btn-home-leaders").onclick = () => openLeaders();
+$("btn-ld-org").onclick = () => openOrg();
+$("btn-ld-run").onclick = async () => {
+  const ed = leaderEdits(); if (!ed.length) return;
+  $("ld-err").textContent = "";
+  const bad = ed.find(e => !e.name) || ed.find(e => e.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e.email));
+  if (bad) { $("ld-err").textContent = !bad.name ? `${cellNameOf(bad.r.cellId)} — 이름을 적어 주세요.` : `${bad.name} — 이메일 형식을 확인해 주세요.`; return; }
+  const mails = ed.filter(e => e.email).map(e => e.email);
+  const dup = mails.find((m, k) => mails.indexOf(m) !== k);
+  if (dup) { $("ld-err").textContent = `같은 이메일이 두 번 있어요: ${dup}`; return; }
+  const inv = mails.length;
+  if (inv && !confirm(`${inv}명에게 초대를 걸까요?\n그분이 그 구글 계정으로 로그인하면 바로 그 셀 셀리더로 들어와요.`)) return;
+  $("btn-ld-run").disabled = true;
+  const fails = []; let okInv = 0, okName = 0;
+  for (const e of ed) {
+    $("ld-log").textContent = `처리 중… ${okInv + okName + fails.length + 1} / ${ed.length}`;
+    try {
+      const { r, name, email } = e;
+      let m = r.t === "noe" ? r.m : null;
+      if (!m) m = (state.dir || []).find(x => x.active !== false && x.jinId === r.jinId && !x.uid && x.name === name
+                  && (x.cellId === r.cellId || !x.cellId) && !pendingInvite(x)) || null;
+      if (!m) {
+        const d = { name, jinId: r.jinId, cellId: null, uid: "", role: "member", linkedEmail: "", careUid: "",
+          soulIds: [], trainingsDone: [], active: true, thumb: "", phone: "", gender: "", birthMD: "", lunar: false,
+          position: "", registeredAt: "", baptizedAt: "", createdBy: uid(), createdAt: serverTimestamp(), updatedAt: serverTimestamp() };
+        const ref = await addDoc(collection(db, "members"), d); m = { id: ref.id, ...d }; state.dir.push(m);
+      }
+      if (m.name !== name) { await updateDoc(doc(db, "members", m.id), { name, updatedAt: serverTimestamp() }); m.name = name; }
+      if (email) {
+        const res = await sendInvite({ name, email, pick: "leader", jinId: r.jinId, cellId: r.cellId, cellIds: [], memberId: m.id });
+        if (res.err) { fails.push(`${name}: ${res.err}`); continue; }
+        await updateDoc(doc(db, "members", m.id), { pendingSeat: null }); m.pendingSeat = null;
+        await log("셀리더 명단 초대", name, cellNameOf(r.cellId)); okInv++;
+      } else {
+        const seat = { role: "leader", cellId: r.cellId, cellIds: [] };
+        await updateDoc(doc(db, "members", m.id), { pendingSeat: seat, updatedAt: serverTimestamp() }); m.pendingSeat = seat;
+        await log("셀리더 명단 이름만", name, cellNameOf(r.cellId)); okName++;
+      }
+    } catch (err) { fails.push(`${e.name}: ${msgOf(err)}`); }
+  }
+  $("btn-ld-run").disabled = false;
+  await loadOrg(true); renderLeaders();
+  $("ld-log").textContent = `끝났어요 — 초대 ${okInv}명${okName ? ` · 이름만 ${okName}` : ""}${fails.length ? ` · 못 한 것 ${fails.length}` : ""}`;
+  if (fails.length) $("ld-err").textContent = fails.join(" / ");
+  toast(okInv ? "초대를 걸었어요." : "넣었어요.");
+};

@@ -458,6 +458,12 @@
   .ocell{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
   .ocell .cn{width:96px;flex-shrink:0;font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
   .ocell .cnt{font-size:12px;color:var(--dim);flex-shrink:0}
+  .lrow{display:flex;align-items:flex-start;gap:10px;padding:12px 0;border-top:1px solid var(--line)}
+  .lrow .cn{width:64px;flex-shrink:0;font-size:14px;font-weight:600;padding-top:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .lrow .cnt{font-size:12px;color:var(--dim);flex-shrink:0;padding-top:10px}
+  .lrow .grow{min-width:0}
+  .ld-in{display:flex;flex-direction:column;gap:6px}
+  .ld-in input{width:100%;min-width:0}
   /* 18단계 — 명부 · 셀 관리 */
   .dgh{display:flex;align-items:baseline;justify-content:space-between;gap:8px;
     font-size:12px;color:var(--dim);margin:18px 2px 8px}
@@ -713,6 +719,24 @@
     <div class="savebar"><button class="btn" id="btn-imp-run" hidden>가져오기</button></div>
   </section>
 
+  <!-- 셀리더 명단 (24단계) -->
+  <section class="screen" id="s-leaders" hidden>
+    <div class="topbar">
+      <button class="icon-btn" id="ld-back" aria-label="뒤로"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5m6-6-6 6 6 6"/></svg></button>
+      <h2 style="font-size:17px;font-weight:600">셀리더 명단</h2>
+      <button class="btn-sm" id="btn-ld-org">조직 구성</button>
+    </div>
+    <div class="scroll pad" style="max-width:640px">
+      <p class="hint" style="margin:0 2px 12px">셀마다 셀리더와 가입 상태예요. 이메일 칸에 그분의 <b>구글 이메일</b>을 넣고 아래 [초대 보내기]를 누르면,
+        그분이 그 구글 계정으로 로그인할 때 바로 그 셀 셀리더로 들어와요. 셀원 목양 카드도 그때 생기고 노션 명단으로 채워져요.</p>
+      <div class="tiles" id="ld-sum"></div>
+      <div id="ld-list"></div>
+      <p class="err" id="ld-err"></p>
+      <p class="muted" id="ld-log" style="margin-top:8px"></p>
+    </div>
+    <div class="savebar"><button class="btn" id="btn-ld-run" hidden>초대 보내기</button></div>
+  </section>
+
   <!-- 홈 -->
   <section class="screen" id="s-home" hidden>
     <div class="topbar">
@@ -748,6 +772,7 @@
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg></summary>
             <div class="drawer-in">
               <button class="btn-ghost" id="btn-home-org" hidden>조직 구성</button>
+              <button class="btn-ghost" id="btn-home-leaders" hidden>셀리더 명단</button>
               <button class="btn-ghost" id="btn-home-import" hidden>보고서 가져오기</button>
               <button class="btn-ghost" id="btn-manage" hidden>리더 관리</button>
               <button class="btn-ghost" id="btn-home-cellmgr" hidden>셀 관리</button>
