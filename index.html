@@ -671,6 +671,48 @@
     <div class="savebar"><button class="btn" id="btn-share-save">저장</button></div>
   </section>
 
+
+  <!-- 22단계 — 셀 보고 모아보기 -->
+  <section class="screen" id="s-reports" hidden>
+    <div class="topbar">
+      <button class="icon-btn" id="rep-back" aria-label="뒤로"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5m6-6-6 6 6 6"/></svg></button>
+      <h2 style="font-size:17px;font-weight:600">셀 보고 모아보기</h2>
+      <span style="width:44px"></span>
+    </div>
+    <div class="pad">
+      <p class="hint" id="rep-sub" style="margin:0 2px"></p>
+      <div class="seg" id="rep-chips" style="margin-top:10px"></div>
+    </div>
+    <div class="scroll pad" style="padding-top:6px;max-width:720px"><div id="rep-list"></div><div style="height:24px"></div></div>
+  </section>
+  <section class="screen" id="s-report" hidden>
+    <div class="topbar">
+      <button class="icon-btn" id="rep1-back" aria-label="뒤로"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5m6-6-6 6 6 6"/></svg></button>
+      <h2 style="font-size:17px;font-weight:600" id="rep1-title">셀 보고</h2>
+      <span style="width:44px"></span>
+    </div>
+    <div class="scroll pad" style="max-width:640px"><div id="rep1-body"></div><div style="height:24px"></div></div>
+  </section>
+
+  <!-- 22단계 — 보고서 가져오기 (수퍼) -->
+  <section class="screen" id="s-import" hidden>
+    <div class="topbar">
+      <button class="icon-btn" id="imp-back" aria-label="뒤로"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5m6-6-6 6 6 6"/></svg></button>
+      <h2 style="font-size:17px;font-weight:600">보고서 가져오기</h2>
+      <span style="width:44px"></span>
+    </div>
+    <div class="scroll pad" style="max-width:640px">
+      <p class="hint" style="margin:0 2px 12px">노션 셀 보고서를 정리한 파일(.json)을 골라 주세요.
+        먼저 무엇이 들어갈지 보여 드리고, '가져오기'를 눌러야 들어가요. 같은 파일을 다시 넣어도 두 번 생기지 않아요.</p>
+      <div class="field"><label for="imp-file">가져올 파일</label>
+        <input type="file" id="imp-file" accept=".json,application/json"></div>
+      <div id="imp-preview" style="margin-top:12px"></div>
+      <p class="err" id="imp-err"></p>
+      <p class="muted" id="imp-log" style="margin-top:8px"></p>
+    </div>
+    <div class="savebar"><button class="btn" id="btn-imp-run" hidden>가져오기</button></div>
+  </section>
+
   <!-- 홈 -->
   <section class="screen" id="s-home" hidden>
     <div class="topbar">
@@ -706,6 +748,7 @@
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg></summary>
             <div class="drawer-in">
               <button class="btn-ghost" id="btn-home-org" hidden>조직 구성</button>
+              <button class="btn-ghost" id="btn-home-import" hidden>보고서 가져오기</button>
               <button class="btn-ghost" id="btn-manage" hidden>리더 관리</button>
               <button class="btn-ghost" id="btn-home-cellmgr" hidden>셀 관리</button>
               <button class="btn-ghost" id="btn-home-dir">교회 명부</button>
@@ -782,9 +825,12 @@
   <section class="screen" id="s-meet" hidden>
     <div class="topbar">
       <h1 style="font-size:21px;font-weight:600;padding-left:6px">셀모임</h1>
+      <div style="display:flex;align-items:center;gap:4px">
+      <button class="btn-sm" id="btn-meet-all">모든 셀 보고</button>
       <button class="icon-btn" id="btn-meet-new" aria-label="모임 추가">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
       </button>
+      </div>
     </div>
     <div class="scroll pad">
       <div class="tiles" id="meet-tiles"></div>
