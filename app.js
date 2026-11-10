@@ -24,7 +24,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
 const APP_NAME = "목자의 삶";
-const APP_VERSION = "31.0 (2026-11-10)";
+const APP_VERSION = "32.0 (2026-11-10)";
 
 /* 사진 크기 — 얼굴을 알아볼 수 있는 선에서 가장 작게.
    얼굴 하나가 가로 80px은 되어야 알아보는데, 여럿이 한 줄로 선
@@ -71,6 +71,9 @@ const show = (id) => {
   sb.style.display = inApp ? "" : "none";
   const sc = document.querySelector(`#${id} .scroll`);
   if (sc) sc.scrollTop = 0;
+  if (id !== "s-meeting") rteCloseAll();
+  /* 32단계 — 숨은 화면에서는 높이를 못 재서 글이 잘렸어요. 보인 뒤 다시 맞춥니다 */
+  requestAnimationFrame(() => document.querySelectorAll(`#${id} textarea`).forEach(t => { if (t.offsetParent) autoGrow(t); }));
 };
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c =>
   ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
@@ -327,7 +330,7 @@ async function shrinkFit(file, spec, limit) {
 }
 
 /* ── 입력 편의 ── */
-function autoGrow(el){ el.style.height="auto"; el.style.height=Math.min(el.scrollHeight,500)+"px"; }
+function autoGrow(el){ if(!el.offsetParent) return; el.style.height="auto"; el.style.height=Math.min(el.scrollHeight+2,560)+"px"; }
 document.addEventListener("input", (ev) => { if (ev.target.tagName === "TEXTAREA") autoGrow(ev.target); });
 document.addEventListener("focusin", (ev) => {
   const t = ev.target;
@@ -3420,17 +3423,18 @@ function openMeeting(id, opts) {
   $("m-time-end").value=state.meeting.timeEnd||"";
   $("m-place").value=state.meeting.place||"";
   $("m-topic").value=state.meeting.topic||"";
-  $("m-note").value=state.meeting.note||"";
+  rteCloseAll(); meetRte().html = state.meeting.noteHtml || textToHtml(state.meeting.note || "");
   $("m-visitor").value=state.meeting.visitors||"";
-  ["m-date","m-time","m-time-end","m-place","m-topic","m-note","m-visitor","m-cell"]
+  ["m-date","m-time","m-time-end","m-place","m-topic","m-visitor","m-cell"]
     .forEach(i=>$(i).disabled=!mine);
+  meetRte().editable(mine);
   $("btn-meeting-save").hidden=!mine;
   $("btn-all-present").hidden=!mine; $("btn-all-open").hidden=!mine;
   $("btn-order-meet").hidden=!mine;
   $("meeting-del").hidden=!(mine&&m);
   $("m-shots").hidden = !mine && !state.meeting.shots.length;
   renderMeetShots(mine);
-  autoGrow($("m-note")); renderAttendance(mine); show("s-meeting");
+  renderAttendance(mine); show("s-meeting");
   /* 저장된 모임이면 댓글 — 이 모임을 볼 수 있는 사람(셀리더 · 담당 코치 · 진장)이 같이 봅니다 */
   $("btn-m-cmt").hidden = !m;
   $("btn-m-cmt").textContent = "댓글";
@@ -3533,7 +3537,7 @@ $("btn-meeting-save").onclick=async()=>{
     date:$("m-date").value||todayStr(),
     time:$("m-time").value||"", timeEnd:$("m-time-end").value||"",
     place:$("m-place").value.trim(), topic:$("m-topic").value.trim(),
-    note:$("m-note").value.trim(), visitors:$("m-visitor").value.trim(),
+    note:meetRte().text, noteHtml:meetRte().html, visitors:$("m-visitor").value.trim(),
     attendance:mt.attendance, reasons:mt.reasons, notes:mt.notes,
     reasonKinds:Object.fromEntries(Object.entries(mt.reasonKinds||{}).filter(([k])=>mt.attendance[k]==="absent")),
     recRefs: mt.recRefs||{}, share: sharePrefs().meetPastor ? "pastor" : "", updatedAt:serverTimestamp() };
@@ -3619,7 +3623,7 @@ $("btn-report").onclick=()=>{
     $("m-visitor").value.trim()?`새 방문자: ${$("m-visitor").value.trim()}`:"",
     shares.length?`\n나눔\n${shares.join("\n")}`:"",
     prayers.length?`\n기도제목\n${prayers.join("\n")}`:"",
-    $("m-note").value.trim()?`\n특이사항\n${$("m-note").value.trim()}`:""
+    meetRte().text?`\n특이사항\n${meetRte().text}`:""
   ].filter(Boolean);
   $("report-text").value=lines.join("\n");
   $("dlg-report").showModal(); autoGrow($("report-text"));
@@ -5062,6 +5066,11 @@ async function backfillThumbs() {
    올릴 때마다 version.json 도 같이 올립니다. 앱은 열 때 · 다시 볼 때 · 10분마다
    그 파일만 살짝 확인해서(아주 작은 파일), 지금 버전보다 새것이면 위에 알림을 띄웁니다. */
 const CHANGELOG = [
+  { v:"32.0", d:"2026-11-10", items:[
+    "모임 메모 — 워드처럼 꾸미기: 제목 · 소제목 · 인용, 굵게 · 기울임 · 밑줄 · 취소선, 글자 색 · 형광펜, 목록 · 가운데 맞춤 · 구분선",
+    "모임 메모 [넓게 쓰기] — 화면 가득 펼쳐서 쓰기 (Esc · 다 썼어요로 닫기), 워드 · 한글에서 붙여넣어도 꾸밈이 남아요",
+    "긴 글이 잘리고 스크롤이 안 되던 것 고침 (모임 메모 · 사람별 나눔 칸 모두)",
+    "넓은 화면에서 셀모임 입력 창을 넓게 — 출석 카드 3줄, 메모 칸 크게" ] },
   { v:"31.0", d:"2026-11-10", items:[
     "도우미 — 그림과 짧은 단계로 보는 사용 안내 (처음 시작 · 홈 · 영혼 카드 · 셀모임 · 캘린더 · 명부 · 셀 건강 · 조직도 · 보안 · 자주 묻는 질문)",
     "홈 화면에 바로가기 — 아이폰 · 안드로이드 · 컴퓨터별 그림 안내, 바로 설치할 수 있는 기기는 [지금 설치]",
@@ -7717,7 +7726,7 @@ async function syncReport(mid, m) {
     ym: ymOf(m.date), time: m.time || "", timeEnd: m.timeEnd || "",
     photos: repPhotos() ? (m.photos || []).filter(p => p && p.id && p.thumb).map(p => ({ id: p.id, thumb: p.thumb })) : [],
     topic: m.topic || "", place: m.place || "", visitors: m.visitors || "",
-    note: repPeers() ? (m.note || "") : "", leaderUid: uid(), leaderMemberId: myM ? myM.id : "",
+    note: repPeers() ? (m.note || "") : "", noteHtml: repPeers() ? (m.noteHtml || "") : "", leaderUid: uid(), leaderMemberId: myM ? myM.id : "",
     leaderName: state.me.name || "", att, names, peopleIds: Object.keys(people), peers: repPeers(),
     share: m.share || "", imported: false, src: "app", updatedAt: serverTimestamp() });
   for (const k of before.filter(k => !people[k])) { try { await deleteDoc(doc(db, "reports", mid, "people", k)); } catch {} }
@@ -7844,7 +7853,7 @@ async function openReport(id) {
     <div class="card">
       <p class="muted" style="font-size:12px">${esc(r.leaderName || "")} 셀리더${r.imported ? " · 노션에서 가져온 보고" : ""}</p>
       ${line("주제", r.topic)}${line("장소", r.place)}${line("새 방문", r.visitors)}
-      ${r.note ? `<p style="margin-top:10px;white-space:pre-wrap">${esc(r.note)}</p>` : ""}
+      ${r.noteHtml ? `<div class="rnote" style="margin-top:10px">${rteClean(r.noteHtml)}</div>` : r.note ? `<p style="margin-top:10px;white-space:pre-wrap">${esc(r.note)}</p>` : ""}
     </div>
     <div class="card" style="margin-top:10px">
       <h3 style="font-size:14px;font-weight:600">출석 ${c.ok} / ${c.all}</h3>
@@ -9538,3 +9547,219 @@ $("home-welcome").addEventListener("click", (ev) => {
   if (ev.target.closest("[data-hwoff]")) { try { localStorage.setItem("mokja-welcome-off", "1"); } catch {} renderWelcome(); return; }
   const g = ev.target.closest("[data-hwgo]"); if (g) openHelp(g.dataset.hwgo);
 });
+
+/* ════════ 32단계 — 글 꾸미기 편집기 (워드처럼 · 모임 메모) ════════
+   저장은 두 가지로: noteHtml(꾸민 글, 허용한 태그 · 색만 남겨 깨끗하게) + note(꾸밈 없는 글 — 보고 문구 · 예전 화면용) */
+const RTE_COLORS = [["기본", ""], ["빨강", "#E5484D"], ["주황", "#E8853B"], ["초록", "#2E9D6A"], ["파랑", "#3B82F6"], ["보라", "#8B5CF6"], ["회색", "#8A8180"]];
+const RTE_MARKS = [["없음", ""], ["노랑", "rgba(255, 210, 0, 0.38)"], ["초록", "rgba(46, 190, 110, 0.32)"], ["분홍", "rgba(255, 92, 140, 0.30)"], ["하늘", "rgba(70, 160, 255, 0.30)"]];
+const rgbKey = (v) => {
+  v = String(v || "").trim().toLowerCase();
+  let m = v.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/);
+  if (m) { let h = m[1]; if (h.length === 3) h = h.split("").map(c => c + c).join("");
+    return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16)).join(","); }
+  m = v.match(/^rgba?\(([^)]+)\)$/);
+  if (m) { const p = m[1].split(",").map(x => x.trim()); if (p.length < 3) return "";
+    const a = p[3] !== undefined ? "," + (+p[3]).toFixed(2) : ""; return p.slice(0, 3).map(x => +x).join(",") + a; }
+  return "";
+};
+const RTE_OK_FG = new Set(RTE_COLORS.filter(c => c[1]).map(c => rgbKey(c[1])));
+const RTE_OK_BG = new Set(RTE_MARKS.filter(c => c[1]).map(c => rgbKey(c[1])));
+const RTE_KEEP = new Set(["P", "DIV", "BR", "B", "STRONG", "I", "EM", "U", "S", "SPAN", "H3", "H4", "BLOCKQUOTE", "UL", "OL", "LI", "HR"]);
+const RTE_MAP = { H1: "H3", H2: "H3", H5: "H4", H6: "H4", STRIKE: "S", DEL: "S", INS: "U", FONT: "SPAN", MARK: "SPAN", TR: "DIV", PRE: "DIV", SECTION: "DIV", ARTICLE: "DIV" };
+const RTE_DROP = new Set(["SCRIPT", "STYLE", "IFRAME", "FRAME", "OBJECT", "EMBED", "IMG", "SVG", "VIDEO", "AUDIO", "SOURCE", "LINK", "META", "TITLE", "HEAD", "TEMPLATE", "NOSCRIPT", "FORM", "INPUT", "BUTTON", "TEXTAREA", "SELECT", "OPTION", "CANVAS", "MATH", "XML", "BASE", "PICTURE"]);
+function rteStyle(st) {
+  const keep = [];
+  String(st || "").split(";").forEach(decl => {
+    const i = decl.indexOf(":"); if (i < 0) return;
+    const k = decl.slice(0, i).trim().toLowerCase(), v = decl.slice(i + 1).trim().toLowerCase().replace(/\s*!important$/, "");
+    if (k === "color" && RTE_OK_FG.has(rgbKey(v))) keep.push(`color:${v}`);
+    else if ((k === "background-color" || k === "background") && RTE_OK_BG.has(rgbKey(v))) keep.push(`background-color:${v}`);
+    else if (k === "font-weight" && /^(bold|bolder|[6-9]00)$/.test(v)) keep.push("font-weight:700");
+    else if (k === "font-style" && v === "italic") keep.push("font-style:italic");
+    else if ((k === "text-decoration" || k === "text-decoration-line") && /underline|line-through/.test(v))
+      keep.push(`text-decoration:${["underline", "line-through"].filter(x => v.includes(x)).join(" ")}`);
+    else if (k === "text-align" && /^(center|right)$/.test(v)) keep.push(`text-align:${v}`);
+  });
+  return keep;
+}
+/* 편집 중에도 — 크롬이 몰래 넣는 화면색(다크 · 라이트 글자색 등)을 그 자리에서 걷어 냅니다 (커서는 그대로) */
+function rteTidy(ed) {
+  ed.querySelectorAll("[style]").forEach(el => { const k = rteStyle(el.getAttribute("style"));
+    if (k.length) { if (el.getAttribute("style") !== k.join(";")) el.setAttribute("style", k.join(";")); } else el.removeAttribute("style"); });
+  ed.querySelectorAll("font").forEach(f => { if (f.getAttribute("color") && !RTE_OK_FG.has(rgbKey(f.getAttribute("color")))) f.removeAttribute("color"); });
+}
+/* 붙여넣기 · 불러오기 · 보여주기 모두 이 함수를 거칩니다 — 글자 · 꾸밈 말고는 아무것도 남기지 않아요 */
+function rteClean(html) {
+  const d = new DOMParser().parseFromString(`<!doctype html><body>${String(html || "")}</body>`, "text/html");
+  const walk = (node) => {
+    for (const ch of [...node.childNodes]) {
+      if (ch.nodeType === 3) continue;
+      if (ch.nodeType !== 1) { ch.remove(); continue; }
+      const tag = ch.tagName.toUpperCase();
+      if (RTE_DROP.has(tag) || tag.includes(":") && /^(V|W|M):/.test(tag)) { ch.remove(); continue; }
+      walk(ch);
+      const want = RTE_KEEP.has(tag) ? tag : RTE_MAP[tag];
+      if (!want) { ch.replaceWith(...ch.childNodes); continue; }
+      let st = ch.getAttribute("style") || "";
+      if (tag === "FONT" && ch.getAttribute("color")) st += ";color:" + ch.getAttribute("color");
+      if (tag === "MARK") st += ";background-color:" + RTE_MARKS[1][1];
+      const align = (ch.getAttribute("align") || "").toLowerCase();
+      const keep = rteStyle(st);
+      if (/^(center|right)$/.test(align)) keep.push(`text-align:${align}`);
+      let el = ch;
+      if (want !== tag) { el = d.createElement(want.toLowerCase()); el.append(...ch.childNodes); ch.replaceWith(el); }
+      [...el.attributes].forEach(a => el.removeAttribute(a.name));
+      if (keep.length) el.setAttribute("style", keep.join(";"));
+      else if (want === "SPAN") el.replaceWith(...el.childNodes);
+    }
+  };
+  walk(d.body);
+  return d.body.innerHTML.replace(/(<div><br><\/div>\s*){3,}/g, "<div><br></div><div><br></div>").trim();
+}
+function rteText(html) {
+  const d = new DOMParser().parseFromString(`<!doctype html><body>${rteClean(html)}</body>`, "text/html");
+  const BL = new Set(["P", "DIV", "H3", "H4", "BLOCKQUOTE", "UL", "OL", "LI", "HR"]);
+  let out = "";
+  const walk = (n, list) => {
+    for (const ch of n.childNodes) {
+      if (ch.nodeType === 3) { out += ch.nodeValue.replace(/\s+/g, " "); continue; }
+      if (ch.nodeType !== 1) continue;
+      const t = ch.tagName;
+      if (t === "BR") { out += "\n"; continue; }
+      if (t === "HR") { out += "\n───\n"; continue; }
+      if (BL.has(t) && out && !out.endsWith("\n")) out += "\n";
+      if (t === "LI") out += list && list.tag === "OL" ? `${++list.n}. ` : "• ";
+      walk(ch, t === "UL" || t === "OL" ? { tag: t, n: 0 } : list);
+      if (BL.has(t) && !out.endsWith("\n")) out += "\n";
+    }
+  };
+  walk(d.body, null);
+  return out.split("\n").map(l => l.replace(/^ +| +$/g, "")).join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+const textToHtml = (t) => String(t || "").trim() ? String(t).split("\n").map(l => `<div>${l.trim() ? esc(l) : "<br>"}</div>`).join("") : "";
+const RI = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const RTE_IC = {
+  undo: RI('<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>'),
+  redo: RI('<path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/>'),
+  bold: RI('<path d="M7 5h6a3.5 3.5 0 0 1 0 7H7zM7 12h7a3.5 3.5 0 0 1 0 7H7z" stroke-width="2.2"/>'),
+  italic: RI('<path d="M14 5h-4M14 19h-4M14.5 5 9.5 19"/>'),
+  underline: RI('<path d="M7 4v7a5 5 0 0 0 10 0V4M5 20h14"/>'),
+  strike: RI('<path d="M16.5 7.5C16 5.6 14.3 4.5 12 4.5c-2.6 0-4.5 1.4-4.5 3.4 0 1.5 1 2.4 2.6 3M4 12h16M8 16.5c.5 1.9 2.2 3 4.3 3 2.7 0 4.6-1.4 4.6-3.5 0-.8-.3-1.5-.8-2"/>'),
+  color: RI('<path d="m6 18 6-14 6 14M8.5 12.5h7"/>'),
+  mark: RI('<path d="m14 4 6 6-8.5 8.5H7.5v-4z"/><path d="M4 20h7"/>'),
+  ul: RI('<path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/>'),
+  ol: RI('<path d="M10 6h10M10 12h10M10 18h10M4 5l1.5-1v5M3.5 14.5a1.3 1.3 0 0 1 2.4.7c0 1-2.4 2.3-2.4 2.8h2.6"/>'),
+  left: RI('<path d="M4 6h16M4 10h10M4 14h16M4 18h10"/>'),
+  center: RI('<path d="M4 6h16M7 10h10M4 14h16M7 18h10"/>'),
+  hr: RI('<path d="M3 12h18" stroke-dasharray="3 2.5"/><path d="M8 6h8M8 18h8" opacity=".5"/>'),
+  clear: RI('<path d="M6 5h11M11.5 5 8 19M4 4l16 16"/>'),
+  big: RI('<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>'),
+  small: RI('<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>'),
+};
+function rteCloseAll() {
+  document.querySelectorAll(".rte.full").forEach(r => { r.classList.remove("full");
+    const b = r.querySelector('[data-rc="big"]'); if (b) b.innerHTML = RTE_IC.big + "<span>넓게 쓰기</span>"; });
+  document.querySelectorAll(".rte-dim,.rte-pop").forEach(x => x.remove());
+  document.body.classList.remove("rte-open");
+}
+function rteMount(host, o = {}) {
+  const B = (c, ic, t, extra = "") => `<button type="button" data-rc="${c}" title="${t}" aria-label="${t}" ${extra}>${RTE_IC[ic]}</button>`;
+  host.innerHTML = `<div class="rte-bar" role="toolbar" aria-label="글 꾸미기">
+      <span class="g">${B("undo", "undo", "되돌리기 (⌘Z)")}${B("redo", "redo", "다시 하기")}</span><span class="sep"></span>
+      <select data-rs="1" aria-label="문단 모양" title="문단 모양"><option value="div">본문</option><option value="h3">제목</option><option value="h4">소제목</option><option value="blockquote">인용 · 말씀</option></select>
+      <span class="sep"></span>
+      <span class="g">${B("bold", "bold", "굵게 (⌘B)")}${B("italic", "italic", "기울임 (⌘I)")}${B("underline", "underline", "밑줄 (⌘U)")}${B("strikeThrough", "strike", "취소선")}</span><span class="sep"></span>
+      <span class="g"><button type="button" class="cbtn" data-rc="fg" title="글자 색" aria-label="글자 색">${RTE_IC.color}<i style="background:#E5484D"></i></button>
+        <button type="button" class="cbtn" data-rc="bg" title="형광펜" aria-label="형광펜">${RTE_IC.mark}<i style="background:rgba(255,210,0,.85)"></i></button></span><span class="sep"></span>
+      <span class="g">${B("insertUnorderedList", "ul", "글머리 기호")}${B("insertOrderedList", "ol", "번호 목록")}${B("justifyLeft", "left", "왼쪽 맞춤")}${B("justifyCenter", "center", "가운데 맞춤")}</span><span class="sep"></span>
+      <span class="g">${B("insertHorizontalRule", "hr", "구분선")}${B("clear", "clear", "꾸밈 지우기")}</span>
+      <button type="button" class="big" data-rc="big" title="넓게 쓰기" aria-label="넓게 쓰기">${RTE_IC.big}<span>넓게 쓰기</span></button>
+    </div>
+    <div class="rte-ed" contenteditable="true" role="textbox" aria-multiline="true" ${o.labelledby ? `aria-labelledby="${o.labelledby}"` : ""} data-ph="${esc(o.ph || "")}"></div>`;
+  const bar = host.querySelector(".rte-bar"), ed = host.querySelector(".rte-ed"), sel = host.querySelector("[data-rs]");
+  try { document.execCommand("defaultParagraphSeparator", false, "div"); } catch {}
+  const exec = (c, v = null, css = false) => { ed.focus(); try { document.execCommand("styleWithCSS", false, css); document.execCommand(c, false, v); } catch {} sync(); changed(); };
+  const changed = () => {
+    rteTidy(ed);
+    if (!ed.textContent.trim() && !ed.querySelector("hr,li")) ed.innerHTML = "";
+    if (o.onInput) o.onInput(ed.textContent.replace(/\s/g, "").length);
+  };
+  const sync = () => {
+    const s = document.getSelection(); if (!s || !s.rangeCount || !ed.contains(s.anchorNode)) return;
+    bar.querySelectorAll("[data-rc]").forEach(b => { const c = b.dataset.rc;
+      if (["bold", "italic", "underline", "strikeThrough", "insertUnorderedList", "insertOrderedList", "justifyCenter"].includes(c)) {
+        let on = false; try { on = document.queryCommandState(c); } catch {} b.classList.toggle("on", on); } });
+    let f = ""; try { f = String(document.queryCommandValue("formatBlock") || "").toLowerCase(); } catch {}
+    sel.value = ["h3", "h4", "blockquote"].includes(f) ? f : "div";
+  };
+  const pop = (btn, kind) => {
+    const was = host.querySelector(".rte-pop"); document.querySelectorAll(".rte-pop").forEach(x => x.remove());
+    if (was && was.dataset.k === kind) return;
+    const L = kind === "fg" ? RTE_COLORS : RTE_MARKS, p = document.createElement("div");
+    p.className = "rte-pop"; p.dataset.k = kind;
+    p.innerHTML = `<p>${kind === "fg" ? "글자 색" : "형광펜"}</p>` + L.map(([n, c]) => kind === "fg"
+      ? `<button type="button" data-c="${c}" title="${n}" aria-label="${n}" style="color:${c || "var(--text)"}">${c ? "가" : "✕"}</button>`
+      : `<button type="button" data-c="${c}" title="${n}" aria-label="${n}" style="${c ? `background:${c}` : ""}">${c ? "가" : "✕"}</button>`).join("");
+    const r = btn.getBoundingClientRect(), hr = host.getBoundingClientRect();
+    p.style.left = Math.max(0, Math.min(r.left - hr.left, hr.width - 216)) + "px"; p.style.top = (r.bottom - hr.top + 6) + "px";
+    p.addEventListener("mousedown", e => e.preventDefault());
+    p.addEventListener("click", e => { const b = e.target.closest("[data-c]"); if (!b) return; const c = b.dataset.c;
+      /* '기본 · 없음'은 목록에 없는 표시 색을 칠했다가 바로 걷어 내는 방식 — 원래 색으로 돌아가요 */
+      if (kind === "fg") exec("foreColor", c || "#010203", true);
+      else exec("hiliteColor", c || "#010203", true);
+      if (c) btn.querySelector("i").style.background = c;
+      p.remove(); });
+    host.appendChild(p);
+  };
+  bar.addEventListener("mousedown", e => { if (e.target.closest("button")) e.preventDefault(); });
+  bar.addEventListener("click", e => {
+    const b = e.target.closest("[data-rc]"); if (!b) return; const c = b.dataset.rc;
+    if (c === "fg" || c === "bg") return pop(b, c);
+    document.querySelectorAll(".rte-pop").forEach(x => x.remove());
+    if (c === "big") return full(!host.classList.contains("full"));
+    if (c === "clear") { exec("removeFormat"); exec("formatBlock", "<div>"); return; }
+    exec(c);
+  });
+  sel.addEventListener("change", () => { exec("formatBlock", `<${sel.value}>`); });
+  ed.addEventListener("input", changed);
+  ed.addEventListener("keyup", sync); ed.addEventListener("mouseup", sync);
+  document.addEventListener("selectionchange", () => { if (document.activeElement === ed) sync(); });
+  ed.addEventListener("paste", e => {
+    const cd = e.clipboardData; if (!cd) return; e.preventDefault();
+    const h = cd.getData("text/html"), t = cd.getData("text/plain");
+    if (h) {
+      /* insertHTML은 지금 화면색을 덧입혀서, 깨끗하게 거른 조각을 그 자리에 바로 넣어요 */
+      const sl = document.getSelection(); if (!sl || !sl.rangeCount || !ed.contains(sl.anchorNode)) return;
+      const r = sl.getRangeAt(0); r.deleteContents();
+      const tpl = document.createElement("template"); tpl.innerHTML = rteClean(h);
+      const frag = tpl.content, last = frag.lastChild; r.insertNode(frag);
+      if (last) { r.setStartAfter(last); r.collapse(true); sl.removeAllRanges(); sl.addRange(r); }
+    } else document.execCommand("insertText", false, t);
+    changed();
+  });
+  ed.addEventListener("drop", e => { e.preventDefault(); });
+  ed.addEventListener("keydown", e => { if (e.key === "Escape" && host.classList.contains("full")) { e.preventDefault(); full(false); } });
+  const full = (on) => {
+    rteCloseAll();
+    if (!on) { ed.focus(); return; }
+    const dim = document.createElement("div"); dim.className = "rte-dim"; dim.onclick = () => full(false);
+    host.before(dim); host.classList.add("full"); document.body.classList.add("rte-open");
+    bar.querySelector('[data-rc="big"]').innerHTML = RTE_IC.small + "<span>다 썼어요</span>";
+    ed.focus();
+  };
+  return {
+    ed,
+    get html() { return ed.textContent.trim() || ed.querySelector("hr") ? rteClean(ed.innerHTML) : ""; },
+    set html(v) { ed.innerHTML = rteClean(v || ""); changed(); },
+    get text() { return rteText(ed.innerHTML); },
+    editable(on) { ed.contentEditable = on ? "true" : "false"; bar.hidden = !on; host.style.borderStyle = on ? "" : "dashed"; },
+    close: () => full(false),
+  };
+}
+function meetRte() {
+  if (!state._mrte) state._mrte = rteMount($("m-note-rte"), { labelledby: "m-note-lab",
+    ph: "모임 전체에 대한 메모 — 위 도구로 제목 · 굵게 · 색 · 형광펜 · 목록을 넣을 수 있어요",
+    onInput: (n) => { $("m-note-count").textContent = n ? `${n.toLocaleString()}자` : ""; } });
+  return state._mrte;
+}
+document.addEventListener("mousedown", (e) => { if (!e.target.closest(".rte-pop,.cbtn")) document.querySelectorAll(".rte-pop").forEach(x => x.remove()); });

@@ -718,6 +718,69 @@
     .rooms{grid-template-columns:repeat(3,minmax(0,1fr))}
     .drawer-in{grid-template-columns:repeat(3,minmax(0,1fr))}
   }
+
+  /* 32단계 — 글 꾸미기 편집기 (모임 메모) */
+  textarea{overflow-y:auto}
+  .rte-lab{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+  .rte-lab .hint{margin:0;font-size:11.5px}
+  .rte{position:relative;border:1px solid var(--line);border-radius:14px;background:var(--surface);transition:border-color .15s,box-shadow .15s}
+  .rte:focus-within{border-color:var(--rose-line);box-shadow:0 0 0 3px var(--rose-bg)}
+  .rte-bar{position:sticky;top:0;z-index:3;display:flex;flex-wrap:wrap;align-items:center;gap:2px;padding:6px 8px;
+    border-bottom:1px solid var(--line);background:var(--surface2);border-radius:14px 14px 0 0}
+  .rte-bar .g{display:flex;align-items:center;gap:2px}
+  .rte-bar .sep{width:1px;height:22px;background:var(--line);margin:0 5px}
+  .rte-bar button{height:34px;min-width:34px;padding:0 7px;border:none;border-radius:8px;background:none;color:var(--sub-tx);
+    display:inline-flex;align-items:center;justify-content:center;gap:4px;cursor:pointer;font:inherit;font-size:13px}
+  .rte-bar button:hover{background:var(--surface);color:var(--text)}
+  .rte-bar button.on{background:var(--rose-bg);color:var(--rose-tx)}
+  .rte-bar button svg{width:18px;height:18px}
+  .rte-bar .cbtn{position:relative}
+  .rte-bar .cbtn i{position:absolute;left:8px;right:8px;bottom:5px;height:3px;border-radius:2px}
+  .rte-bar select{height:34px;width:auto;padding:0 28px 0 10px;border-radius:8px;font-size:13px;background-color:var(--surface)}
+  .rte-bar .big{margin-left:auto}
+  .rte-pop{position:absolute;z-index:80;display:flex;flex-wrap:wrap;gap:6px;padding:10px;width:208px;border-radius:14px;
+    background:var(--surface);border:1px solid var(--line);box-shadow:0 12px 32px rgba(0,0,0,.35)}
+  .rte-pop p{width:100%;margin:0 0 2px;font-size:11.5px;color:var(--dim)}
+  .rte-pop button{width:30px;height:30px;border-radius:9px;border:1px solid var(--line);cursor:pointer;font-weight:700;font-size:13px;
+    display:flex;align-items:center;justify-content:center;background:var(--surface2);color:var(--text)}
+  .rte-pop button:hover{outline:2px solid var(--rose-line)}
+  .rte-ed{min-height:220px;padding:14px 16px 18px;outline:none;font-size:15px;line-height:1.75;color:var(--text);word-break:break-word;overflow-wrap:anywhere}
+  .rte-ed:empty::before{content:attr(data-ph);color:var(--dim);pointer-events:none}
+  .rte-ed[contenteditable="false"]{min-height:0}
+  .rte-ed p,.rte-ed div{margin:0}
+  .rte-ed h3{font-size:19px;font-weight:700;margin:12px 0 4px;line-height:1.45}
+  .rte-ed h4{font-size:16px;font-weight:700;margin:10px 0 2px;color:var(--rose-tx)}
+  .rte-ed blockquote{margin:8px 0;padding:6px 14px;border-left:3px solid var(--rose-line);background:var(--surface2);border-radius:0 10px 10px 0;color:var(--sub-tx)}
+  .rte-ed ul,.rte-ed ol{margin:4px 0;padding-left:24px}
+  .rte-ed li{margin:2px 0}
+  .rte-ed hr{border:none;border-top:1px dashed var(--line3);margin:14px 0}
+  .rte-ed>:first-child{margin-top:0}
+  /* 넓게 쓰기 — 화면 가득 */
+  .rte.full{position:fixed;inset:18px;z-index:75;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,.55)}
+  @media (min-width:880px){ .rte.full{left:calc(224px + 28px);right:28px;top:24px;bottom:24px} }
+  .rte.full .rte-ed{flex:1;overflow-y:auto;font-size:16px;padding:22px clamp(18px,5vw,64px) 40px}
+  @media (max-width:700px){
+    .rte-bar{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+    .rte-bar::-webkit-scrollbar{display:none}
+    .rte-bar .g,.rte-bar select{flex-shrink:0}
+    .rte-bar .big{margin-left:4px;flex-shrink:0}
+    .rte-ed{min-height:180px}
+  }
+  .rte-dim{position:fixed;inset:0;z-index:74;background:rgba(0,0,0,.5)}
+  body.rte-open{overflow:hidden}
+  .rnote{line-height:1.75;word-break:break-word}
+  .rnote p,.rnote div{margin:0}
+  .rnote h3{font-size:17px;font-weight:700;margin:10px 0 2px}
+  .rnote h4{font-size:15px;font-weight:700;margin:8px 0 2px;color:var(--rose-tx)}
+  .rnote blockquote{margin:6px 0;padding:4px 12px;border-left:3px solid var(--rose-line);color:var(--sub-tx)}
+  .rnote ul,.rnote ol{margin:4px 0;padding-left:22px}
+  .rnote hr{border:none;border-top:1px dashed var(--line3);margin:10px 0}
+  /* 셀모임 입력 — 넓은 화면은 넓게 */
+  @media (min-width:1200px){
+    #s-meeting{max-width:1440px}
+    #s-meeting #list-att{grid-template-columns:repeat(3,minmax(0,1fr))}
+    #s-meeting .rte-ed{min-height:300px}
+  }
   /* 31단계 — 도우미 */
   @media (min-width:880px){ #s-help{max-width:1280px} }
   .hp-hero{position:relative;overflow:hidden;border-radius:20px;padding:20px;background:linear-gradient(135deg,var(--lead-bg),var(--surface) 75%);
@@ -1429,8 +1492,9 @@
           이 모임에 붙어요. 이 모임을 볼 수 있는 분이 같이 봅니다.</p></div>
       <div class="field"><label for="m-visitor">새 방문자</label>
         <input id="m-visitor" placeholder="이름을 적어주세요 (여러 명이면 쉼표로)"></div>
-      <div class="field"><label for="m-note">모임 메모</label>
-        <textarea id="m-note" placeholder="모임 전체에 대한 메모"></textarea></div>
+      <div class="field"><div class="rte-lab"><label id="m-note-lab">모임 메모</label>
+          <span class="hint" id="m-note-count"></span></div>
+        <div class="rte" id="m-note-rte"></div></div>
       <button type="button" class="btn-ghost" id="btn-m-cmt" style="margin-top:10px;height:44px;font-size:13px;max-width:320px" hidden>댓글</button>
       <div class="rp-box" id="m-report" hidden></div>
       <p class="err" id="meeting-err"></p>
