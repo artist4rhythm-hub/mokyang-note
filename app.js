@@ -24,7 +24,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
 const APP_NAME = "목자의 삶";
-const APP_VERSION = "28.0 (2026-11-09)";
+const APP_VERSION = "30.0 (2026-11-10)";
 
 /* 사진 크기 — 얼굴을 알아볼 수 있는 선에서 가장 작게.
    얼굴 하나가 가로 80px은 되어야 알아보는데, 여럿이 한 줄로 선
@@ -58,7 +58,7 @@ if ("serviceWorker" in navigator) {
 
 /* ── 공통 ── */
 const $ = (id) => document.getElementById(id);
-const SCREENS = ["s-loading","s-login","s-verify","s-setup","s-accept","s-pending",
+const SCREENS = ["s-orgchart","s-loading","s-login","s-verify","s-setup","s-accept","s-pending",
                  "s-home","s-souls","s-cal","s-meet","s-meeting","s-log","s-soul",
                  "s-edit","s-train","s-search","s-mine","s-usage","s-more","s-manage",
                  "s-photos","s-stats","s-inbox","s-dir","s-cellmgr","s-org","s-consent","s-share",
@@ -1036,6 +1036,7 @@ function renderRooms() {
       + room("train","훈련 현황", state.courses.length, "과정")
       + room("stats","활동 통계", monthMeets, "이번 달 만남")
       + room("photos","사진", "보기", "셀모임 · 만남 사진")
+      + room("orgchart","조직도", "보기", "진장 · 코치 · 셀")
       + (me.role === "super" ? room("leaders","셀리더 명단", leaderSeatStats().n, leaderSeatStats().txt, leaderSeatStats().noe > 0) : "");
   } else if (["coach","jinjang","pastor"].includes(me.role)) {
     const pastor = me.role === "pastor";
@@ -1047,12 +1048,14 @@ function renderRooms() {
       + room("health","셀 건강", seenCells().length, `셀 · 인턴 ${interns()}`)
       + room("dir","교회 명부", dirCountTxt(), `셀 ${state.cells.length}개`)
       + room("train","훈련 현황", state.courses.length, "과정")
-      + room("cal","캘린더", weekEv(), "이번 주 셀모임");
+      + room("cal","캘린더", weekEv(), "이번 주 셀모임")
+      + room("orgchart","조직도", "보기", "진장 · 코치 · 셀");
   } else {
     const pendingN = state.invites.filter(i=>i.status==="pending").length;
     html = room("dir","교회 명부", dirCountTxt(), "명")
       + room("leaders","셀리더 명단", leaderSeatStats().n, leaderSeatStats().txt, leaderSeatStats().noe > 0)
       + room("org","조직 구성", state.cells.length, `셀 · 초대 중 ${pendingN}`, pendingN>0)
+      + room("orgchart","조직도", "보기", "진장 · 코치 · 셀")
       + room("cellmgr","셀 관리", state.jins.length, "진")
       + room("reports","셀 보고 모아보기", "보기", "모든 진 셀 보고")
       + room("usage","사용 현황", "보기", "기기 · 시간대");
@@ -1076,7 +1079,7 @@ $("s-home").addEventListener("click", async (ev) => {
   if (rm) {
     const k = rm.dataset.room;
     ({ souls:openSouls, meet:openMeet, cal:openCal, health:openHealth, dir:openDir, train:openTrainBoard,
-       stats:openStats, photos:openPhotos, org:openOrg, cellmgr:openCellMgr, usage:openUsage,
+       stats:openStats, photos:openPhotos, org:openOrg, orgchart:openOrgChart, cellmgr:openCellMgr, usage:openUsage,
        reports:()=>openReports(""), leaders:openLeaders }[k] || (()=>{}))();
     return;
   }
@@ -1210,14 +1213,13 @@ function renderSouls() {
           st >= 2 ? `<span class="tpill streak">결석 ${st}주</span>` : ""] });
     }
     const bt = birthText(s), bd = annivIn(s.birth), od = isLeaderCard(s) ? null : oneDays(s);
-    return scard({ attr: `data-open="${s.id}"`, ava: avatar(s, 52), name: esc(s.name),
+    return scard({ attr: `data-open="${s.id}"`, ava: avatar(s, 52), name: esc(s.name) + (s.intern ? ` <span class="chip intern" style="font-size:10.5px;padding:2px 8px;vertical-align:2px">인턴</span>` : ""),
       sub: (bt ? esc(bt) : "생일 미입력") + (bd !== null && bd <= 14 ? ` · 🎂 ${bd === 0 ? "오늘" : "D-" + bd}` : ""),
       chip: isLeaderCard(s) ? KINDLABEL[s.kind] : esc(STATUS[s.status] || "—"),
       chipCls: isLeaderCard(s) ? "" : s.status === "care" ? "warn" : "rose",
       stats: [stat("만남", dago(n), n !== null && n >= 30 ? "mid" : ""), stat("1:1", isLeaderCard(s) ? "—" : dago(od), od !== null && od >= 30 ? "mid" : ""),
         stat("출석", rate === null ? "—" : rate + "%", tone(rate)), stat("기도", pray ? pray : "—")],
       foot: [st >= 2 ? `<span class="tpill streak">결석 ${st}주</span>` : "",
-        s.intern ? `<span class="tpill">인턴</span>` : "",
         s.status === "care" ? `<span class="tpill warnp">돌봄 필요</span>` : ""] });
   }).join("") || `<p class="muted">${
     kw ? "찾는 이름이 없어요."
@@ -1258,11 +1260,12 @@ $("btn-soul-new").onclick = () => openEdit(null);
 
 /* ── 셀원 순서 정하기 ── */
 const dlgOrder = $("dlg-order");
-let orderList = [], orderAfter = null;
+let orderList = [], orderAfter = null, orderIntern = {};
 function openOrderDlg(cellId, after) {
   const mine = state.souls.filter(s=>isLeaderOf(s) && (!cellId || s.cellId === cellId));
   if (!mine.length) { toast("순서를 정할 영혼이 없어요."); return; }
   orderList = mine.slice(); orderAfter = after || null;
+  orderIntern = Object.fromEntries(mine.map(s => [s.id, !!s.intern]));
   $("order-err").textContent = ""; renderOrder(); dlgOrder.showModal();
 }
 function renderOrder() {
@@ -1270,11 +1273,17 @@ function renderOrder() {
     <div class="ordrow">
       <span class="no">${i+1}</span>
       <span class="who">${esc(s.name)}</span>
+      <button type="button" class="int${orderIntern[s.id]?" on":""}" data-int="${s.id}" aria-pressed="${!!orderIntern[s.id]}">인턴</button>
+      <button type="button" class="top" data-top="${i}" aria-label="맨 위로"${i===0?" disabled":""}>맨 위</button>
       <button type="button" data-up="${i}" aria-label="위로"${i===0?" disabled":""}>↑</button>
       <button type="button" data-down="${i}" aria-label="아래로"${i===orderList.length-1?" disabled":""}>↓</button>
     </div>`).join("");
 }
 $("order-list").addEventListener("click",(ev)=>{
+  const it = ev.target.closest("[data-int]");
+  if (it) { orderIntern[it.dataset.int] = !orderIntern[it.dataset.int]; renderOrder(); return; }
+  const tp = ev.target.closest("[data-top]");
+  if (tp) { const i = Number(tp.dataset.top); orderList.unshift(...orderList.splice(i, 1)); renderOrder(); return; }
   const u = ev.target.closest("[data-up]"), d = ev.target.closest("[data-down]");
   const i = u ? Number(u.dataset.up) : d ? Number(d.dataset.down) : -1;
   if (i < 0) return;
@@ -1288,16 +1297,21 @@ $("ord-save").onclick = async () => {
   $("ord-save").disabled = true;
   try {
     /* 자리가 바뀐 사람만 저장해서 쓸데없는 쓰기를 줄입니다 */
-    const writes = [];
+    const writes = [], today = todayStr();
     orderList.forEach((s,i)=>{
-      if (s.seq !== i+1) writes.push(updateDoc(doc(db,"souls",s.id), { seq:i+1 }));
+      const p = {};
+      if (s.seq !== i+1) p.seq = i+1;
+      const iv = !!orderIntern[s.id];
+      if (!!s.intern !== iv) { p.intern = iv; p.internSince = iv ? (s.internSince || today) : ""; }
+      if (Object.keys(p).length) writes.push(updateDoc(doc(db,"souls",s.id), p).then(() => Object.assign(s, p)));
     });
     await Promise.all(writes);
     state.soulsAt = 0;
     orderList.forEach((s,i)=>{
       s.seq = i+1;
-      const inList = state.souls.find(x=>x.id===s.id); if (inList) inList.seq = i+1;
+      const inList = state.souls.find(x=>x.id===s.id); if (inList) { inList.seq = i+1; inList.intern = s.intern; inList.internSince = s.internSince; }
     });
+    await syncRankToDir(orderList).catch(e => console.warn("명부 순서", e));   // 29단계 — 명부에도 같은 순서 · 인턴
     state.souls.sort(bySeq);
     dlgOrder.close(); toast("순서를 저장했어요.");
     if (orderAfter) orderAfter(); else renderSouls();
@@ -5059,6 +5073,17 @@ async function backfillThumbs() {
    올릴 때마다 version.json 도 같이 올립니다. 앱은 열 때 · 다시 볼 때 · 10분마다
    그 파일만 살짝 확인해서(아주 작은 파일), 지금 버전보다 새것이면 위에 알림을 띄웁니다. */
 const CHANGELOG = [
+  { v:"30.0", d:"2026-11-10", items:[
+    "조직도 — 교회 → 진 → 진장 → 코치(맡은 셀) → 셀(셀리더 · 셀원 수 · 인턴 · 출석률)을 한 그림으로",
+    "홈 전시실 · 관리 서랍 · 조직 구성에서 '조직도' 열기, 사람을 누르면 명부 카드 · 셀을 누르면 그 셀 명부",
+    "교회 명부 목록(셀원 · 리더들 · 찾기) — '한눈에 보기' 비율 막대: 침례 · 새로운 삶 · 제자의 삶 · 정회원, 막대를 누르면 그 사람들만",
+    "정렬 더 — 셀 번호순 · 가나다순 · 나이순 · 젊은순 · 출석률순 · 생일순(다가오는 순)" ] },
+  { v:"29.0", d:"2026-11-09", items:[
+    "셀원 순서 · 인턴 — 한 창에서 영적 순서(맨 위 · ↑ · ↓)와 인턴을 함께, 영혼 목록 · 출석 · 교회 명부 · 셀 건강에 모두 같은 순서",
+    "인턴 표시 — 영혼 카드 이름 옆 · 교회 명부 카드에 '인턴'",
+    "교회 명부 — 목록 보기에서 셀 번호순 · 가나다순 · 나이순 정렬",
+    "교회 명부 › 통계 · 그래프 — 평균 나이 · 연령대 · 평균 출석률 · 출석률 분포 · 수료 현황 · 셀별 표 · 이번 달 생일",
+    "셀 건강 — 사람 줄을 '순서대로' 또는 '자주 빠지는 순'으로" ] },
   { v:"28.0", d:"2026-11-09", items:[
     "구글 캘린더 — 오류가 'c.includes…'로 가려지던 문제 고침, 무엇이 빠졌는지(API 켜기 · 캘린더 허용) 그대로 알려줘요",
     "셀 건강 — 창이 아니라 화면으로, 고리 + 숫자 4칸 + 8주 출석 막대, 자주 빠지는 사람이 위로, 인턴은 눌러서",
@@ -5669,6 +5694,9 @@ async function ensureDirectoryOnce() {
       try { await updateDoc(doc(db,"members",m.id), { soulIds: ids }); m.soulIds = ids; } catch {}
     }
     if (m && m.uid === me.id) { state.selfDup = s; continue; }
+    if (m && !m.uid && ((m.rank || 0) !== (s.seq || 0) || !!m.intern !== !!s.intern)) {
+      try { await updateDoc(doc(db, "members", m.id), { rank: s.seq || 0, intern: !!s.intern }); m.rank = s.seq || 0; m.intern = !!s.intern; } catch {}
+    }
     /* 명부 쪽에서 계정 · 초대가 이어졌으면 이 카드에도 본인 차단을 겁니다 */
     if (m && m.uid && !s.linkedUid) patch.linkedUid = m.uid;
     if (m && m.linkedEmail && m.linkedEmail !== myEmail() && !s.subjectEmail) patch.subjectEmail = m.linkedEmail;
@@ -5807,6 +5835,15 @@ function renderDir() {
   $("dir-cells").querySelectorAll("[data-dc]").forEach(b => b.classList.toggle("on", b.dataset.dc === state.dirCell));
   $("dir-roles").innerHTML = DROLES.map(([k,l]) => `<button type="button" data-dr="${k}" class="${state.dirRole===k?"on":""}">${l}</button>`).join("");
   const isLead = (m) => (m.role && m.role !== "member") || LM.has(m.id);
+  state.dirView = state.dirView || "list";
+  $("dir-view").querySelectorAll("[data-dv]").forEach(b => b.classList.toggle("on", b.dataset.dv === state.dirView));
+  $("dir-roles").hidden = state.dirView === "stats";
+  if (state.dirView === "stats") {
+    $("dir-sort").hidden = true; $("dir-ratio").innerHTML = "";
+    const scope = state.dirCell === "all" ? pool : state.dirCell === "none" ? pool.filter(m => !cellOfM(m)) : pool.filter(m => cellOfM(m) === state.dirCell);
+    renderDirStats(scope, cells, cellOfM, LM);
+    return;
+  }
   let list = pool;
   if (state.dirCell === "none") list = list.filter(m => !cellOfM(m));
   else if (state.dirCell !== "all") list = list.filter(m => cellOfM(m) === state.dirCell);
@@ -5814,14 +5851,38 @@ function renderDir() {
   if (state.dirRole === "member") list = list.filter(m => !isLead(m));
   if (state.dirRole === "new") list = list.filter(m => !m.uid && !(m.soulIds||[]).length);
   if (kw) list = list.filter(m => (m.name||"").includes(kw) || (kwd.length >= 3 && String(m.phone||"").replace(/\D/g,"").includes(kwd)));
+  /* 30단계 — 침례 · 새로운 삶 · 제자의 삶 · 정회원으로 거르기 (목록 보기) */
+  const listMode = !(!kw && state.dirRole === "all" && state.dirCell !== "none");
+  const preF = list;
+  if (listMode) list = list.filter(m => dirAttrPass(m));
   const rank = (m) => LM.has(m.id) ? 0 : isLead(m) ? 1 : 2;
-  list = list.slice().sort((a,b) => rank(a) - rank(b) || (a.name||"").localeCompare(b.name||"", "ko"));
   const grouped = !kw && state.dirRole === "all" && state.dirCell !== "none";
+  /* 29단계 — 셀 안에서는 셀리더가 정한 영적 순서(rank) → 이름 / 목록 보기는 고른 정렬 */
+  const byRank = (a, b) => ((a.rank || 999) - (b.rank || 999)) || (a.name||"").localeCompare(b.name||"", "ko");
+  const cellIdx = (m) => { const i = cells.findIndex(c => c.id === cellOfM(m)); return i < 0 ? 999 : i; };
+  if (grouped) list = list.slice().sort((a,b) => rank(a) - rank(b) || byRank(a, b));
+  else {
+    state.dirSort = state.dirSort || (state.dirRole === "lead" ? "cell" : "name");
+    const ds = state.dirSort, by = state.bdate || {};
+    const nm = (a, b) => (a.name||"").localeCompare(b.name||"", "ko");
+    const attR = (m) => { const r = attStats(m.id, cellOfM(m)).rate; return r == null ? -1 : r; };
+    const bdk = (m) => { if (!m.birthMD) return "99-99"; const t = todayStr().slice(5); const k = String(m.birthMD); return (k >= t ? "0" : "1") + k; };
+    list = list.slice().sort(ds === "cell" ? (a, b) => cellIdx(a) - cellIdx(b) || rank(a) - rank(b) || byRank(a, b)
+      : ds === "age" ? (a, b) => String(by[a.id] || "9999").localeCompare(String(by[b.id] || "9999")) || nm(a, b)
+      : ds === "young" ? (a, b) => String(by[b.id] || "0000").localeCompare(String(by[a.id] || "0000")) || nm(a, b)
+      : ds === "att" ? (a, b) => attR(b) - attR(a) || nm(a, b)
+      : ds === "bday" ? (a, b) => bdk(a).localeCompare(bdk(b)) || nm(a, b)
+      : nm);
+  }
+  $("dir-sort").hidden = grouped;
+  renderDirRatio(listMode ? preF : null, list.length);
+  $("dir-sort").querySelectorAll("[data-ds]").forEach(b => b.classList.toggle("on", b.dataset.ds === state.dirSort));
   const showCells = state.dirCell === "all" ? cells : cells.filter(c => c.id === state.dirCell);
   $("dir-count").textContent = `${list.length}명${state.dirCell === "all" && !kw ? ` · 셀 ${cells.length}개` : ""}`;
   const card = (m, o) => memCardHTML(m, { ...o, cellName: cellNameOf(cellOfM(m)), lead: LM.has(m.id) ? "셀리더" : "" });
   if (grouped) {
     const jinName = (c) => me.role === "super" && state.jins.length > 1 ? ((state.jins.find(j => j.id === c.jinId) || {}).name || "") : "";
+    const myCellIds = new Set(canLead() ? ownCells().map(c => c.id) : []);
     const none = state.dirCell === "all" ? list.filter(m => !cellOfM(m)) : [];
     const secs = showCells.map(c => {
       const ents = cellLeadEntries(c);
@@ -5833,9 +5894,9 @@ function renderDir() {
       const single = state.dirCell !== "all";   // 셀 하나만 볼 땐 셀리더도 같은 크기 카드로 한 판에
       return `<section class="cgrp">
         <div class="cgh"><span class="cbadge">${esc(c.name)}</span>
-          <span class="cgm">${esc(jinName(c))}</span><span class="cgc" data-cellatt="${c.id}">셀원 ${ms.length}명</span></div>
-        ${single ? `<div class="mgrid one">${leadH}${ms.map(m => card(m, {})).join("")}</div>`
-          : `${leadH}${ms.length ? `<div class="twigs">${ms.map(m => card(m, { twig: true })).join("")}</div>`
+          <span class="cgm">${esc(jinName(c))}</span>${myCellIds.has(c.id) ? `<button type="button" class="btn-sm" data-ordcell="${c.id}" style="height:30px;font-size:12px;padding:0 10px">순서 · 인턴</button>` : ""}<span class="cgc" data-cellatt="${c.id}">셀원 ${ms.length}명</span></div>
+        ${single ? `<div class="mgrid one">${leadH}${ms.map(m => card(m, { rank: true })).join("")}</div>`
+          : `${leadH}${ms.length ? `<div class="twigs">${ms.map(m => card(m, { twig: true, rank: true })).join("")}</div>`
           : `<p class="muted twig-empty">아직 등록된 셀원이 없어요.</p>`}`}
       </section>`;
     });
@@ -5860,7 +5921,7 @@ $("dir-search").oninput = () => renderDir();
 $("dir-cells").addEventListener("click", (ev) => { const b = ev.target.closest("[data-dc]"); if (!b) return;
   state.dirCell = b.dataset.dc; renderDir(); });
 $("dir-roles").addEventListener("click", (ev) => { const b = ev.target.closest("[data-dr]"); if (!b) return;
-  state.dirRole = b.dataset.dr; renderDir(); });
+  state.dirRole = b.dataset.dr; state.dirSort = ""; renderDir(); });
 $("dir-list").addEventListener("click", (ev) => { const r = ev.target.closest("[data-mem]"); if (r) openMember(r.dataset.mem); });
 $("btn-dir-new").onclick = () => openMEdit(null, state.dirCell !== "all" && state.dirCell !== "none" ? state.dirCell : null);
 $("btn-dir-cellmgr").onclick = () => openCellMgr();
@@ -7041,6 +7102,8 @@ async function openHealth() {
   renderHealth(); $("hl-err").textContent = ""; markSide("health"); show("s-health");
 }
 function renderHealth() {
+  state.hlSort = state.hlSort || "seq";
+  document.querySelectorAll("#hl-sort [data-hs]").forEach(b => b.classList.toggle("on", b.dataset.hs === state.hlSort));
   const own = new Set(ownCells().map(c => c.id));
   const cells = canLead() && !["coach", "jinjang", "pastor"].includes(state.me.role) ? ownCells() : seenCells();
   $("hl-body").innerHTML = cells.map(c => healthCard(c, cellHealth(c.id), own.has(c.id))).join("")
@@ -7071,7 +7134,8 @@ function healthCard(c, h, mine) {
     const okn = cells.filter(v => v && v !== "absent").length, rec = cells.filter(Boolean).length;
     const r = rec ? Math.round(okn / rec * 100) : null, tone = r == null ? "" : r >= 75 ? "good" : r >= 50 ? "mid" : "low";
     return { s, cells, r, tone };
-  }).sort((a, b) => (a.r == null ? 101 : a.r) - (b.r == null ? 101 : b.r));   // 빠지는 사람이 위로
+  });
+  if (state.hlSort === "low") ppl.sort((a, b) => (a.r == null ? 101 : a.r) - (b.r == null ? 101 : b.r));   // 빠지는 사람이 위로
   const canTick = mine && h.people.some(isLeaderOf);
   return `<div class="hc">
     <div class="hc-h"><span class="cbadge">${esc(c.name)}</span>
@@ -7087,13 +7151,13 @@ function healthCard(c, h, mine) {
         </div></div>
       <div class="hc-chart"><p class="t"><b>8주 출석</b><span>초록 = 온 사람 · 회색 = 체크한 인원</span></p>${chart}</div>
     </div>
-    ${ppl.length && ms.length ? `<p class="hc-sec">사람별 출석 <span>최근 8주 · 자주 빠지는 사람이 위에</span></p>
+    ${ppl.length && ms.length ? `<p class="hc-sec">사람별 출석 <span>최근 8주 · ${state.hlSort === "low" ? "자주 빠지는 사람이 위에" : "셀리더가 정한 순서"}</span></p>
       <div class="hppl">${ppl.map(p => `<div class="hp ${p.tone}">
         <span class="nm" title="${esc(p.s.name)}">${esc(p.s.name)}</span>
         <span class="dd">${p.cells.map((v, i) => `<i class="${v || "nr"}" title="${esc(md(ms[i].date))} ${v ? ATT[v] : "기록 없음"}"></i>`).join("")}</span>
         <span class="rt"><b>${p.r == null ? "—" : p.r + "%"}</b><span class="at-bar"><i style="width:${p.r || 0}%"></i></span></span></div>`).join("")}</div>
       <p class="hlegend"><span><i style="background:var(--ok-strong)"></i>출석</span><span><i style="background:#7FA8E8"></i>온라인</span><span><i style="background:var(--brand)"></i>결석</span><span><i style="box-shadow:inset 0 0 0 1.5px var(--line3)"></i>기록 없음</span></p>` : ""}
-    <p class="hc-sec">인턴 (예비 셀리더) ${h.interns.length}명 <span>${canTick ? "눌러서 세우거나 빼요" : ""}</span></p>
+    <p class="hc-sec">인턴 (예비 셀리더) ${h.interns.length}명 <span>${canTick ? "눌러서 세우거나 빼요 · 순서는 '순서 · 인턴'에서" : ""}</span></p>
     ${canTick ? `<div class="hints">${h.people.filter(isLeaderOf).map(s => `
         <label class="${s.intern ? "on" : ""}"><input type="checkbox" data-intern="${s.id}" ${s.intern ? "checked" : ""}>${esc(s.name)}${s.intern && s.internSince ? `<span class="muted" style="font-size:11px">${fmtDate(s.internSince)}~</span>` : ""}</label>`).join("")}</div>`
       : `<p style="font-size:14px">${h.interns.map(s => esc(s.name)).join(", ") || "아직 없어요"}</p>`}
@@ -7105,6 +7169,7 @@ $("hl-body").addEventListener("change", async (ev) => {
   const patch = cb.checked ? { intern: true, internSince: s.internSince || todayStr() } : { intern: false, internSince: "" };
   cb.disabled = true;
   try { await updateDoc(doc(db, "souls", s.id), patch); Object.assign(s, patch);
+        syncRankToDir([s]).catch(() => {});
         toast(cb.checked ? `${s.name} 님을 인턴으로 세웠어요.` : "인턴 표시를 뺐어요."); renderHealth(); renderRooms(); }
   catch (e) { cb.checked = !cb.checked; $("hl-err").textContent = msgOf(e); }
   finally { cb.disabled = false; }
@@ -8292,6 +8357,7 @@ function memCardHTML(m, o) {
     if (e.p.sub) chips.push(`<span class="chip">${esc(e.p.sub)}</span>`);
   }
   if (m.uid === me.id) chips.push(`<span class="chip rose">나</span>`);
+  if (m.intern && !lead) chips.push(`<span class="chip intern">인턴</span>`);
   if (!e && pendingInvite(m)) chips.push(`<span class="chip warn">초대 중</span>`);
   if (handPendingFor(m)) chips.push(`<span class="chip warn">카드 넘어가는 중</span>`);
   const role = lead ? "셀리더" : (m.role && m.role !== "member" ? (ROLEBADGE[m.role] || "") : "");
@@ -8305,7 +8371,7 @@ function memCardHTML(m, o) {
     <div class="mc-body">
       <div class="mc-top">
         <div class="mc-id">${role ? `<p class="mc-role">${esc(role)}${chips.length ? " " + chips.join(" ") : ""}</p>` : ""}
-          <p class="mc-nm">${esc(m.name || "")}${!role && chips.length ? " " + chips.join(" ") : ""}</p></div>
+          <p class="mc-nm">${o.rank && m.rank && !lead ? `<span class="rk" title="셀 안 순서">${m.rank}</span>` : ""}${esc(m.name || "")}${!role && chips.length ? " " + chips.join(" ") : ""}</p></div>
         <div class="mc-att" data-att="${m.id}"></div>
       </div>
       <div class="mc-info">
@@ -8971,3 +9037,274 @@ document.addEventListener("click", (ev) => {
 
 /* 28단계 — 홈 위 · 사이드바 아래에도 버전 */
 document.addEventListener("click", (ev) => { if (ev.target.closest("#home-ver, #side-ver")) $("btn-ver").click(); });
+
+/* ════════ 29단계 — 셀원 순서 · 인턴을 명부에도 (같은 진 누구나 보는 명부 카드) ════════
+   셀리더는 자기 셀의 (계정 없는) 사람 명부 카드를 고칠 수 있어서 보안 규칙은 그대로예요. */
+async function syncRankToDir(souls) {
+  const ws = [];
+  for (const s of souls) {
+    const m = s.memberId ? memberById(s.memberId) : null; if (!m || m.uid) continue;
+    const want = { rank: s.seq || 0, intern: !!s.intern };
+    if ((m.rank || 0) !== want.rank || !!m.intern !== want.intern)
+      ws.push(updateDoc(doc(db, "members", m.id), want).then(() => Object.assign(m, want)).catch(e => console.warn("명부 순서", m.name, e)));
+  }
+  await Promise.all(ws);
+}
+
+/* 29단계 — 명부: 명단 / 통계 · 정렬 */
+$("dir-view").addEventListener("click", (ev) => {
+  const b = ev.target.closest("[data-dv]"); if (!b) return;
+  state.dirView = b.dataset.dv; renderDir();
+});
+$("dir-sort").addEventListener("click", async (ev) => {
+  const b = ev.target.closest("[data-ds]"); if (!b) return;
+  state.dirSort = b.dataset.ds;
+  if (state.dirSort === "age" || state.dirSort === "young") {
+    b.disabled = true;
+    const n = await loadBirths(dirPool());
+    b.disabled = false;
+    if (!n) toast("나이는 노션 명단(잠긴 칸)을 볼 수 있는 분만 정렬돼요.");
+  }
+  renderDir();
+});
+/* 생년월일(잠긴 칸) — 볼 수 있는 사람 것만 */
+async function loadBirths(list) {
+  state.bdate = state.bdate || {};
+  await Promise.all(list.map(async m => {
+    if (state.bdate[m.id] !== undefined) return;
+    const P = await privOf(m); const b = String((P && P.birth) || "");
+    state.bdate[m.id] = /^(19|20)\d\d-\d\d-\d\d$/.test(b) ? b : /^(19|20)\d\d/.test(b) ? b.slice(0, 4) + "-07-01" : "";
+  }));
+  return list.filter(m => state.bdate[m.id]).length;
+}
+const ageOf = (b) => { if (!b) return null; const t = new Date(todayStr()), d = new Date(b);
+  let a = t.getFullYear() - d.getFullYear(); if (t.getMonth() < d.getMonth() || (t.getMonth() === d.getMonth() && t.getDate() < d.getDate())) a--; return a; };
+function renderDirStats(scope, cells, cellOfM, LM) {
+  $("dir-count").textContent = `${scope.length}명 기준`;
+  $("dir-list").innerHTML = `<p class="muted" style="margin-top:14px">통계를 모으는 중…</p>`;
+  const tk = state.dirStatsTk = (state.dirStatsTk || 0) + 1;
+  Promise.all([loadBirths(scope), loadAttReps().catch(() => [])]).then(() => {
+    if (tk !== state.dirStatsTk || state.dirView !== "stats") return;
+    $("dir-list").innerHTML = dirStatsHTML(scope, cells, cellOfM, LM);
+  });
+}
+function dirStatsHTML(scope, cells, cellOfM, LM) {
+  const by = state.bdate || {}, N = scope.length;
+  const ages = scope.map(m => ageOf(by[m.id])).filter(a => a !== null);
+  const avgAge = ages.length ? Math.round(ages.reduce((a, b) => a + b, 0) / ages.length * 10) / 10 : null;
+  const AB = [["20대 이하", a => a < 30], ["30대", a => a >= 30 && a < 40], ["40대", a => a >= 40 && a < 50], ["50대", a => a >= 50 && a < 60], ["60대 이상", a => a >= 60]];
+  const ab = AB.map(([l, f]) => ({ l, n: ages.filter(f).length })), abMax = Math.max(1, ...ab.map(x => x.n));
+  /* 출석 — 최근 3개월 셀 보고 */
+  const at = scope.map(m => ({ m, st: attStats(m.id, cellOfM(m)) }));
+  let okS = 0, nS = 0; at.forEach(x => { okS += x.st.ok; nS += x.st.n; });
+  const rate = nS ? Math.round(okS / nS * 100) : null;
+  const RB = [["75% 이상", "var(--ok-strong)", r => r >= 75], ["50~74%", "var(--warn-tx)", r => r >= 50 && r < 75], ["25~49%", "#E07B5A", r => r >= 25 && r < 50], ["25% 미만", "var(--brand)", r => r < 25]];
+  const rated = at.filter(x => x.st.rate !== null), noRec = N - rated.length;
+  const rb = RB.map(([l, c, f]) => ({ l, c, n: rated.filter(x => f(x.st.rate)).length }));
+  /* 수료 */
+  const has = (m, t) => (m.trainingsDone || []).includes(t);
+  const both = scope.filter(m => has(m, "새로운 삶") && has(m, "제자의 삶")).length;
+  const nl = scope.filter(m => has(m, "새로운 삶")).length, dl = scope.filter(m => has(m, "제자의 삶")).length;
+  const onlyN = nl - both, onlyD = dl - both, none = N - both - onlyN - onlyD;
+  const pct = (x) => N ? Math.round(x / N * 100) : 0;
+  const interns = scope.filter(m => m.intern).length;
+  const streak = at.filter(x => x.st.streak >= 2).length;
+  /* 생일 — 이번 달 · 다음 달 */
+  const mo = Number(todayStr().slice(5, 7)), mo2 = mo % 12 + 1;
+  const bd = (mm) => scope.filter(m => m.birthMD && Number(String(m.birthMD).slice(0, 2)) === mm)
+    .sort((a, b) => String(a.birthMD).localeCompare(String(b.birthMD)));
+  const bdHTML = (mm) => { const l = bd(mm); return l.length ? `<div class="bdays">${l.map(m => `<span>${esc(m.name)} · ${Number(String(m.birthMD).slice(3, 5))}일</span>`).join("")}</div>` : `<p class="muted" style="font-size:12px">없어요</p>`; };
+  /* 셀별 */
+  const perCell = state.dirCell === "all" ? cells.map(c => {
+    const ms = scope.filter(m => cellOfM(m) === c.id); if (!ms.length) return null;
+    const ag = ms.map(m => ageOf(by[m.id])).filter(a => a !== null);
+    let o = 0, n = 0; ms.forEach(m => { const st = attStats(m.id, c.id); o += st.ok; n += st.n; });
+    return { c, n: ms.length, age: ag.length ? Math.round(ag.reduce((a, b) => a + b, 0) / ag.length) : null, rate: n ? Math.round(o / n * 100) : null };
+  }).filter(Boolean) : [];
+  const nMax = Math.max(1, ...perCell.map(x => x.n));
+  return `<div class="dst">
+    <div class="dst-kpi">
+      <div><p>인원</p><b>${N}명</b><small>${state.dirCell === "all" ? `셀 ${cells.length}개 · 셀당 ${cells.length ? Math.round(N / cells.length * 10) / 10 : 0}명` : esc(cellNameOf(state.dirCell) || "")}</small></div>
+      <div><p>평균 나이 (만)</p><b>${avgAge === null ? "—" : avgAge + "세"}</b><small>${ages.length}명 기준</small></div>
+      <div><p>평균 출석률</p><b style="color:${rate === null ? "inherit" : rate >= 75 ? "var(--ok-tx)" : rate >= 50 ? "var(--warn-tx)" : "var(--rose-tx)"}">${rate === null ? "—" : rate + "%"}</b><small>최근 3개월 셀 보고</small></div>
+      <div><p>새로운 삶 수료</p><b>${pct(nl)}%</b><small>${nl}명</small></div>
+      <div><p>제자의 삶 수료</p><b>${pct(dl)}%</b><small>${dl}명</small></div>
+      <div><p>인턴 · 연속 결석</p><b>${interns} · <span style="color:${streak ? "var(--warn-tx)" : "inherit"}">${streak}</span></b><small>인턴 ${interns}명 · 2번 넘게 결석 ${streak}명</small></div>
+    </div>
+    <div class="dst-grid">
+      <div class="dst-c"><h3>연령대 <span>만 나이 · ${ages.length}명 (모름 ${N - ages.length}명)</span></h3>
+        <div class="agebars">${ab.map(x => `<div class="ab${x.n ? "" : " dim"}"><b>${x.n}</b><i style="height:${Math.max(3, x.n / abMax * 100)}%"></i></div>`).join("")}</div>
+        <div class="agelab">${ab.map(x => `<span>${x.l}</span>`).join("")}</div></div>
+      <div class="dst-c"><h3>출석률 분포 <span>최근 3개월 · 기록 있는 ${rated.length}명</span></h3>
+        <div class="stk">${rb.map(x => x.n ? `<i style="width:${x.n / Math.max(1, rated.length) * 100}%;background:${x.c}" title="${x.l} ${x.n}명"></i>` : "").join("")}</div>
+        <div class="lgd">${rb.map(x => `<span><i style="background:${x.c}"></i>${x.l} ${x.n}명</span>`).join("")}<span><i style="background:var(--track)"></i>기록 없음 ${noRec}명</span></div>
+        <h3 style="margin-top:18px">수료 현황 <span>새로운 삶 · 제자의 삶</span></h3>
+        <div class="stk">${[[both, "var(--ok-strong)"], [onlyN, "#7FA8E8"], [onlyD, "#9A8CF0"]].map(([n, c]) => n ? `<i style="width:${pct(n)}%;background:${c}"></i>` : "").join("")}</div>
+        <div class="lgd"><span><i style="background:var(--ok-strong)"></i>둘 다 ${both}명</span><span><i style="background:#7FA8E8"></i>새로운 삶만 ${onlyN}명</span><span><i style="background:#9A8CF0"></i>제자의 삶만 ${onlyD}명</span><span><i style="background:var(--track)"></i>아직 ${none}명</span></div></div>
+      ${perCell.length ? `<div class="dst-c" style="grid-column:1/-1"><h3>셀별 <span>인원 · 평균 나이 · 출석률 (최근 3개월)</span></h3>
+        <div class="ctab h"><span>셀</span><span>인원</span><span class="v">평균 나이</span><span class="v">출석률</span></div>
+        ${perCell.map(x => `<div class="ctab"><span class="nm"><b>${esc(x.c.name)}</b><small>${esc(cellLeadName(x.c))}</small></span>
+          <span style="display:flex;align-items:center;gap:8px"><span class="tr" style="flex:1"><i style="width:${x.n / nMax * 100}%;background:var(--brand)"></i></span><span style="width:28px;text-align:right">${x.n}</span></span>
+          <span class="v">${x.age === null ? "—" : x.age + "세"}</span>
+          <span class="v" style="color:${x.rate === null ? "var(--dim)" : x.rate >= 75 ? "var(--ok-tx)" : x.rate >= 50 ? "var(--warn-tx)" : "var(--rose-tx)"}">${x.rate === null ? "보고 없음" : x.rate + "%"}</span></div>`).join("")}</div>` : ""}
+      <div class="dst-c"><h3>이번 달 생일 <span>${mo}월</span></h3>${bdHTML(mo)}<h3 style="margin-top:16px">다음 달 생일 <span>${mo2}월</span></h3>${bdHTML(mo2)}</div>
+    </div>
+    <p class="hint">나이는 노션 명단(잠긴 칸)의 생년월일로 세요 — 그걸 볼 수 있는 분(수퍼 · 진장 · 코치 · 그 셀 셀리더)에게만 나이가 잡혀요.</p>
+  </div>`;
+}
+
+$("dir-list").addEventListener("click", async (ev) => {
+  const b = ev.target.closest("[data-ordcell]"); if (!b) return;
+  ev.stopPropagation();
+  await loadSouls();
+  openOrderDlg(b.dataset.ordcell, () => renderDir());
+}, true);
+/* 셀 건강 — 사람 줄 순서: 셀리더가 정한 순서 / 자주 빠지는 순 */
+document.addEventListener("click", (ev) => {
+  const b = ev.target.closest("#hl-sort [data-hs]"); if (!b) return;
+  state.hlSort = b.dataset.hs; renderHealth();
+});
+
+/* ════════ 30단계 — 조직도 ════════
+   교회 → 진 → 진장 → 코치(맡은 셀) → 셀(셀리더 · 셀원 수 · 인턴 · 출석률).
+   자리는 '조직 구성'(수퍼)에서 짜고, 여기는 누구나(같은 진) 보는 그림이에요. */
+async function openOrgChart() {
+  if (!state.me || state.me.role === "member") return;
+  show("s-loading");
+  await loadOrg(true);
+  if (!state.orgName) { try { const o = await getDoc(doc(db, "org", "main")); if (o.exists()) state.orgName = o.data().name; } catch {} }
+  $("oc-edit").hidden = state.me.role !== "super";
+  renderOrgChart(); markSide && markSide(""); show("s-orgchart");
+  loadAttReps().then(() => { if (!$("s-orgchart").hidden) renderOrgChart(); }).catch(() => {});
+}
+function ocPerson(p, role, extraCls) {
+  const m = p.t === "acc" ? memberOfUid(p.uid) : p.t === "noe" ? p.m : (p.inv && p.inv.memberId ? memberById(p.inv.memberId) : null);
+  const ava = m ? avatar(m, 40) : `<span class="ava" style="width:40px;height:40px;font-size:16px">${esc(initial(p.name || ""))}</span>`;
+  const st = p.t === "inv" ? `<span class="chip warn">초대 중</span>` : p.t === "noe" ? `<span class="chip lock">가입 전</span>` : "";
+  const mine = p.t === "acc" && p.uid === uid() ? `<span class="chip rose">나</span>` : "";
+  return `<button type="button" class="oc-node ${extraCls || ""}${p.t !== "acc" ? " pend" : ""}"${m ? ` data-ocmem="${m.id}"` : ""}>
+    ${ava}<span class="t"><span class="r">${role}${st}${mine}</span><span class="n" style="display:block">${esc(p.name || "")}</span>
+    ${p.sub ? `<span class="s" style="display:block">${esc(p.sub)}</span>` : ""}</span></button>`;
+}
+function ocCell(c) {
+  const ents = cellLeadEntries(c), e = ents[0];
+  const lids = new Set(ents.map(x => x.m && x.m.id).filter(Boolean));
+  const ms = (state.dir || []).filter(m => m.cellId === c.id && m.active !== false && !lids.has(m.id));
+  const interns = ms.filter(m => m.intern).length;
+  let rate = null;
+  if (state.attRep) { const from = ymd(new Date(Date.now() - 92 * 864e5));
+    let ok = 0, all = 0; state.attRep.filter(r => r.cellId === c.id && r.date >= from && r.date <= todayStr())
+      .forEach(r => Object.values(r.att || {}).forEach(v => { if (!v) return; all++; if (v !== "absent") ok++; }));
+    rate = all ? Math.round(ok / all * 100) : null; }
+  const lm = e && e.m, nm = e ? ((lm && lm.name) || e.p.name || "") : "";
+  const st = !e ? "" : e.p.t === "inv" ? `<span class="chip warn">초대 중</span>` : e.p.t === "noe" ? `<span class="chip lock">가입 전</span>` : "";
+  return `<button type="button" class="oc-cell" data-occell="${c.id}">
+    <span class="h"><span class="cbadge">${esc(c.name)}</span><span class="cnt">셀원 ${ms.length}명</span></span>
+    <span class="ld">${lm ? avatar(lm, 30) : `<span class="ava" style="width:30px;height:30px;font-size:13px">${esc(initial(nm || "?"))}</span>`}
+      <span class="nm">${nm ? esc(nm) : "셀리더 미정"}</span>${st}</span>
+    <span class="ft">${interns ? `<span class="tpill">인턴 ${interns}</span>` : ""}${rate !== null ? `<span>출석 ${rate}%</span>` : `<span>최근 보고 없음</span>`}</span>
+  </button>`;
+}
+function renderOrgChart() {
+  const me = state.me;
+  const jins = state.jins.filter(j => j.active !== false && (me.role === "super" || j.id === me.jinId));
+  const body = jins.map(j => {
+    const cells = activeCells().filter(c => c.jinId === j.id);
+    const jj = seatList("jinjang", j.id), co = seatList("coach", j.id);
+    const people = (state.dir || []).filter(m => m.jinId === j.id && m.active !== false).length;
+    /* 코치마다 맡은 셀 */
+    const cellIdsOf = (p) => p.t === "acc" ? ((userOf(p.uid) || {}).cellIds || []) : p.t === "inv" ? (p.inv.cellIds || []) : ((p.m && p.m.pendingSeat && p.m.pendingSeat.cellIds) || []);
+    const used = new Set();
+    const groups = co.map(p => { const ids = cellIdsOf(p).filter(id => cells.some(c => c.id === id)); ids.forEach(id => used.add(id));
+      return { p, cells: cells.filter(c => ids.includes(c.id)) }; });
+    const rest = cells.filter(c => !used.has(c.id));
+    const jjHTML = jj.length ? `<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">${jj.map(p => ocPerson(p, "진장", "oc-jj")).join("")}</div>`
+      : `<div class="oc-node empty">진장 자리 비어 있음${me.role === "super" ? " — '자리 고치기'에서 넣어요" : ""}</div>`;
+    let lower;
+    if (groups.length) {
+      const cols = groups.map(g => `<div class="oc-col">${ocPerson({ ...g.p, sub: `맡은 셀 ${g.cells.length}개` }, "코치", "oc-coach")}
+          ${g.cells.length ? `<div class="oc-cells${g.cells.length > 8 ? " c3" : g.cells.length > 4 ? " c2" : ""}">${g.cells.map(ocCell).join("")}</div>` : ""}</div>`);
+      if (rest.length) cols.push(`<div class="oc-col"><div class="oc-node oc-coach none" style="cursor:default"><span class="t"><span class="r">코치</span>
+          <span class="n" style="display:block;color:var(--dim)">코치 미지정</span><span class="s" style="display:block">셀 ${rest.length}개 — 진장이 바로</span></span></div>
+          <div class="oc-cells${rest.length > 8 ? " c3" : rest.length > 4 ? " c2" : ""}">${rest.map(ocCell).join("")}</div></div>`);
+      lower = `<div class="oc-v"></div><div class="oc-scroll"><div class="oc-cols">${cols.join("")}</div></div>`;
+    } else {
+      lower = `<div class="oc-v"></div>${cells.length ? `<div class="oc-grid">${cells.map(ocCell).join("")}</div>`
+        : `<div class="oc-node empty">아직 셀이 없어요</div>`}`;
+    }
+    return `<div class="oc-jinwrap">
+      <div class="oc-node oc-jin"><span class="t"><span class="r">진</span><span class="n" style="display:block">${esc(j.name)}</span>
+        <span class="s" style="display:block">셀 ${cells.length}개 · ${people}명${co.length ? ` · 코치 ${co.length}명` : ""}</span></span></div>
+      <div class="oc-v"></div>${jjHTML}${lower}</div>`;
+  }).join("");
+  $("oc-body").innerHTML = `<div class="oc">
+    <div class="oc-node oc-church">${esc(state.orgName || "교회")}</div>
+    ${jins.length ? `<div class="oc-v"></div>` : ""}${body || `<p class="muted">아직 진이 없어요.</p>`}</div>`;
+}
+$("oc-back").onclick = () => openHome();
+$("oc-edit").onclick = () => openOrg();
+$("btn-home-orgchart").onclick = () => openOrgChart();
+$("oc-body").addEventListener("click", (ev) => {
+  const p = ev.target.closest("[data-ocmem]"); if (p) { openMember(p.dataset.ocmem); return; }
+  const c = ev.target.closest("[data-occell]");
+  if (c) { state.dirCell = c.dataset.occell; state.dirView = "list"; state.dirRole = "all"; openDir(); }
+});
+$("btn-org-chart").onclick = () => openOrgChart();
+
+/* ════════ 30단계 — 명부 목록: 비율 한눈에 + 눌러서 거르기 ════════
+   침례 · 정회원은 노션 명단(잠긴 칸)이라 볼 수 있는 분에게만 잡혀요 (명부 카드의 침례일이 있으면 그것도). */
+state.dirF = state.dirF || {};
+state.pv = state.pv || {};
+function pvOf(m) { return state.pv[m.id]; }
+async function loadPv(list) {
+  const need = list.filter(m => state.pv[m.id] === undefined && canSeePriv(m) && m.notionAt);
+  list.forEach(m => { if (state.pv[m.id] === undefined && !(canSeePriv(m) && m.notionAt)) state.pv[m.id] = null; });
+  if (!need.length) return false;
+  await Promise.all(need.map(async m => { state.pv[m.id] = (await privOf(m)) || null; }));
+  return true;
+}
+const bapOf = (m) => {
+  if (m.baptizedAt) return "y";
+  const P = pvOf(m); const t = P ? (P.baptism || []).join(" ") : "";
+  if (/침례\s*(O|o|○|Yes|예)|침례여부\s*(Yes|예|O)/.test(t)) return "y";
+  if (/침례\s*(X|x|No|아니)|침례여부\s*(No|아니|X)/.test(t)) return "n";
+  return "u";
+};
+const memOf = (m) => { const P = pvOf(m); const t = P ? String(P.membership || "") : ""; return /정회원/.test(t) && !/비회원/.test(t) ? "y" : /비회원/.test(t) ? "n" : "u"; };
+const trOf = (m, t) => (m.trainingsDone || []).includes(t) ? "y" : "n";
+const DIR_ATTR = [
+  { k: "bap", label: "침례", f: bapOf, parts: [["y", "받음", "var(--ok-strong)"], ["n", "안 받음", "var(--brand)"], ["u", "모름", ""]] },
+  { k: "nl", label: "새로운 삶", f: (m) => trOf(m, "새로운 삶"), parts: [["y", "수료", "#5B8DEF"], ["n", "아직", "#C77A52"]] },
+  { k: "dl", label: "제자의 삶", f: (m) => trOf(m, "제자의 삶"), parts: [["y", "수료", "#8C7CF0"], ["n", "아직", "#C77A52"]] },
+  { k: "mem", label: "정회원", f: memOf, parts: [["y", "정회원", "#2E9D8F"], ["n", "비회원", "#B08A3E"], ["u", "모름", ""]] },
+];
+function dirAttrPass(m) { return DIR_ATTR.every(a => !state.dirF[a.k] || a.f(m) === state.dirF[a.k]); }
+function renderDirRatio(base, shown) {
+  const box = $("dir-ratio");
+  if (!base) { box.innerHTML = ""; return; }
+  if (base.length && base.some(m => state.pv[m.id] === undefined)) {
+    loadPv(base).then(ch => { if (ch && state.dirView !== "stats") renderDir(); });
+  }
+  const anyF = DIR_ATTR.some(a => state.dirF[a.k]);
+  const N = base.length;
+  const rows = DIR_ATTR.map(a => {
+    const cnt = {}; base.forEach(m => { const v = a.f(m); cnt[v] = (cnt[v] || 0) + 1; });
+    const parts = a.parts.filter(([v]) => cnt[v]);
+    const known = a.parts.filter(([v]) => v !== "u").reduce((n, [v]) => n + (cnt[v] || 0), 0);
+    const yes = cnt.y || 0;
+    return `<div class="rr"><span class="lb">${a.label}</span>
+      <div class="bar${state.dirF[a.k] ? " dimmed" : ""}">${parts.map(([v, l, c]) => `<button type="button" class="${c ? "" : "unk"}${state.dirF[a.k] === v ? " on" : ""}"
+        data-rf="${a.k}:${v}" style="flex:${cnt[v]} 1 0;${c ? `background:${c}` : ""}" title="${a.label} ${l} ${cnt[v]}명 — 눌러서 거르기">${cnt[v] / N >= .12 ? `${l} ${cnt[v]}` : cnt[v]}</button>`).join("")}</div>
+      <div class="lg">${a.parts.map(([v, l, c]) => `<span><i style="background:${c || "var(--track)"}"></i>${l} ${cnt[v] || 0}명</span>`).join("")}
+        ${known ? `<span style="color:var(--text);font-weight:600">${Math.round(yes / known * 100)}%${a.parts.some(p => p[0] === "u") && cnt.u ? ` (아는 ${known}명 중)` : ""}</span>` : ""}</div></div>`;
+  }).join("");
+  box.innerHTML = N ? `<div class="rto"><div class="rto-h"><b>한눈에 보기</b><span>${N}명 · 막대를 누르면 그 사람들만 보여요</span>
+      ${anyF ? `<button type="button" class="btn-sm" data-rfclear="1" style="height:28px;font-size:12px">거르기 풀기 (${shown}명 보는 중)</button>` : ""}</div>
+    <div class="rto-grid">${rows}</div></div>` : "";
+}
+$("dir-ratio").addEventListener("click", (ev) => {
+  if (ev.target.closest("[data-rfclear]")) { state.dirF = {}; renderDir(); return; }
+  const b = ev.target.closest("[data-rf]"); if (!b) return;
+  const [k, v] = b.dataset.rf.split(":");
+  state.dirF[k] = state.dirF[k] === v ? "" : v; renderDir();
+});

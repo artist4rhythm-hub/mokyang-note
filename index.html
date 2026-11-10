@@ -416,6 +416,9 @@
   .ordrow button{width:38px;height:38px;flex-shrink:0;border:1px solid var(--line);
     border-radius:10px;background:transparent;color:var(--text);cursor:pointer;font-size:14px}
   .ordrow button:disabled{opacity:.3;cursor:default}
+  .ordrow button.int{width:auto;padding:0 10px;font-size:12px;color:var(--dim);font-family:inherit}
+  .ordrow button.int.on{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok-tx);font-weight:600}
+  .ordrow button.top{width:auto;padding:0 8px;font-size:11px;color:var(--dim);font-family:inherit}
 
   .row .sub2{font-size:12px;color:var(--dim);margin-top:2px;overflow:hidden;
     text-overflow:ellipsis;white-space:nowrap}
@@ -715,6 +718,106 @@
     .rooms{grid-template-columns:repeat(3,minmax(0,1fr))}
     .drawer-in{grid-template-columns:repeat(3,minmax(0,1fr))}
   }
+  /* 30단계 — 명부 비율 · 거르기 */
+  .rto{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px 14px;margin-top:10px;box-shadow:var(--card-shadow)}
+  .rto-h{display:flex;align-items:baseline;gap:8px;margin-bottom:6px}
+  .rto-h b{font-size:13px;font-weight:600}.rto-h span{font-size:11px;color:var(--dim)}
+  .rto-h button{margin-left:auto}
+  .rto-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:4px 22px}
+  .rr{display:grid;grid-template-columns:62px minmax(0,1fr);gap:10px;align-items:center;padding:5px 0}
+  .rr .lb{font-size:12px;font-weight:600}
+  .rr .bar{display:flex;height:22px;border-radius:7px;overflow:hidden;background:var(--track);gap:2px}
+  .rr .bar button{border:none;padding:0 6px;font:inherit;font-size:11px;font-weight:600;color:#fff;cursor:pointer;min-width:0;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:filter .15s}
+  .rr .bar button.unk{color:var(--dim);background:transparent}
+  .rr .bar button:hover{filter:brightness(1.12)}
+  .rr .bar button.on{box-shadow:inset 0 0 0 2px var(--text)}
+  .rr .bar.dimmed button:not(.on){opacity:.35}
+  .rr .lg{grid-column:2;display:flex;gap:10px;flex-wrap:wrap;font-size:11px;color:var(--dim);margin-top:-1px}
+  .rr .lg i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px}
+  /* 30단계 — 조직도 */
+  @media (min-width:880px){ #s-orgchart{max-width:1640px} }
+  .oc{display:flex;flex-direction:column;align-items:center}
+  .oc-node{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:14px;
+    padding:10px 14px;box-shadow:var(--card-shadow);min-width:200px;max-width:320px;cursor:pointer;text-align:left;font-family:inherit;color:inherit}
+  .oc-node.pend{border-style:dashed}
+  .oc-node.empty{border-style:dashed;color:var(--dim);cursor:default;justify-content:center}
+  .oc-node .t{flex:1;min-width:0}
+  .oc-node .r{font-size:11px;color:var(--rose-tx);display:flex;gap:5px;align-items:center;flex-wrap:wrap}
+  .oc-node .r .chip{font-size:10px;padding:1px 7px}
+  .oc-node .n{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .oc-node .s{font-size:11.5px;color:var(--dim);margin-top:1px}
+  .oc-church{background:var(--rose-bg);border-color:var(--rose-line);cursor:default;justify-content:center;font-weight:600;font-size:15px}
+  .oc-jin{background:linear-gradient(135deg,var(--lead-bg),var(--surface) 70%);border-color:var(--rose-line2);cursor:default}
+  .oc-jj{border-color:var(--rose-line2);border-width:1.5px}
+  .oc-v{width:2px;height:22px;background:var(--line3)}
+  .oc-scroll{width:100%;overflow-x:auto;padding-bottom:6px}
+  .oc-cols{display:flex;gap:18px;justify-content:center;min-width:max-content;margin:0 auto;padding:0 8px}
+  .oc-col{position:relative;padding-top:22px;display:flex;flex-direction:column;align-items:center}
+  .oc-col::before{content:"";position:absolute;top:0;left:50%;height:22px;border-left:2px solid var(--line3)}
+  .oc-col::after{content:"";position:absolute;top:0;left:-9px;right:-9px;border-top:2px solid var(--line3)}
+  .oc-col:first-child::after{left:50%}.oc-col:last-child::after{right:50%}
+  .oc-col:only-child::after{display:none}
+  .oc-coach{border-color:#7FA8E8;min-width:210px}
+  .oc-coach .r{color:#7FA8E8}
+  .oc-coach.none{border-style:dashed;color:var(--dim)}
+  .oc-cells{display:flex;flex-direction:column;gap:8px;margin-top:0;position:relative;padding-top:18px;align-items:center}
+  .oc-cells::before{content:"";position:absolute;top:0;left:50%;height:18px;border-left:2px solid var(--line3)}
+  @media (min-width:641px){ .oc-cells.c2{display:grid;grid-template-columns:repeat(2,240px)} .oc-cells.c3{display:grid;grid-template-columns:repeat(3,240px)} }
+  .oc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;width:100%;
+    border:2px solid var(--line3);border-radius:18px;padding:14px;position:relative}
+  .oc-cell{display:flex;flex-direction:column;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:14px;
+    padding:10px 12px;width:240px;cursor:pointer;box-shadow:var(--card-shadow);text-align:left;font-family:inherit;color:inherit}
+  .oc-grid .oc-cell{width:auto}
+  .oc-cell:hover,.oc-node:hover{border-color:var(--line3)}
+  .oc-cell .h{display:flex;align-items:center;gap:8px}
+  .oc-cell .h .cnt{margin-left:auto;font-size:11.5px;color:var(--dim)}
+  .oc-cell .ld{display:flex;align-items:center;gap:8px}
+  .oc-cell .ld .nm{font-size:14px;font-weight:600}
+  .oc-cell .ld .chip{font-size:10px;padding:1px 7px}
+  .oc-cell .ft{display:flex;gap:6px;flex-wrap:wrap;font-size:11px;color:var(--dim)}
+  .oc-cell .ft .tpill{font-size:10.5px}
+  .oc-jinwrap{width:100%;display:flex;flex-direction:column;align-items:center;margin-bottom:26px}
+  .oc-sum{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:8px}
+  @media (max-width:640px){
+    .oc-cols{flex-direction:column;min-width:0;gap:14px;align-items:stretch}
+    .oc-col{padding-top:0;align-items:stretch}.oc-col::before,.oc-col::after{display:none}
+    .oc-cell,.oc-node{width:100%;max-width:none}
+    .oc-cells{align-items:stretch;padding-left:18px;padding-top:8px}
+    .oc-cells::before{left:8px;top:0;bottom:22px;height:auto}
+  }
+  /* 29단계 — 명부 순서 번호 · 인턴 · 통계 */
+  .rk{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:6px;
+    background:var(--surface);border:1px solid var(--line);font-size:10.5px;color:var(--dim);font-weight:600;font-variant-numeric:tabular-nums}
+  .chip.intern{background:var(--ok-bg);color:var(--ok-tx)}
+  .dst{display:flex;flex-direction:column;gap:14px;margin-top:12px}
+  .dst-kpi{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+  .dst-kpi div{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 14px;box-shadow:var(--card-shadow)}
+  .dst-kpi p{font-size:11px;color:var(--dim)} .dst-kpi b{display:block;font-size:22px;font-weight:600;margin-top:4px;font-variant-numeric:tabular-nums}
+  .dst-kpi small{font-size:11px;color:var(--dim)}
+  .dst-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:14px;align-items:start}
+  .dst-c{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 16px;box-shadow:var(--card-shadow)}
+  .dst-c h3{font-size:14px;font-weight:600;display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px}
+  .dst-c h3 span{font-size:11px;font-weight:400;color:var(--dim)}
+  .agebars{display:flex;align-items:flex-end;gap:10px;height:150px;padding:0 4px;border-bottom:1px solid var(--line)}
+  .agebars .ab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:4px}
+  .agebars .ab b{font-size:12px;font-weight:600}
+  .agebars .ab i{width:100%;max-width:56px;border-radius:8px 8px 0 0;background:linear-gradient(180deg,var(--brand),var(--action))}
+  .agebars .ab.dim i{background:var(--track)}
+  .agelab{display:flex;gap:10px;padding:6px 4px 0}
+  .agelab span{flex:1;text-align:center;font-size:11px;color:var(--dim)}
+  .stk{display:flex;height:16px;border-radius:9px;overflow:hidden;background:var(--track)}
+  .stk i{display:block;height:100%}
+  .lgd{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--dim);margin-top:10px}
+  .lgd span{display:inline-flex;align-items:center;gap:5px}.lgd i{width:10px;height:10px;border-radius:3px;display:inline-block}
+  .ctab{display:grid;grid-template-columns:96px minmax(0,1fr) 56px 64px;gap:8px;align-items:center;font-size:12px;padding:5px 0;border-top:1px solid var(--line2)}
+  .ctab:first-of-type{border-top:none}
+  .ctab.h{color:var(--dim);font-size:10.5px}
+  .ctab .nm b{display:block;font-size:13px}.ctab .nm small{color:var(--dim)}
+  .ctab .tr{height:9px;border-radius:9px;background:var(--track);overflow:hidden}.ctab .tr i{display:block;height:100%;background:var(--ok-strong);border-radius:9px}
+  .ctab .v{text-align:right;font-variant-numeric:tabular-nums}
+  .bdays{display:flex;flex-wrap:wrap;gap:6px}
+  .bdays span{font-size:12px;padding:4px 10px;border-radius:999px;background:var(--surface2)}
   /* 27단계 — 셀 보고: 왼쪽 캘린더 · 출석 그래프 / 오른쪽 목록 */
   .rep-wrap{display:flex;flex-direction:column;gap:14px}
   .rep-side:empty{display:none}
@@ -959,6 +1062,20 @@
 
 
   <!-- 22단계 — 셀 보고 모아보기 -->
+  <!-- 30단계 — 조직도 -->
+  <section class="screen" id="s-orgchart" hidden>
+    <div class="topbar">
+      <button class="icon-btn" id="oc-back" aria-label="뒤로"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5m6-6-6 6 6 6"/></svg></button>
+      <h2 style="font-size:17px;font-weight:600">조직도</h2>
+      <button class="btn-sm" id="oc-edit" hidden>자리 고치기</button>
+    </div>
+    <div class="scroll pad">
+      <div id="oc-body"></div>
+      <p class="hint" style="margin-top:16px">사람을 누르면 명부 카드, 셀을 누르면 그 셀 명부가 열려요.
+        <b>실선</b> = 가입함 · <b>점선</b> = 초대 보냄 / 가입 전</p>
+      <div style="height:24px"></div>
+    </div>
+  </section>
   <!-- 28단계 — 셀 건강 (화면) -->
   <section class="screen" id="s-health" hidden>
     <div class="topbar">
@@ -967,7 +1084,11 @@
       <span style="width:44px"></span>
     </div>
     <div class="scroll pad">
-      <p class="hint" id="hl-sub" style="margin:0 2px 12px">최근 8주 셀모임 기록으로 셈해요.</p>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+        <p class="hint" id="hl-sub" style="margin:0 2px">최근 8주 셀모임 기록으로 셈해요.</p>
+        <div class="seg" id="hl-sort" style="margin:0 0 0 auto">
+          <button type="button" data-hs="seq">순서대로</button><button type="button" data-hs="low">자주 빠지는 순</button></div>
+      </div>
       <div id="hl-body"></div>
       <p class="err" id="hl-err"></p>
       <div style="height:24px"></div>
@@ -1072,6 +1193,7 @@
             <div class="drawer-in">
               <button class="btn-ghost" id="btn-home-org" hidden>조직 구성</button>
               <button class="btn-ghost" id="btn-home-leaders" hidden>셀리더 명단</button>
+              <button class="btn-ghost" id="btn-home-orgchart">조직도</button>
               <button class="btn-ghost" id="btn-home-import" hidden>보고서 가져오기</button>
               <button class="btn-ghost" id="btn-manage" hidden>리더 관리</button>
               <button class="btn-ghost" id="btn-home-cellmgr" hidden>셀 관리</button>
@@ -1764,11 +1886,26 @@
     </div>
     <div class="pad">
       <input id="dir-search" placeholder="이름 · 연락처로 찾기" style="height:44px">
+      <div class="seg" id="dir-view" style="margin:12px 0 0">
+        <button type="button" data-dv="list" class="on">명단</button>
+        <button type="button" data-dv="stats">통계 · 그래프</button>
+      </div>
       <div class="seg" id="dir-cells"></div>
-      <div class="picks" id="dir-roles"></div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <div class="picks" id="dir-roles"></div>
+        <div class="seg" id="dir-sort" hidden style="margin:10px 0 0">
+          <button type="button" data-ds="cell">셀 번호순</button>
+          <button type="button" data-ds="name">가나다순</button>
+          <button type="button" data-ds="age">나이순</button>
+          <button type="button" data-ds="young">젊은순</button>
+          <button type="button" data-ds="att">출석률순</button>
+          <button type="button" data-ds="bday">생일순</button>
+        </div>
+      </div>
     </div>
     <div class="scroll pad" style="padding-top:10px">
       <p class="hint" id="dir-count" style="margin:0"></p>
+      <div id="dir-ratio"></div>
       <div id="dir-list"></div>
       <p class="hint" style="margin-top:18px">명부에는 이름 · 사진 · 셀 · 역할 · 연락처 · 생일(월 · 일) · 교회 등록일 · 침례 · 직분 · 수료한 훈련만 있어요.
         목양 내용(상태 · 메모 · 기도제목 · 만남 기록)은 맡은 사람만 봅니다.</p>
@@ -1803,6 +1940,7 @@
       <div class="card" style="display:flex;align-items:center;gap:10px">
         <div class="grow"><p class="muted" style="font-size:12px">교회</p>
           <p id="org-church" style="font-size:16px;font-weight:600;margin-top:2px"></p></div>
+        <button class="btn-sm" id="btn-org-chart">조직도로 보기</button>
         <button class="btn-sm" id="btn-org-church">이름</button>
       </div>
       <p class="hint" style="margin:12px 2px 0">자리를 먼저 짜고, 자리마다 그분의 이름과 구글 이메일을 넣으세요.
@@ -2490,9 +2628,9 @@
 
 <!-- 셀원 순서 배정 -->
 <dialog id="dlg-order">
-  <h3>셀원 순서 정하기</h3>
-  <p class="muted" style="margin-bottom:14px">영혼 목록과 출석 명단에 이 순서로 나와요.
-    위아래 화살표로 옮긴 뒤 저장을 누르세요.</p>
+  <h3>셀원 순서 · 인턴</h3>
+  <p class="muted" style="margin-bottom:14px">영적 순서대로 위에서부터 놓아 주세요. 영혼 목록 · 출석 명단 · 교회 명부 · 셀 건강에 모두 이 순서로 나와요.
+    <b>인턴</b>을 누르면 예비 셀리더로 표시돼요. 옮긴 뒤 저장을 누르세요.</p>
   <div class="list" id="order-list"></div>
   <p class="err" id="order-err"></p>
   <div class="dlg-btns">
