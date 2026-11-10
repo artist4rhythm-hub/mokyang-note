@@ -719,6 +719,83 @@
     .drawer-in{grid-template-columns:repeat(3,minmax(0,1fr))}
   }
 
+
+  /* 33단계 — 사용 현황 (수퍼) */
+  @media (min-width:1200px){ #s-usage{max-width:1440px} }
+  .us-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+  .us-bar .seg{margin:0}
+  .us-bar .sp{flex:1}
+  .seg.mini{margin:0;padding:3px}
+  .seg.mini button{padding:5px 10px;font-size:12.5px}
+  .us-note{font-size:12px;color:var(--dim);margin:8px 0 0;line-height:1.6}
+  .us-note b{color:var(--text);font-weight:600}
+  .us-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-top:14px}
+  .kpi{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 14px 12px}
+  .kpi .ki{position:absolute;right:12px;top:12px;width:30px;height:30px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:var(--surface2);color:var(--sub-tx)}
+  .kpi .ki svg{width:17px;height:17px}
+  .kpi .k{margin:0;font-size:12px;color:var(--dim)}
+  .kpi .v{margin:6px 0 0;font-size:26px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+  .kpi .v small{font-size:14px;font-weight:500;color:var(--dim)}
+  .kpi .s{margin:4px 0 0;font-size:11.5px;color:var(--dim)}
+  .kpi.warn .ki{background:var(--warn-bg,rgba(232,133,59,.16));color:var(--warn-tx)}
+  .kpi.bad .ki{background:var(--rose-bg);color:var(--rose-tx)}
+  .kpi.bad .v{color:var(--rose-tx)}
+  .us-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;margin-top:12px}
+  @media (min-width:1000px){ .us-grid{grid-template-columns:repeat(2,minmax(0,1fr))} .us-wide{grid-column:1/-1} }
+  .us-card{margin:0;padding:16px}
+  .us-h{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin-bottom:10px}
+  .us-h h3{margin:0;font-size:14.5px;font-weight:700;flex:0 0 auto}
+  .us-h .muted{font-size:12px;margin-left:auto}
+  summary.us-h{list-style:none} summary.us-h::-webkit-details-marker{display:none}
+  .us-chart{position:relative;padding-bottom:22px}
+  .us-svg{display:block;width:100%;height:170px}
+  .us-svg rect{fill:var(--brand);opacity:.55}
+  .us-svg rect.sun{opacity:1}
+  .us-svg rect.now{fill:var(--rose-tx);opacity:1}
+  .us-svg rect:hover{opacity:1;filter:brightness(1.15)}
+  .us-svg .gl{stroke:var(--line);stroke-width:1;vector-effect:non-scaling-stroke;stroke-dasharray:3 4}
+  .us-x{position:absolute;left:0;right:0;bottom:0;height:18px}
+  .us-x span{position:absolute;transform:translateX(-50%);font-size:11px;color:var(--dim);white-space:nowrap}
+  .hm{display:grid;grid-template-columns:22px repeat(24,minmax(0,1fr));gap:3px;align-items:center}
+  .hm .hx{font-size:10px;color:var(--dim);text-align:left;height:14px}
+  .hm .hy{font-size:11px;color:var(--sub-tx)}
+  .hm i{display:block;aspect-ratio:1;border-radius:4px;background:var(--track);position:relative;overflow:hidden}
+  .hm i::after{content:"";position:absolute;inset:0;background:var(--brand);opacity:var(--a)}
+  .us-lab{margin:12px 0 6px;font-size:12px;font-weight:600;color:var(--sub-tx)}
+  .us-lab:first-of-type{margin-top:0}
+  .us-stack{display:flex;height:12px;border-radius:999px;overflow:hidden;background:var(--track);gap:2px}
+  .us-stack i{display:block;height:100%;background:var(--brand);opacity:var(--o)}
+  .us-stack i.hl{background:var(--rose-tx);opacity:1}
+  .us-leg{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:7px;font-size:12px;color:var(--sub-tx)}
+  .us-leg span{display:inline-flex;align-items:center;gap:6px}
+  .us-leg i{width:9px;height:9px;border-radius:3px;background:var(--brand);opacity:var(--o)}
+  .us-leg .hl i{background:var(--rose-tx);opacity:1}
+  .us-leg b{color:var(--text);font-weight:600}
+  .us-hb{max-width:none;margin-top:0}
+  .us-hb .hb{grid-template-columns:minmax(90px,150px) 1fr 48px}
+  .us-hints{display:grid;grid-template-columns:minmax(0,1fr);gap:16px}
+  @media (min-width:900px){ .us-hints{grid-template-columns:repeat(3,minmax(0,1fr))} }
+  .us-hints .us-lab{margin-top:0}
+  .us-chips{display:flex;flex-wrap:wrap;gap:6px}
+  .us-chips .chip b{margin-left:3px}
+  .us-tw{overflow-x:auto;margin:0 -4px}
+  .us-tbl{width:100%;border-collapse:collapse;font-size:13px;min-width:720px}
+  .us-tbl th{text-align:left;font-size:11.5px;font-weight:600;color:var(--dim);padding:8px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+  .us-tbl td{padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+  .us-tbl tr:last-child td{border-bottom:none}
+  .us-tbl td b{display:block;font-weight:600}
+  .us-tbl td small{font-size:11.5px;color:var(--dim)}
+  .us-tbl .n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .us-tbl .t{color:var(--sub-tx)}
+  .us-tbl .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;word-break:break-all}
+  .us-tbl tr.warn td:first-child b{color:var(--warn-tx)}
+  .us-tbl .tag{display:inline-block;font-size:10.5px;padding:1px 6px;border-radius:6px;background:var(--surface2);border:1px solid var(--line);color:var(--sub-tx);margin-left:2px}
+  .us-tbl .tag.old{color:var(--warn-tx);border-color:var(--warn-tx)}
+  .us-tbl.us-errt{min-width:640px}
+  .us-priv{display:flex;gap:12px;align-items:flex-start;margin-top:14px;padding:14px 16px;border-radius:14px;border:1px dashed var(--line3);color:var(--sub-tx);font-size:12.5px;line-height:1.65}
+  .us-priv svg{width:20px;height:20px;flex-shrink:0;margin-top:2px}
+  .us-priv p{margin:2px 0 0}
+  .us-priv b{color:var(--text)}
   /* 32단계 — 글 꾸미기 편집기 (모임 메모) */
   textarea{overflow-y:auto}
   .rte-lab{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
@@ -1896,20 +1973,10 @@
       <button class="icon-btn" id="usage-back" aria-label="뒤로">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5m6-6-6 6 6 6"/></svg>
       </button>
-      <h2 style="font-size:17px;font-weight:600">사용 현황</h2>
+      <h2 style="font-size:17px;font-weight:600">사용 현황 <small style="font-size:11.5px;font-weight:500;color:var(--dim)">수퍼 관리자</small></h2>
       <span style="width:44px"></span>
     </div>
-    <div class="scroll pad">
-      <div class="tiles" id="usage-tiles"></div>
-      <div id="usage-chart"></div>
-      <h3 class="sec-title">사람별</h3>
-      <div class="list" id="usage-people"></div>
-      <h3 class="sec-title">많이 쓰는 화면</h3>
-      <div id="usage-screens"></div>
-      <h3 class="sec-title">중요 기록</h3>
-      <div class="list" id="usage-audit"></div>
-      <p class="hint" style="margin-top:16px">접속 위치는 모으지 않아요. 기기 종류와 접속 시간대만 쌓입니다.</p>
-    </div>
+    <div class="scroll pad"><div id="us-body"></div><div style="height:28px"></div></div>
   </section>
 
   <!-- 더보기 -->

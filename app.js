@@ -20,11 +20,11 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
 import {
   getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc,
-  collection, addDoc, getDocs, query, where, serverTimestamp, onSnapshot
+  collection, addDoc, getDocs, query, where, serverTimestamp, onSnapshot, increment
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
 const APP_NAME = "목자의 삶";
-const APP_VERSION = "32.0 (2026-11-10)";
+const APP_VERSION = "33.0 (2026-11-10)";
 
 /* 사진 크기 — 얼굴을 알아볼 수 있는 선에서 가장 작게.
    얼굴 하나가 가로 80px은 되어야 알아보는데, 여럿이 한 줄로 선
@@ -128,6 +128,7 @@ const PLACES = ["카페","식사","집","교회","전화","산책"];
 const RELS   = ["배우자","아버지","어머니","아들","딸","형제","자매"];
 
 function msgOf(e) {
+  try { usageErr(e); } catch {}   /* 33단계 — 오류 종류만 세어 사용 현황으로 */
   const c = String((e && e.code) || "");   // 구글 캘린더 오류처럼 숫자 코드도 와요
   if (c.includes("invalid-credential") || c.includes("wrong-password") || c.includes("user-not-found"))
     return "이메일이나 비밀번호가 맞지 않아요.";
@@ -1063,7 +1064,7 @@ function renderRooms() {
       + room("orgchart","조직도", "보기", "진장 · 코치 · 셀")
       + room("cellmgr","셀 관리", state.jins.length, "진")
       + room("reports","셀 보고 모아보기", "보기", "모든 진 셀 보고")
-      + room("usage","사용 현황", "보기", "기기 · 시간대");
+      + room("usage","사용 현황", "보기", "누가 · 언제 · 무엇을");
   }
   $("home-rooms").innerHTML = html;
 }
@@ -4025,7 +4026,7 @@ async function log(action, target, detail) {
    화면을 누를 때마다 한 줄씩 쌓으면 쓰기 횟수가 금세 한도에 닿습니다.
    그래서 메모리에 모았다가 30초마다, 그리고 화면을 덮을 때 한 번만 올립니다.
    사람 한 명의 하루치가 칸 하나입니다. 접속 위치는 모으지 않아요. */
-const usage = { screens:{}, acts:{}, opens:0, dirty:false };
+const usage = { screens:{}, acts:{}, hours:{}, errs:{}, opens:1, mins:0, loadMs:0, loaded:false, cur:"", dirty:false, lastAct:Date.now(), hiddenAt:0 };
 const mergeCount = (a,b) => {
   const o = { ...(a||{}) };
   Object.entries(b||{}).forEach(([k,v]) => { o[k] = (o[k]||0) + v; });
@@ -4037,141 +4038,292 @@ function deviceKind() {
   const kind = w < 500 ? "폰" : w < 1100 ? "패드" : "컴퓨터";
   return standalone ? kind + " (앱)" : kind;
 }
+/* 33단계 — 기기 환경 (개발 개선용: 어떤 기기 · 브라우저에서 문제가 나는지) */
+function envInfo() {
+  const ua = navigator.userAgent;
+  const ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+  const os = ios ? "iOS" : /Android/.test(ua) ? "안드로이드" : /Mac OS X/.test(ua) ? "맥" : /Windows/.test(ua) ? "윈도우" : /CrOS/.test(ua) ? "크롬북" : "기타";
+  const br = /SamsungBrowser/.test(ua) ? "삼성 인터넷" : /Edg\//.test(ua) ? "엣지" : /Whale/.test(ua) ? "웨일" : /KAKAOTALK/i.test(ua) ? "카카오톡 안" : /NAVER/.test(ua) ? "네이버 앱 안"
+    : /CriOS|Chrome\//.test(ua) ? "크롬" : /FxiOS|Firefox/.test(ua) ? "파이어폭스" : /Safari/.test(ua) ? "사파리" : "기타";
+  const pwa = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  return { os, br, pwa };
+}
 function bump(what, kind) {
+  if (kind === "screen") {
+    usage.cur = what;
+    if (what === "home" && !usage.loaded) { usage.loaded = true; usage.loadMs = Math.round(performance.now()); }
+  }
   if (!state.me) return;
   if (kind === "screen") usage.screens[what] = (usage.screens[what]||0) + 1;
   else usage.acts[what] = (usage.acts[what]||0) + 1;
   usage.dirty = true;
 }
+/* 오류 — 글 내용 · 이메일 · 문서 번호는 지우고 종류만 셉니다 */
+function usageErr(e) {
+  let k = String((e && (e.code || e.message)) || e || "").trim(); if (!k) return;
+  k = k.replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, "@").replace(/https?:\/\/\S+/g, "주소").replace(/[A-Za-z0-9]{16,}/g, "#")
+    .replace(/[.\/`\[\]~*\\]/g, "·").replace(/^_+|_+$/g, "").replace(/\s+/g, " ").slice(0, 70).trim();
+  if (!k) return;
+  k = `${usage.cur || "앱"} | ${k}`;
+  usage.errSeen = usage.errSeen || new Set();
+  if (!usage.errSeen.has(k) && usage.errSeen.size >= 15) k = "앱 | 그 밖의 오류";   /* 하루 칸이 넘치지 않게 */
+  usage.errSeen.add(k);
+  usage.errs[k] = (usage.errs[k] || 0) + 1; usage.dirty = true;
+}
+["pointerdown", "keydown", "wheel", "touchstart"].forEach(ev => window.addEventListener(ev, () => { usage.lastAct = Date.now(); }, { passive: true, capture: true }));
+/* 실제로 손을 댄 분만 '사용 시간'으로 — 켜 두기만 한 시간은 세지 않아요 */
+setInterval(() => {
+  if (document.hidden || !state.me || Date.now() - usage.lastAct > 60000) return;
+  const h = String(new Date().getHours());
+  usage.mins++; usage.hours[h] = (usage.hours[h] || 0) + 1; usage.dirty = true;
+}, 60000);
+window.addEventListener("error", (e) => { if (e && e.message) usageErr({ message: e.message }); });
+window.addEventListener("unhandledrejection", (e) => { usageErr(e && e.reason); });
 async function flushUsage() {
   if (!usage.dirty || !state.me || !uid()) return;
-  const payload = { screens:{...usage.screens}, acts:{...usage.acts}, opens:usage.opens };
-  usage.screens = {}; usage.acts = {}; usage.opens = 0; usage.dirty = false;
+  const P = { screens:usage.screens, acts:usage.acts, hours:usage.hours, errs:usage.errs, opens:usage.opens, mins:usage.mins, loadMs:usage.loadMs };
+  usage.screens = {}; usage.acts = {}; usage.hours = {}; usage.errs = {}; usage.opens = 0; usage.mins = 0; usage.loadMs = 0; usage.dirty = false;
+  const inc = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, increment(v)]));
+  const E = envInfo(), d = { uid: uid(), name: state.me.name || "", role: state.me.role, jinId: state.me.jinId || null, date: todayStr(),
+    device: deviceKind(), ver: APP_VERSION.split(" ")[0], os: E.os, br: E.br, pwa: E.pwa, lastAt: serverTimestamp() };
+  if (P.opens) d.opens = increment(P.opens);
+  if (P.mins) d.mins = increment(P.mins);
+  if (P.loadMs) { d.loadSum = increment(P.loadMs); d.loadN = increment(1); }
+  ["screens", "acts", "hours", "errs"].forEach(k => { if (Object.keys(P[k]).length) d[k] = inc(P[k]); });
   try {
-    const ref = doc(db, "usage", `${uid()}_${todayStr()}`);
-    const snap = await getDoc(ref);
-    const old = snap.exists() ? snap.data() : null;
-    await setDoc(ref, {
-      uid: uid(), name: state.me.name || "", role: state.me.role,
-      jinId: state.me.jinId || null, date: todayStr(),
-      opens: ((old && old.opens) || 0) + payload.opens,
-      screens: mergeCount(old && old.screens, payload.screens),
-      acts: mergeCount(old && old.acts, payload.acts),
-      hours: mergeCount(old && old.hours, { [String(new Date().getHours())]: 1 }),
-      device: deviceKind(), lastAt: serverTimestamp()
-    }, { merge: true });
+    /* 더하기(increment)로 올려서 — 먼저 읽을 필요가 없어요 (읽기 한도 아낌) */
+    await setDoc(doc(db, "usage", `${uid()}_${todayStr()}`), d, { merge: true });
   } catch {
     /* 못 올려도 앱은 그대로 굴러가야 합니다 — 다음 번에 다시 모읍니다 */
-    usage.screens = mergeCount(usage.screens, payload.screens);
-    usage.acts = mergeCount(usage.acts, payload.acts);
-    usage.opens += payload.opens; usage.dirty = true;
+    /* 오류 칸은 다시 넣지 않아요 — 오류 기록 때문에 사용 기록까지 막히지 않게 */
+    ["screens", "acts", "hours"].forEach(k => { usage[k] = mergeCount(usage[k], P[k]); });
+    usage.opens += P.opens; usage.mins += P.mins; usage.loadMs = usage.loadMs || P.loadMs; usage.dirty = true;
   }
 }
-setInterval(flushUsage, 30000);
-document.addEventListener("visibilitychange", () => { if (document.hidden) flushUsage(); });
+setInterval(flushUsage, 60000);
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) { usage.hiddenAt = Date.now(); flushUsage(); return; }
+  /* 30분 넘게 덮어 뒀다가 다시 열면 '한 번 더 연 것'으로 */
+  if (usage.hiddenAt && Date.now() - usage.hiddenAt > 30 * 60000) { usage.opens++; usage.dirty = true; }
+  usage.lastAct = Date.now();
+});
 window.addEventListener("pagehide", flushUsage);
 
-/* ── 수퍼 관리자용 화면 ── */
+/* ── 수퍼 관리자용 화면 (33단계 — 개발 개선을 위한 사용 현황) ── */
 const SCREEN_NAME = { home:"홈", souls:"영혼들", cal:"캘린더", meet:"셀모임", more:"더보기",
   soul:"영혼 카드", log:"만남 기록", meeting:"셀모임 입력", train:"훈련 현황",
   search:"기록 검색", manage:"리더 관리", usage:"사용 현황", edit:"영혼 수정",
-  dir:"교회 명부", cellmgr:"셀 관리", org:"조직 구성", inbox:"소식", photos:"사진 모아보기", stats:"활동 통계", mine:"내 카드" };
+  dir:"교회 명부", cellmgr:"셀 관리", org:"조직 구성", inbox:"소식", photos:"사진 모아보기", stats:"활동 통계", mine:"내 카드",
+  help:"도우미", orgchart:"조직도", health:"셀 건강", reports:"셀 보고 모아보기", report:"셀 보고 보기", import:"보고서 가져오기",
+  leaders:"셀리더 명단", share:"공유 설정", consent:"개인정보 동의", accept:"초대 수락", pending:"승인 기다림", login:"로그인", verify:"이메일 확인", setup:"처음 설정" };
+/* 기능 점검에서 빼는 화면 — 처음 한 번만 거치는 화면들 */
+const SCREEN_SKIP = new Set(["login", "verify", "setup", "accept", "pending", "consent", "usage", "loading"]);
 const ACT_NAME = { recordCreate:"기록 남김", planCreate:"만남 예약", meetingSave:"셀모임 저장",
-  soulCreate:"영혼 추가", trainSave:"훈련 기록", exportCsv:"내려받기" };
+  soulCreate:"영혼 추가", trainSave:"훈련 기록", exportCsv:"내려받기", myNote:"내 기록", handover:"카드 인계",
+  promote:"셀리더 세우기", comment:"댓글", dm:"쪽지", careContact:"챙김 연락", meetingReport:"셀 보고",
+  gcalConnect:"구글 캘린더 연결", gcalSync:"구글 캘린더 맞추기", photoUpload:"셀모임 사진 올림", themeChange:"화면 밝기 바꿈",
+  memoFormat:"메모 꾸미기 사용", installApp:"홈 화면 앱 설치", welcomeOff:"처음 안내 닫음" };
+const actName = (k) => ACT_NAME[k] || (k.startsWith("help_") ? `도우미 · ${(HELP.find(t => t.id === k.slice(5)) || {}).t || k.slice(5)}` : k);
+const US_PERIOD = [[7, "7일"], [30, "30일"], [90, "90일"]];
+const US_ROLE = [["all", "모두"], ["leader", "셀리더"], ["upline", "코치 · 진장 · 교역자"], ["super", "수퍼"]];
+const usRoleOk = (r, f) => f === "all" || (f === "leader" ? r === "leader" : f === "upline" ? ["coach", "jinjang", "pastor"].includes(r) : r === "super");
+const sumMap = (rows, k) => rows.reduce((o, r) => mergeCount(o, r[k]), {});
+const nf = (n) => Number(n || 0).toLocaleString("ko-KR");
+const minTxt = (m) => !m ? "0분" : m < 60 ? `${Math.round(m)}분` : `${Math.floor(m / 60)}시간${Math.round(m % 60) ? ` ${Math.round(m % 60)}분` : ""}`;
 
-async function openUsage() {
+async function openUsage(force) {
   if (state.me.role !== "super") { toast("수퍼 관리자만 볼 수 있어요."); return; }
+  state.us = state.us || { days: 30, role: "all", sort: "quiet", cache: {} };
+  const U = state.us;
   show("s-loading");
   await flushUsage();
   await loadOrg();
-  let rows = [], audit = [];
-  try {
-    const since = plusDays(-30);
-    const [u, a] = await Promise.all([
-      getDocs(query(collection(db, "usage"), where("date", ">=", since))),
-      getDocs(collection(db, "audit"))
-    ]);
-    rows = pack(u);
-    audit = pack(a).sort((x, y) => (y.at && y.at.seconds || 0) - (x.at && x.at.seconds || 0)).slice(0, 100);
-  } catch (e) { toast(msgOf(e)); }
-
-  const days = {}, people = {}, screens = {};
-  rows.forEach(r => {
-    (days[r.date] = days[r.date] || new Set()).add(r.uid);
-    const p = people[r.uid] = people[r.uid] || { name: r.name, role: r.role, opens: 0, acts: 0, last: "", device: r.device };
-    p.opens += r.opens || 0;
-    p.acts += Object.values(r.acts || {}).reduce((n, v) => n + v, 0);
-    if (r.date > p.last) { p.last = r.date; p.device = r.device; }
-    Object.entries(r.screens || {}).forEach(([k, v]) => { screens[k] = (screens[k] || 0) + v; });
-  });
-  const dayList = Object.keys(days).sort();
-  const peopleList = Object.entries(people)
-    .map(([k, v]) => ({ uid: k, ...v, quiet: daysSince(v.last) }))
-    .sort((a, b) => (b.quiet ?? 0) - (a.quiet ?? 0));
-  const activeN = peopleList.filter(p => (p.quiet ?? 99) <= 7).length;
-
-  $("usage-tiles").innerHTML = tile("구성원", state.members.length + "명")
-    + tile("이번 주 접속", activeN + "명")
-    + tile("30일 기록", peopleList.reduce((n, p) => n + p.acts, 0) + "건");
-
-  /* 날짜별 접속자 수 — 한 가지만 재므로 색도 하나입니다 */
-  if (dayList.length >= 2) {
-    const last = dayList.slice(-30);
-    const peak = Math.max(...last.map(d => days[d].size), 1);
-    const keep = new Set([0, Math.floor((last.length - 1) / 2), last.length - 1]);
-    $("usage-chart").innerHTML = `
-      <div class="card" style="margin-top:14px">
-        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px">
-          <h3 style="font-size:13px;font-weight:600">날마다 몇 명이 썼나</h3>
-          <span class="muted" style="font-size:12px">최근 ${last.length}일 · 최대 ${peak}명</span>
-        </div>
-        <div class="chart"><div class="plot">
-          ${last.map((d, i) => {
-            const n = days[d].size;
-            return `<div class="bar${n === 0 ? " zero" : ""}" title="${fmtDate(d)} · ${n}명">
-              ${i === last.length - 1 ? `<span class="val">${n}명</span>` : ""}
-              <i style="height:${Math.round(n / peak * 100)}%"></i></div>`;
-          }).join("")}
-        </div>
-        <div class="xaxis">${last.map((d, i) => {
-          const p = d.split("-");
-          return `<span>${keep.has(i) ? `${Number(p[1])}/${Number(p[2])}` : ""}</span>`;
-        }).join("")}</div></div>
-      </div>`;
-  } else {
-    $("usage-chart").innerHTML = `<p class="muted" style="margin-top:14px">이틀 이상 쌓이면 그래프가 생겨요.</p>`;
+  if (force) U.cache = {};
+  if (!U.cache[U.days]) {
+    try {
+      /* 기간 안의 칸만 — 기간 × 사람 수만큼 읽어요 (한 번 읽으면 [새로 읽기] 전까지 다시 안 읽어요) */
+      const [u, a] = await Promise.all([
+        getDocs(query(collection(db, "usage"), where("date", ">=", plusDays(-(U.days - 1))))),
+        U.audit ? Promise.resolve(null) : getDocs(collection(db, "audit"))
+      ]);
+      U.cache[U.days] = pack(u);
+      if (a) U.audit = pack(a).sort((x, y) => (y.at && y.at.seconds || 0) - (x.at && x.at.seconds || 0)).slice(0, 60);
+    } catch (e) { toast(msgOf(e)); U.cache[U.days] = []; }
   }
+  renderUsage(); show("s-usage");
+}
+function renderUsage() {
+  const U = state.us, days = U.days, curVer = APP_VERSION.split(" ")[0];
+  const rows = (U.cache[days] || []).filter(r => usRoleOk(r.role, U.role));
+  const accts = state.members.filter(m => m.active !== false && usRoleOk(m.role, U.role));
+  const dayList = []; for (let i = days - 1; i >= 0; i--) dayList.push(plusDays(-i));
+  const byDay = Object.fromEntries(dayList.map(d => [d, { users: new Set(), mins: 0, opens: 0 }]));
+  const people = {};
+  rows.forEach(r => {
+    const D = byDay[r.date]; if (D) { D.users.add(r.uid); D.mins += r.mins || 0; D.opens += r.opens || 0; }
+    const p = people[r.uid] = people[r.uid] || { uid: r.uid, name: r.name, role: r.role, days: 0, mins: 0, opens: 0, acts: 0, screens: {}, last: "", L: null };
+    p.days++; p.mins += r.mins || 0; p.opens += r.opens || 0;
+    p.acts += Object.values(r.acts || {}).reduce((n, v) => n + v, 0);
+    p.screens = mergeCount(p.screens, r.screens);
+    if (r.date >= p.last) { p.last = r.date; p.L = r; p.name = r.name || p.name; p.role = r.role || p.role; }
+  });
+  const P = Object.values(people);
+  const today = todayStr(), w7 = plusDays(-6);
+  const todayN = new Set(rows.filter(r => r.date === today).map(r => r.uid)).size;
+  const w7N = new Set(rows.filter(r => r.date >= w7).map(r => r.uid)).size;
+  const minRows = rows.filter(r => r.mins !== undefined);
+  const avgMin = minRows.length ? minRows.reduce((n, r) => n + (r.mins || 0), 0) / minRows.length : 0;
+  const latest = P.map(p => p.L).filter(Boolean);
+  const withVer = latest.filter(l => l.ver);
+  const pwaN = withVer.filter(l => l.pwa).length, verN = withVer.filter(l => l.ver === curVer).length;
+  const errs = {}; rows.forEach(r => Object.entries(r.errs || {}).forEach(([k, v]) => {
+    const e = errs[k] = errs[k] || { n: 0, users: new Set(), last: "", vers: new Set() };
+    e.n += v; e.users.add(r.uid); if (r.date > e.last) e.last = r.date; if (r.ver) e.vers.add(r.ver); }));
+  const errN = Object.values(errs).reduce((n, e) => n + e.n, 0);
+  const loadSum = rows.reduce((n, r) => n + (r.loadSum || 0), 0), loadN = rows.reduce((n, r) => n + (r.loadN || 0), 0);
+  const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
+  const K = (ic, k, v, sub, tone) => `<div class="kpi${tone ? " " + tone : ""}"><span class="ki">${HIC[ic]}</span><p class="k">${k}</p><p class="v">${v}</p>${sub ? `<p class="s">${sub}</p>` : ""}</div>`;
+  const firstDay = rows.reduce((m, r) => !m || r.date < m ? r.date : m, "");
 
-  $("usage-people").innerHTML = peopleList.map(p => {
-    const q = p.quiet;
-    const quiet = q === null ? "" : q === 0 ? "오늘 접속" : q === 1 ? "어제 접속" : `${q}일째 안 들어옴`;
-    return `<div class="row ${q !== null && q > 30 ? "off" : ""}">
-      <span class="ava">${esc(initial(p.name))}</span>
-      <div class="grow"><p class="nm">${esc(p.name || "—")}</p>
-        <p class="sub">${esc(ROLE[p.role] || "")} · ${esc(p.device || "")} · 기록 ${p.acts}건</p></div>
-      <span class="chip ${q !== null && q >= 14 ? "warn" : ""}">${quiet}</span>
-    </div>`;
-  }).join("") || `<p class="muted">아직 쌓인 게 없어요. 하루이틀 쓰시면 보여요.</p>`;
+  /* 날마다 */
+  const metric = U.metric || "users";
+  const val = (d) => metric === "users" ? byDay[d].users.size : metric === "mins" ? byDay[d].mins : byDay[d].opens;
+  const peak = Math.max(1, ...dayList.map(val));
+  const step = days <= 7 ? 1 : days <= 30 ? 7 : 15;
+  const mUnit = metric === "users" ? "명" : metric === "mins" ? "분" : "번";
+  const bw = 1000 / dayList.length;
+  const chart = `<svg class="us-svg" viewBox="0 0 1000 170" preserveAspectRatio="none" role="img" aria-label="날마다 ${mUnit}">
+      ${[0.5, 1].map(f => `<line x1="0" x2="1000" y1="${165 - f * 150}" y2="${165 - f * 150}" class="gl"/>`).join("")}
+      ${dayList.map((d, i) => { const v = val(d), h = v ? Math.max(v / peak * 150, 3) : 0, wk = new Date(d + "T00:00").getDay();
+        return `<rect x="${(i * bw + bw * 0.14).toFixed(1)}" y="${(165 - h).toFixed(1)}" width="${(bw * 0.72).toFixed(1)}" height="${h.toFixed(1)}" class="${wk === 0 ? "sun" : ""}${d === today ? " now" : ""}"><title>${fmtDate(d)} · ${nf(v)}${mUnit}</title></rect>`; }).join("")}
+    </svg>
+    <div class="us-x">${dayList.map((d, i) => (dayList.length - 1 - i) % step === 0 ? `<span style="left:${((i + 0.5) * bw / 10).toFixed(2)}%">${Number(d.slice(5, 7))}/${Number(d.slice(8))}</span>` : "").join("")}</div>`;
 
-  const total = Object.values(screens).reduce((n, v) => n + v, 0);
-  const sorted = Object.entries(screens).sort((a, b) => b[1] - a[1]);
-  $("usage-screens").innerHTML = total ? `<div class="hbars">${sorted.map(([k, v]) => `
-    <div class="hb"><span class="who">${esc(SCREEN_NAME[k] || k)}</span>
-      <span class="track"><i style="width:${Math.round(v / sorted[0][1] * 100)}%"></i></span>
-      <span class="pct">${Math.round(v / total * 100)}%</span></div>`).join("")}</div>`
-    : `<p class="muted">아직 쌓인 게 없어요.</p>`;
+  /* 요일 × 시간 */
+  const HM = Array.from({ length: 7 }, () => Array(24).fill(0));
+  rows.forEach(r => { const wd = (new Date(r.date + "T00:00").getDay() + 6) % 7; Object.entries(r.hours || {}).forEach(([h, v]) => { if (HM[wd][+h] !== undefined) HM[wd][+h] += v; }); });
+  const hmPeak = Math.max(1, ...HM.flat());
+  const WD = ["월", "화", "수", "목", "금", "토", "일"];
+  let best = [0, 0, 0]; HM.forEach((r, i) => r.forEach((v, h) => { if (v > best[0]) best = [v, i, h]; }));
+  const heat = `<div class="hm"><span class="hx"></span>${Array.from({ length: 24 }, (_, h) => `<span class="hx">${h % 6 === 0 ? h : ""}</span>`).join("")}
+    ${HM.map((r, i) => `<span class="hy">${WD[i]}</span>${r.map((v, h) => `<i style="--a:${v ? (0.14 + 0.86 * v / hmPeak).toFixed(2) : 0}" title="${WD[i]}요일 ${h}시 · ${nf(v)}분"></i>`).join("")}`).join("")}</div>
+    <p class="us-note">${best[0] ? `가장 많이 쓰는 때 — <b>${WD[best[1]]}요일 ${best[2]}시</b> 무렵 · 진할수록 많이 씀` : "시간대 기록은 33단계부터 쌓여요."}</p>`;
 
-  $("usage-audit").innerHTML = audit.map(a => `
-    <div class="row"><div class="grow">
-      <p class="nm">${esc(a.action)}${a.detail ? " · " + esc(a.detail) : ""}</p>
-      <p class="sub">${esc(a.byName || "")} · ${a.at && a.at.seconds
-        ? new Date(a.at.seconds * 1000).toLocaleString("ko-KR") : "—"}</p>
-    </div></div>`).join("") || `<p class="muted">중요 기록이 아직 없어요.</p>`;
+  /* 기능 */
+  const scr = sumMap(rows, "screens"), act = sumMap(rows, "acts");
+  const HB = (m, nameOf, max = 14) => { const L = Object.entries(m).filter(([k]) => !SCREEN_SKIP.has(k)).sort((a, b) => b[1] - a[1]).slice(0, max);
+    const top = L.length ? L[0][1] : 1;
+    return L.length ? `<div class="hbars us-hb">${L.map(([k, v]) => `<div class="hb"><span class="who" title="${esc(nameOf(k))}">${esc(nameOf(k))}</span>
+      <span class="track"><i style="width:${Math.max(2, Math.round(v / top * 100))}%"></i></span><span class="pct">${nf(v)}</span></div>`).join("")}</div>` : `<p class="muted">아직 쌓인 게 없어요.</p>`; };
+  const unused = Object.keys(SCREEN_NAME).filter(k => !SCREEN_SKIP.has(k) && !scr[k]);
+  const usersOf = (k) => P.filter(p => p.screens[k]).length;
+  const rare = Object.keys(SCREEN_NAME).filter(k => !SCREEN_SKIP.has(k) && scr[k] && P.length >= 3 && usersOf(k) <= Math.max(1, Math.floor(P.length * 0.2)));
 
-  show("s-usage");
+  /* 기기 · 환경 (사람마다 마지막 기록 기준) */
+  const cnt = (f) => latest.reduce((o, l) => { const k = f(l); if (k) o[k] = (o[k] || 0) + 1; return o; }, {});
+  const devC = cnt(l => (l.device || "").replace(" (앱)", "")), osC = cnt(l => l.os), brC = cnt(l => l.br), verC = cnt(l => l.ver);
+  const PB = (m, hl) => { const L = Object.entries(m).sort((a, b) => hl ? String(b[0]).localeCompare(String(a[0]), undefined, { numeric: true }) : b[1] - a[1]); const t = L.reduce((n, x) => n + x[1], 0) || 1;
+    return L.length ? `<div class="us-stack">${L.map(([k, v], i) => `<i style="width:${(v / t * 100).toFixed(2)}%;--o:${Math.max(0.28, 1 - i * 0.2).toFixed(2)}" class="${hl && k === hl ? "hl" : ""}" title="${esc(k)} ${v}명"></i>`).join("")}</div>
+      <div class="us-leg">${L.map(([k, v], i) => `<span class="${hl && k === hl ? "hl" : ""}"><i style="--o:${Math.max(0.28, 1 - i * 0.2).toFixed(2)}"></i>${esc(k)} <b>${v}</b></span>`).join("")}</div>` : `<p class="muted" style="margin:6px 0 0">—</p>`; };
+
+  /* 사람별 */
+  const noUse = accts.filter(m => !people[m.id]);
+  const sortP = { quiet: (a, b) => a.last.localeCompare(b.last), most: (a, b) => b.mins - a.mins || b.days - a.days, name: (a, b) => (a.name || "").localeCompare(b.name || "", "ko") }[U.sort] || ((a, b) => 0);
+  const cellOf = (id) => { const m = state.members.find(x => x.id === id); const c = m && state.cells.find(c => c.id === m.cellId); return c ? c.name : ""; };
+  const topScr = (p) => Object.entries(p.screens).filter(([k]) => !["home", "more"].includes(k) && !SCREEN_SKIP.has(k)).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([k]) => SCREEN_NAME[k] || k).join(" · ");
+  const quietTxt = (d) => { const q = daysSince(d); return q === 0 ? "오늘" : q === 1 ? "어제" : `${q}일 전`; };
+  const ppl = [...P].sort(sortP).map(p => { const q = daysSince(p.last), L = p.L || {};
+    return `<tr class="${q >= 14 ? "warn" : ""}"><td><b>${esc(p.name || "—")}</b><small>${esc(ROLE[p.role] || "")}${cellOf(p.uid) ? " · " + esc(cellOf(p.uid)) : ""}</small></td>
+      <td><span class="chip ${q >= 14 ? "warn" : q <= 1 ? "ok" : ""}">${quietTxt(p.last)}</span></td>
+      <td class="n">${p.days}<small>/${days}일</small></td><td class="n">${minTxt(p.mins)}</td><td class="n">${nf(p.acts)}</td>
+      <td class="t">${esc(topScr(p) || "—")}</td>
+      <td class="t">${esc((L.device || "").replace(" (앱)", ""))}${L.pwa ? ` <span class="tag">앱</span>` : ""}${L.ver ? ` <span class="tag ${L.ver === curVer ? "" : "old"}">${esc(L.ver)}</span>` : ""}</td></tr>`; }).join("");
+
+  /* 오류 */
+  const EL = Object.entries(errs).sort((a, b) => b[1].n - a[1].n).slice(0, 20);
+
+  $("us-body").innerHTML = `
+    <div class="us-bar">
+      <div class="seg" id="us-days">${US_PERIOD.map(([d, l]) => `<button type="button" data-usd="${d}" class="${d === days ? "on" : ""}">${l}</button>`).join("")}</div>
+      <div class="seg" id="us-role">${US_ROLE.map(([k, l]) => `<button type="button" data-usr="${k}" class="${k === U.role ? "on" : ""}">${l}</button>`).join("")}</div>
+      <span class="sp"></span>
+      <button type="button" class="btn-sm" id="us-refresh">새로 읽기</button>
+      <button type="button" class="btn-sm" id="us-csv">CSV 내려받기</button>
+    </div>
+    ${firstDay && firstDay > plusDays(-(days - 1)) ? `<p class="us-note" style="margin-top:10px">기록은 ${fmtDate(firstDay)}부터 있어요. 사용 시간 · 버전 · 오류 · 기기 환경은 33단계부터 쌓여요.</p>` : ""}
+    <div class="us-kpis">
+      ${K("souls", "쓰는 사람", `${P.length}<small>/${accts.length}명</small>`, `${days}일 동안 한 번이라도 · ${pct(P.length, accts.length)}%`)}
+      ${K("home", "오늘 · 이번 주", `${todayN}<small> · ${w7N}명</small>`, "오늘 연 사람 · 최근 7일")}
+      ${K("cal", "하루 평균 사용", minTxt(avgMin), "쓴 날 한 사람 기준")}
+      ${K("phone", "홈 화면 앱", `${pct(pwaN, withVer.length)}%`, `${pwaN}/${withVer.length}명이 앱으로`, pct(pwaN, withVer.length) < 50 && withVer.length ? "warn" : "")}
+      ${K("refresh", "최신 버전", `${pct(verN, withVer.length)}%`, `${curVer} 쓰는 사람 ${verN}/${withVer.length}`, verN < withVer.length ? "warn" : "")}
+      ${K("faq", "오류", nf(errN), errN ? `${Object.keys(errs).length}가지 · 아래 목록` : "문제 없어요", errN ? "bad" : "")}
+    </div>
+    <div class="us-grid">
+      <div class="card us-card us-wide">
+        <div class="us-h"><h3>날마다</h3>
+          <div class="seg mini" id="us-metric">${[["users", "사람 수"], ["mins", "사용 시간"], ["opens", "연 횟수"]].map(([k, l]) => `<button type="button" data-usm="${k}" class="${k === metric ? "on" : ""}">${l}</button>`).join("")}</div>
+          <span class="muted">최대 ${nf(peak)}${mUnit} · 진한 막대 = 주일</span></div>
+        <div class="us-chart">${chart}</div>
+      </div>
+      <div class="card us-card"><div class="us-h"><h3>언제 쓰나</h3><span class="muted">요일 × 시간 (사용 분)</span></div>${heat}</div>
+      <div class="card us-card"><div class="us-h"><h3>기기 · 환경</h3><span class="muted">사람마다 마지막 기록</span></div>
+        <p class="us-lab">기기</p>${PB(devC)}
+        <p class="us-lab">운영체제</p>${PB(osC)}
+        <p class="us-lab">브라우저</p>${PB(brC)}
+        <p class="us-lab">앱 버전</p>${PB(verC, curVer)}
+        <p class="us-note">${loadN ? `앱 여는 데 평균 <b>${(loadSum / loadN / 1000).toFixed(1)}초</b> (${nf(loadN)}번 잼)` : "여는 속도는 33단계부터 재요."}${Object.keys(brC).some(k => /안$/.test(k)) ? " · 카카오톡 · 네이버 앱 안에서 연 사람이 있어요 — 구글 로그인이 막힐 수 있어요." : ""}</p>
+      </div>
+      <div class="card us-card"><div class="us-h"><h3>많이 쓰는 화면</h3><span class="muted">연 횟수</span></div>${HB(scr, k => SCREEN_NAME[k] || k)}</div>
+      <div class="card us-card"><div class="us-h"><h3>한 일</h3><span class="muted">저장 · 누른 횟수</span></div>${HB(act, actName)}</div>
+      <div class="card us-card us-wide"><div class="us-h"><h3>개선 힌트</h3><span class="muted">${days}일 기준</span></div>
+        <div class="us-hints">
+          <div><p class="us-lab">아무도 안 연 화면</p><div class="us-chips">${unused.map(k => `<span class="chip">${esc(SCREEN_NAME[k])}</span>`).join("") || `<span class="muted">없어요 — 모든 화면이 쓰였어요</span>`}</div>
+            <p class="us-note">모르는 기능일 수 있어요 → 도우미 · 교육 때 소개하거나, 정말 필요 없으면 줄일 후보.</p></div>
+          <div><p class="us-lab">몇 사람만 쓰는 화면</p><div class="us-chips">${rare.map(k => `<span class="chip">${esc(SCREEN_NAME[k])} <b>${usersOf(k)}명</b></span>`).join("") || `<span class="muted">없어요</span>`}</div>
+            <p class="us-note">쓰는 사람에게 어떻게 쓰는지 물어보면 다음 개선 아이디어가 나와요.</p></div>
+          <div><p class="us-lab">계정은 있는데 ${days}일 동안 안 들어온 사람</p><div class="us-chips">${noUse.map(m => `<span class="chip warn">${esc(m.name || "—")}</span>`).join("") || `<span class="muted">없어요 — 모두 들어왔어요</span>`}</div>
+            ${state.invites && state.invites.length ? `<p class="us-note">초대했는데 아직 가입 전 — <b>${state.invites.length}명</b> (조직 구성에서 확인)</p>` : ""}</div>
+        </div>
+      </div>
+      <div class="card us-card us-wide"><div class="us-h"><h3>사람별</h3>
+          <select id="us-sort" aria-label="사람별 정렬" style="width:auto;height:34px;font-size:13px;padding:0 30px 0 10px">${[["quiet", "오래 안 들어온 순"], ["most", "많이 쓰는 순"], ["name", "가나다순"]].map(([k, l]) => `<option value="${k}" ${U.sort === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>
+        <div class="us-tw"><table class="us-tbl"><thead><tr><th>이름</th><th>마지막</th><th class="n">쓴 날</th><th class="n">사용 시간</th><th class="n">한 일</th><th>주로 쓰는 화면</th><th>기기 · 버전</th></tr></thead>
+          <tbody>${ppl || `<tr><td colspan="7" class="muted">아직 쌓인 게 없어요.</td></tr>`}</tbody></table></div>
+      </div>
+      <div class="card us-card us-wide"><div class="us-h"><h3>오류</h3><span class="muted">어느 화면에서 · 몇 번 · 몇 사람</span></div>
+        ${EL.length ? `<div class="us-tw"><table class="us-tbl us-errt"><thead><tr><th>화면</th><th>오류</th><th class="n">횟수</th><th class="n">사람</th><th>마지막</th><th>버전</th></tr></thead><tbody>
+          ${EL.map(([k, e]) => { const [w, ...m] = k.split(" | "); return `<tr><td>${esc(SCREEN_NAME[w] || w)}</td><td class="t mono">${esc(m.join(" | "))}</td><td class="n">${nf(e.n)}</td><td class="n">${e.users.size}</td><td>${fmtDate(e.last)}</td><td class="t">${esc([...e.vers].join(", "))}</td></tr>`; }).join("")}
+          </tbody></table></div>` : `<p class="muted">${days}일 동안 기록된 오류가 없어요.</p>`}
+      </div>
+      <details class="card us-card us-wide"><summary class="us-h" style="cursor:pointer"><h3>중요 기록</h3><span class="muted">수퍼 · 인계 · 내려받기 등 최근 ${(U.audit || []).length}건 — 눌러서 펼치기</span></summary>
+        <div class="list" style="margin-top:10px">${(U.audit || []).map(a => `<div class="row"><div class="grow"><p class="nm">${esc(a.action)}${a.detail ? " · " + esc(a.detail) : ""}</p>
+          <p class="sub">${esc(a.byName || "")} · ${a.at && a.at.seconds ? new Date(a.at.seconds * 1000).toLocaleString("ko-KR") : "—"}</p></div></div>`).join("") || `<p class="muted">없어요.</p>`}</div>
+      </details>
+    </div>
+    <div class="us-priv">${HIC.lock}<div><b>무엇을 모으나</b><p>화면 이름 · 누른 기능의 횟수 · 사용 분 · 시간대 · 기기 종류 · 브라우저 · 앱 버전 · 오류 종류.
+      <b>기록 · 기도 · 메모의 글 내용, 영혼 이름, 위치는 모으지 않아요.</b> 이 화면은 수퍼 관리자만 봅니다.</p></div></div>`;
 }
 $("usage-back").onclick = () => openMore();
 $("btn-go-usage").onclick = () => openUsage();
+$("us-body").addEventListener("click", (e) => {
+  const U = state.us; if (!U) return;
+  const d = e.target.closest("[data-usd]"); if (d) { U.days = +d.dataset.usd; openUsage(); return; }
+  const r = e.target.closest("[data-usr]"); if (r) { U.role = r.dataset.usr; renderUsage(); return; }
+  const m = e.target.closest("[data-usm]"); if (m) { U.metric = m.dataset.usm; renderUsage(); return; }
+  if (e.target.closest("#us-refresh")) { U.audit = null; openUsage(true); return; }
+  if (e.target.closest("#us-csv")) {
+    const rows = (U.cache[U.days] || []).filter(x => usRoleOk(x.role, U.role)).sort((a, b) => a.date.localeCompare(b.date) || (a.name || "").localeCompare(b.name || "", "ko"));
+    const H = ["날짜", "이름", "역할", "연 횟수", "사용 분", "화면 연 횟수", "한 일", "오류", "기기", "운영체제", "브라우저", "홈 화면 앱", "버전"];
+    const sum = (o) => Object.values(o || {}).reduce((n, v) => n + v, 0);
+    const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const csv = "﻿" + [H, ...rows.map(x => [x.date, x.name, ROLE[x.role] || x.role, x.opens || 0, x.mins ?? "", sum(x.screens), sum(x.acts), sum(x.errs), x.device || "", x.os || "", x.br || "", x.pwa ? "예" : x.ver ? "아니오" : "", x.ver || ""])].map(r => r.map(q).join(",")).join("\n");
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    a.download = `목자의삶-사용현황-${todayStr()}-${U.days}일.csv`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    bump("exportCsv");
+  }
+});
+$("us-body").addEventListener("change", (e) => { if (e.target.id === "us-sort") { state.us.sort = e.target.value; renderUsage(); } });
 
 /* ════════ 내 기록 ════════
    영혼 카드와 완전히 다른 것입니다.
@@ -4455,7 +4607,7 @@ async function putMeetShots(meetingId, cellId) {
       meetingId, cellId, jinId: state.me.jinId, leaderUid: state.me.id, peers: repPhotos(),
       data: p.full, by: uid(), createdAt: serverTimestamp()
     });
-    out.push({ id: ref.id, thumb: p.thumb });
+    out.push({ id: ref.id, thumb: p.thumb }); bump("photoUpload");
   }
   return out;
 }
@@ -5066,6 +5218,11 @@ async function backfillThumbs() {
    올릴 때마다 version.json 도 같이 올립니다. 앱은 열 때 · 다시 볼 때 · 10분마다
    그 파일만 살짝 확인해서(아주 작은 파일), 지금 버전보다 새것이면 위에 알림을 띄웁니다. */
 const CHANGELOG = [
+  { v:"33.0", d:"2026-11-10", items:[
+    "사용 현황(수퍼) 새 단장 — 쓰는 사람 · 오늘/이번 주 · 하루 평균 사용 시간 · 홈 화면 앱 비율 · 최신 버전 비율 · 오류",
+    "날마다 그래프(사람 수 · 사용 시간 · 연 횟수), 요일 × 시간 히트맵, 기기 · 운영체제 · 브라우저 · 버전, 앱 여는 속도",
+    "개선 힌트 — 아무도 안 연 화면 · 몇 사람만 쓰는 화면 · 안 들어온 사람, 사람별 표, 오류 목록, CSV 내려받기",
+    "모으는 것은 횟수 · 시간 · 기기뿐 — 글 내용 · 영혼 이름 · 위치는 모으지 않아요" ] },
   { v:"32.0", d:"2026-11-10", items:[
     "모임 메모 — 워드처럼 꾸미기: 제목 · 소제목 · 인용, 굵게 · 기울임 · 밑줄 · 취소선, 글자 색 · 형광펜, 목록 · 가운데 맞춤 · 구분선",
     "모임 메모 [넓게 쓰기] — 화면 가득 펼쳐서 쓰기 (Esc · 다 썼어요로 닫기), 워드 · 한글에서 붙여넣어도 꾸밈이 남아요",
@@ -8661,7 +8818,7 @@ function applyTheme(pref) {
 $("more-theme").addEventListener("click", (ev) => {
   const b = ev.target.closest("[data-theme]"); if (!b) return;
   try { localStorage.setItem("mokja-theme", b.dataset.theme); } catch {}
-  applyTheme(b.dataset.theme);
+  applyTheme(b.dataset.theme); bump("themeChange");
 });
 try { matchMedia("(prefers-color-scheme: light)").addEventListener("change", () => { if (themePref() === "system") applyTheme("system"); }); } catch {}
 applyTheme(themePref());
@@ -8837,7 +8994,7 @@ function gcalConnect() {
   return reauthenticateWithPopup(u, p).then(res => {
     const cred = GoogleAuthProvider.credentialFromResult(res);
     if (!cred || !cred.accessToken) throw new Error("구글 캘린더 허락을 받지 못했어요.");
-    gcalSetTok(cred.accessToken);
+    gcalSetTok(cred.accessToken); bump("gcalConnect");
   }).catch(e => {
     if (e && e.code === "auth/user-mismatch") throw new Error("앱에 로그인한 구글 계정으로 골라 주세요.");
     if (e && (e.code === "auth/popup-closed-by-user" || e.code === "auth/cancelled-popup-request")) throw new Error("연결을 취소했어요.");
@@ -8927,7 +9084,7 @@ async function gcalSync(again) {
   const g = state.gcal; if (g.busy) return;
   const D = await gcalDoc(); if (!D || !D.on) return;
   if (!gcalTok()) { g.need = true; renderGcal(); return; }
-  g.busy = true; g.err = ""; renderGcal();
+  g.busy = true; g.err = ""; renderGcal(); bump("gcalSync");
   try {
     await Promise.all([loadMeetings(), loadSouls()]); await loadAllRecords(); await loadAllTrainings();
     let calId = D.calId;
@@ -9511,6 +9668,7 @@ function helpFaq() {
     ["화면이 너무 어두워요", `더보기 › 화면에서 ${kb("moon", "라이트")} 또는 '기기 설정 따르기'.`],
     ["셀원 순서를 바꾸고 싶어요", `영혼들 ${kb("", "순서")} · 셀모임 ${kb("", "순서 정하기")} · 명부의 ${kb("", "순서 · 인턴")} — 어디서 바꿔도 모두 같아요.`],
     ["진장님은 어디서 넣나요?", `조직 구성 → 진장 줄 ${kb("plus", "진장")} → 이름 + 구글 이메일. '교역자'가 아니라 '진장' 자리로.`],
+    ["앱이 내 사용을 기록하나요?", `어떤 화면을 몇 번 · 몇 분 · 어떤 기기로 썼는지만 세요 (앱 개선용, 수퍼 관리자만 봄). 기록 · 기도 · 메모의 <b>글 내용과 위치는 모으지 않아요</b>.`],
     ["사진은 얼마나 올릴 수 있나요?", `사진 모아보기 위쪽에 쓴 용량과 남은 양이 보여요. 셀모임 사진은 대략 4,000장까지.`],
   ];
   return `<div class="hp-faq">${Q.map(([q, a]) => `<details><summary><span class="q">Q</span>${q}</summary><div class="a">${a}</div></details>`).join("")}</div>`;
@@ -9518,10 +9676,10 @@ function helpFaq() {
 $("hp-back").onclick = () => { if (state.helpTopic) { state.helpTopic = ""; renderHelp(); } else openHome(); };
 $("hp-body").addEventListener("click", async (ev) => {
   const t = ev.target.closest("[data-hp]");
-  if (t) { state.helpTopic = t.dataset.hp; renderHelp(); $("s-help").querySelector(".scroll").scrollTop = 0; return; }
+  if (t) { state.helpTopic = t.dataset.hp; if (t.dataset.hp) bump("help_" + t.dataset.hp); renderHelp(); $("s-help").querySelector(".scroll").scrollTop = 0; return; }
   const d = ev.target.closest("[data-hpdev]"); if (d) { state.helpDev = d.dataset.hpdev; renderHelp(); return; }
   const i = ev.target.closest("[data-hpinstall]");
-  if (i && deferredPrompt) { deferredPrompt.prompt(); await deferredPrompt.userChoice; deferredPrompt = null; renderHelp(); return; }
+  if (i && deferredPrompt) { deferredPrompt.prompt(); const ch = await deferredPrompt.userChoice; if (ch && ch.outcome === "accepted") bump("installApp"); deferredPrompt = null; renderHelp(); return; }
   const g = ev.target.closest("[data-hpgo]");
   if (g) { const k = g.dataset.hpgo; ({ souls: openSouls, meet: openMeet, cal: openCal, dir: openDir, health: openHealth, orgchart: openOrgChart }[k] || openHome)(); }
 });
@@ -9544,7 +9702,7 @@ function renderWelcome() {
     <button type="button" class="x" data-hwoff="1" aria-label="닫기">×</button></div>`;
 }
 $("home-welcome").addEventListener("click", (ev) => {
-  if (ev.target.closest("[data-hwoff]")) { try { localStorage.setItem("mokja-welcome-off", "1"); } catch {} renderWelcome(); return; }
+  if (ev.target.closest("[data-hwoff]")) { try { localStorage.setItem("mokja-welcome-off", "1"); } catch {} bump("welcomeOff"); renderWelcome(); return; }
   const g = ev.target.closest("[data-hwgo]"); if (g) openHelp(g.dataset.hwgo);
 });
 
@@ -9714,6 +9872,7 @@ function rteMount(host, o = {}) {
   bar.addEventListener("mousedown", e => { if (e.target.closest("button")) e.preventDefault(); });
   bar.addEventListener("click", e => {
     const b = e.target.closest("[data-rc]"); if (!b) return; const c = b.dataset.rc;
+    if (!["big", "undo", "redo"].includes(c) && !state._fmtBumped) { state._fmtBumped = true; bump("memoFormat"); }
     if (c === "fg" || c === "bg") return pop(b, c);
     document.querySelectorAll(".rte-pop").forEach(x => x.remove());
     if (c === "big") return full(!host.classList.contains("full"));
