@@ -24,7 +24,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
 const APP_NAME = "목자의 삶";
-const APP_VERSION = "30.0 (2026-11-10)";
+const APP_VERSION = "31.0 (2026-11-10)";
 
 /* 사진 크기 — 얼굴을 알아볼 수 있는 선에서 가장 작게.
    얼굴 하나가 가로 80px은 되어야 알아보는데, 여럿이 한 줄로 선
@@ -58,7 +58,7 @@ if ("serviceWorker" in navigator) {
 
 /* ── 공통 ── */
 const $ = (id) => document.getElementById(id);
-const SCREENS = ["s-orgchart","s-loading","s-login","s-verify","s-setup","s-accept","s-pending",
+const SCREENS = ["s-help","s-orgchart","s-loading","s-login","s-verify","s-setup","s-accept","s-pending",
                  "s-home","s-souls","s-cal","s-meet","s-meeting","s-log","s-soul",
                  "s-edit","s-train","s-search","s-mine","s-usage","s-more","s-manage",
                  "s-photos","s-stats","s-inbox","s-dir","s-cellmgr","s-org","s-consent","s-share",
@@ -354,7 +354,8 @@ ICON.inbox = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke
 ICON.dir = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3.5" width="14" height="17" rx="2"/><circle cx="12" cy="10" r="2.6"/><path d="M8.5 16.5a3.5 3.5 0 0 1 7 0"/></svg>`;
 ICON.health = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 12h4l2-4.5 4 9 2-4.5h5"/></svg>`;
 const SIDE = [["home","홈"],["inbox","소식"],["souls","영혼들"],["dir","교회 명부"],["cal","캘린더"],["meet","셀모임"],
-  ["health","셀 건강"],["train","훈련 현황"],["stats","활동 통계"],["photos","사진 모아보기"],["more","더보기"]];
+  ["health","셀 건강"],["train","훈련 현황"],["stats","활동 통계"],["photos","사진 모아보기"],["help","도우미"],["more","더보기"]];
+ICON.help = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.1-2.4 3.7M12 16.9v.1"/></svg>`;
 function renderNav() {
   document.querySelectorAll("[data-nav]").forEach(nav => {
     nav.innerHTML = NAV.map(([k,label]) =>
@@ -377,6 +378,7 @@ document.addEventListener("click", (ev) => {
   else if (t === "cal") openCal();
   else if (t === "meet") openMeet();
   else if (t === "more") openMore();
+  else if (t === "help") openHelp("");
   else if (t === "train") openTrainBoard();
   else if (t === "stats") openStats();
   else if (t === "photos") openPhotos();
@@ -715,7 +717,7 @@ function absentStreak(soulId, cellId) {
    자주 쓰는 것은 방으로 크게, 가끔 쓰는 것은 서랍에 넣었습니다. */
 async function openHome() {
   const me = state.me;
-  startLive(); renderVerCard(); checkVersion(); noteUpdated();
+  startLive(); renderVerCard(); checkVersion(); noteUpdated(); renderWelcome();
   const now = new Date(), days = ["일","월","화","수","목","금","토"];
   $("home-date").textContent = `${now.getMonth()+1}월 ${now.getDate()}일 ${days[now.getDay()]}요일`;
   /* 19단계 — 홈은 '조직 · 영혼 · 셀모임'만 기다리고 바로 보여줍니다.
@@ -3663,20 +3665,7 @@ $("btn-refresh").onclick=async()=>{
 };
 let deferredPrompt=null;
 window.addEventListener("beforeinstallprompt",(e)=>{ e.preventDefault(); deferredPrompt=e; });
-$("btn-install").onclick=async()=>{
-  if(deferredPrompt){ deferredPrompt.prompt(); await deferredPrompt.userChoice; deferredPrompt=null; return; }
-  const ios=/iPhone|iPad|iPod/.test(navigator.userAgent);
-  $("install-guide").innerHTML = ios?`
-    <p>사파리에서 이 페이지를 연 다음</p>
-    <ol style="margin:10px 0 0;padding-left:18px;line-height:2">
-      <li>아래쪽 <b>공유 버튼</b>(↑)을 누르고</li>
-      <li>목록에서 <b>홈 화면에 추가</b>를 고르고</li>
-      <li>오른쪽 위 <b>추가</b>를 누르면 끝이에요.</li></ol>
-    <p style="margin-top:12px">크롬이 아니라 <b>사파리</b>에서 해야 돼요.</p>`
-    : `<p>브라우저 메뉴(⋮)를 열고 <b>앱 설치</b> 또는 <b>홈 화면에 추가</b>를 눌러주세요.</p>
-       <p style="margin-top:10px">메뉴에 보이지 않으면 페이지를 새로고침한 뒤 다시 열어보세요.</p>`;
-  $("dlg-install").showModal();
-};
+/* 31단계 — 설치 안내는 도우미 › 홈 화면에 바로가기로 */
 $("ins-close").onclick=()=>$("dlg-install").close();
 
 function download(filename, text, mime) {
@@ -5073,6 +5062,10 @@ async function backfillThumbs() {
    올릴 때마다 version.json 도 같이 올립니다. 앱은 열 때 · 다시 볼 때 · 10분마다
    그 파일만 살짝 확인해서(아주 작은 파일), 지금 버전보다 새것이면 위에 알림을 띄웁니다. */
 const CHANGELOG = [
+  { v:"31.0", d:"2026-11-10", items:[
+    "도우미 — 그림과 짧은 단계로 보는 사용 안내 (처음 시작 · 홈 · 영혼 카드 · 셀모임 · 캘린더 · 명부 · 셀 건강 · 조직도 · 보안 · 자주 묻는 질문)",
+    "홈 화면에 바로가기 — 아이폰 · 안드로이드 · 컴퓨터별 그림 안내, 바로 설치할 수 있는 기기는 [지금 설치]",
+    "홈 위 (?) · 사이드바 '도우미' · 더보기에서 열기, 처음 쓰는 분께 홈에 한 줄 안내" ] },
   { v:"30.0", d:"2026-11-10", items:[
     "조직도 — 교회 → 진 → 진장 → 코치(맡은 셀) → 셀(셀리더 · 셀원 수 · 인턴 · 출석률)을 한 그림으로",
     "홈 전시실 · 관리 서랍 · 조직 구성에서 '조직도' 열기, 사람을 누르면 명부 카드 · 셀을 누르면 그 셀 명부",
@@ -9307,4 +9300,241 @@ $("dir-ratio").addEventListener("click", (ev) => {
   const b = ev.target.closest("[data-rf]"); if (!b) return;
   const [k, v] = b.dataset.rf.split(":");
   state.dirF[k] = state.dirF[k] === v ? "" : v; renderDir();
+});
+
+/* ════════ 31단계 — 도우미 (그림으로 보는 사용 안내 · 홈 화면 바로가기) ════════ */
+const HI = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const HIC = {
+  start: HI('<path d="M5 19c3-1 4-4 5-6l3-3c2-2 5-3 6-3 0 1-1 4-3 6l-3 3c-2 1-5 2-6 5"/><path d="M9 15l-2-2 2-3h3M15 9v3l-3 2"/>'),
+  phone: HI('<rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M11 18.5h2"/>'),
+  home: HI('<path d="M4 10.5 12 4.2l8 6.3V19a1.5 1.5 0 0 1-1.5 1.5H15V15H9v5.5H5.5A1.5 1.5 0 0 1 4 19z"/>'),
+  souls: HI('<circle cx="9.5" cy="8.5" r="3"/><path d="M4 19.5v-1a4 4 0 0 1 4-4h3a4 4 0 0 1 4 4v1M16.5 6.2a3 3 0 0 1 0 4.6M17.5 14.7a4 4 0 0 1 2.5 3.7v1.1"/>'),
+  meet: HI('<rect x="4" y="4.5" width="16" height="16" rx="3"/><path d="m8.5 12.5 2.5 2.5 4.5-5"/>'),
+  cal: HI('<rect x="3.5" y="5.5" width="17" height="15" rx="2.5"/><path d="M3.5 10.5h17M8.5 3.5v4M15.5 3.5v4"/>'),
+  dir: HI('<rect x="5" y="3.5" width="14" height="17" rx="2.5"/><circle cx="12" cy="10" r="2.6"/><path d="M8 17c.6-2 2.1-3 4-3s3.4 1 4 3"/>'),
+  chart: HI('<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'),
+  lock: HI('<rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/>'),
+  org: HI('<rect x="9" y="3" width="6" height="5" rx="1.5"/><rect x="3" y="16" width="6" height="5" rx="1.5"/><rect x="15" y="16" width="6" height="5" rx="1.5"/><path d="M12 8v4M6 16v-2h12v2"/>'),
+  faq: HI('<circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.1-2.4 3.7M12 16.9v.1"/>'),
+  plus: HI('<path d="M12 5v14M5 12h14"/>'),
+  pray: HI('<path d="M12 21s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.6-7 10-7 10z"/>'),
+  pen: HI('<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>'),
+  check: HI('<path d="m5 12.5 4.5 4.5L19 7.5"/>'),
+  camera: HI('<path d="M4 8.5h3l1.5-2h7l1.5 2h3v10H4z"/><circle cx="12" cy="13" r="3.2"/>'),
+  send: HI('<path d="M4 12 20 4l-5 16-3.5-6.5z"/><path d="m11.5 13.5 3.5-3.5"/>'),
+  google: HI('<path d="M20 12.2a8 8 0 1 1-2.4-5.7"/><path d="M20 5v5h-5"/>'),
+  eye: HI('<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/>'),
+  sort: HI('<path d="M7 4v16M3.5 16.5 7 20l3.5-3.5M17 20V4M13.5 7.5 17 4l3.5 3.5"/>'),
+  star: HI('<path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.5 9.7l5.9-.9z"/>'),
+  share: HI('<path d="M12 3.5v11M8 7.5l4-4 4 4"/><path d="M6 11v8.5h12V11"/>'),
+  addsq: HI('<rect x="4" y="4" width="16" height="16" rx="3.5"/><path d="M12 8.5v7M8.5 12h7"/>'),
+  dots: HI('<circle cx="12" cy="5.5" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="12" cy="18.5" r="1.3"/>'),
+  install: HI('<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M12 7.5v5M9.5 10.5 12 13l2.5-2.5M8 20h8"/>'),
+  mail: HI('<rect x="3.5" y="5.5" width="17" height="13" rx="2.5"/><path d="m4.5 7 7.5 6 7.5-6"/>'),
+  key: HI('<circle cx="8" cy="15" r="3.5"/><path d="m10.5 12.5 8-8M15.5 7.5l2 2"/>'),
+  heart: HI('<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.6-7 10-7 10z"/>'),
+  refresh: HI('<path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v4.5h-4.5"/>'),
+  moon: HI('<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>'),
+};
+const kb = (ic, t) => `<kbd>${ic ? HIC[ic] : ""}${t}</kbd>`;
+/* 주제 — 단계는 짧게, 그림(아이콘)과 함께 */
+const HELP = [
+  { id: "start", ic: "start", c: "#E3354B", t: "처음 시작", s: "초대받은 구글 계정으로 로그인", who: "all",
+    steps: [["mail", "초대 받기", `셀리더 명단 · 조직 구성에서 내 <b>구글 이메일</b>로 초대가 와요`],
+      ["key", "구글로 로그인", `앱 주소를 열고 ${kb("google", "구글로 시작")}`],
+      ["check", "초대 수락 · 동의", `내 자리(셀 · 역할) 확인 → 개인정보 동의`],
+      ["home", "홈에서 시작", `오늘 기도할 영혼과 챙길 사람이 바로 보여요`]],
+    tips: [["phone", "홈 화면에 바로가기를 만들어 두면 앱처럼 열려요"], ["lock", "초대받은 구글 계정으로만 들어올 수 있어요"]], go: ["install", "홈 화면에 바로가기"] },
+  { id: "install", ic: "phone", c: "#2E9D8F", t: "홈 화면에 바로가기", s: "아이폰 · 안드로이드 · 컴퓨터", who: "all", special: "install" },
+  { id: "home", ic: "home", c: "#5B8DEF", t: "홈 화면", s: "오늘 할 일이 한눈에", who: "lead",
+    steps: [["pray", "오늘의 전시", `기도할 영혼 한 사람 → ${kb("", "기도했어요")}`],
+      ["heart", "오늘 챙길 사람", `결석 · 오래 못 만난 사람 · 다가오는 예정`],
+      ["chart", "전시실", `영혼들 · 셀모임 · 캘린더 · 명부 … 숫자를 누르면 그 화면`],
+      ["dots", "관리 서랍", `조직 구성 · 셀리더 명단 · 보고서 가져오기`]],
+    tips: [["plus", "오른쪽 위 ＋ 로 빠른 기록"], ["star", "홈 위 '버전'을 누르면 바뀐 것"]] },
+  { id: "souls", ic: "souls", c: "#E07B5A", t: "영혼 카드", s: "만남 · 기도 · 상태를 한 장에", who: "lead",
+    steps: [["plus", "영혼 더하기", `영혼들 오른쪽 위 ${kb("plus", "")} — 명부에서 고르거나 새로`],
+      ["pen", "만남 기록", `카드를 열고 ${kb("", "만남")} · ${kb("", "1:1")} · 심방`],
+      ["pray", "기도제목", `기도 중 → 응답됨으로 바꿔 가며`],
+      ["sort", "순서 · 인턴", `${kb("", "순서")} — 영적 순서와 인턴을 한 창에서`]],
+    tips: [["lock", "기록마다 공개 범위: 나만 · 코치·진장 · 교역자"], ["star", "명함 카드 네 칸 = 만남 · 1:1 · 출석 · 기도"]], go: ["souls", "영혼들 열기"] },
+  { id: "meet", ic: "meet", c: "#7FA8E8", t: "셀모임 · 보고", s: "출석 체크 → 보고까지 한 번에", who: "lead",
+    steps: [["plus", "셀모임 열기", `셀모임 ${kb("plus", "")} — 날짜 · 시간 · 장소 · 주제`],
+      ["check", "출석 체크", `한 사람씩 ${kb("", "출석")} ${kb("", "온라인")} ${kb("", "결석")}`],
+      ["camera", "나눔 · 사진", `사람별 나눔과 셀모임 사진`],
+      ["send", "보고", `${kb("send", "보고하기")} → 코치 · 진장이 확인`]],
+    tips: [["eye", "보고 사본은 같은 진이 봐요 — 나눔 공유는 공유 설정에서"], ["chart", "셀 보고 모아보기 = 캘린더 · 출석 그래프"]], go: ["meet", "셀모임 열기"] },
+  { id: "cal", ic: "cal", c: "#9A8CF0", t: "캘린더", s: "셀모임 · 만남 · 생일", who: "lead",
+    steps: [["cal", "날짜 누르기", `그날 일정 · ${kb("plus", "이 날 기록")}`],
+      ["souls", "다른 셀 보기", `맨 위 ${kb("", "1B01 김준")} — 같은 진 셀리더 캘린더`],
+      ["google", "구글 캘린더", `${kb("", "구글 캘린더 연결하기")} 한 번이면 내 폰 캘린더에`],
+      ["refresh", "맞추기", `1시간 뒤 바뀐 건 ${kb("", "맞추기")} 한 번`]],
+    tips: [["lock", "다른 셀 만남은 날짜 · 시간 · 종류만 보여요"]], go: ["cal", "캘린더 열기"] },
+  { id: "dir", ic: "dir", c: "#C9A227", t: "교회 명부", s: "셀별 가지 · 목록 · 통계", who: "all",
+    steps: [["dir", "셀별로", `셀마다 맨 위 셀리더, 아래로 셀원이 가지처럼`],
+      ["sort", "목록 · 정렬", `${kb("", "셀원")} ${kb("", "리더들")} → 가나다 · 나이 · 출석률 · 생일순`],
+      ["chart", "한눈에 보기", `침례 · 새로운 삶 · 제자의 삶 · 정회원 비율 — 막대를 누르면 거르기`],
+      ["chart", "통계 · 그래프", `평균 나이 · 연령대 · 출석률 · 셀별 표`]],
+    tips: [["lock", "생년 · 가족 · 침례는 잠긴 칸 — 볼 수 있는 분만"], ["eye", "카드를 누르면 출석 줄 · 기본 사항"]], go: ["dir", "교회 명부 열기"] },
+  { id: "health", ic: "chart", c: "#2E7D54", t: "셀 건강 · 통계 · 사진", s: "그래프로 보는 우리 셀", who: "all",
+    steps: [["chart", "셀 건강", `출석률 고리 · 8주 막대 · 사람별 출석 줄`],
+      ["sort", "자주 빠지는 순", `${kb("", "자주 빠지는 순")} 으로 먼저 챙길 사람`],
+      ["chart", "활동 통계", `종류별 모임 · 달마다 — 다른 셀도 골라서`],
+      ["camera", "사진 모아보기", `셀모임 사진 · 셀원 얼굴`]],
+    go: ["health", "셀 건강 열기"] },
+  { id: "org", ic: "org", c: "#B4384A", t: "조직도 · 관리", s: "진장 · 코치 · 셀 자리", who: "manage",
+    steps: [["org", "조직도", `교회 → 진 → 진장 → 코치 → 셀을 한 그림으로`],
+      ["plus", "자리 넣기", `조직 구성 → ${kb("plus", "진장")} ${kb("plus", "코치")} — 이름 + 구글 이메일`],
+      ["mail", "셀리더 초대", `셀리더 명단 → 이메일 넣고 ${kb("send", "초대 보내기")}`],
+      ["dir", "셀 관리", `분가 · 담당 바꾸기 · 이름 · 보관`]],
+    tips: [["key", "진장은 '교역자'가 아니라 '진장' 자리로"]], go: ["orgchart", "조직도 열기"] },
+  { id: "privacy", ic: "lock", c: "#6F6664", t: "누가 무엇을 보나", s: "보안 원칙 한눈에", who: "all", special: "privacy" },
+  { id: "faq", ic: "faq", c: "#5F5654", t: "자주 묻는 질문", s: "막힐 때 여기부터", who: "all", special: "faq" },
+];
+function helpWho(t) {
+  const r = state.me ? state.me.role : "";
+  if (t.who === "lead") return canLead() || ["coach", "jinjang"].includes(r);
+  if (t.who === "manage") return ["super", "jinjang", "coach"].includes(r);
+  return true;
+}
+async function openHelp(topic) {
+  state.helpTopic = topic || "";
+  renderHelp(); markSide("help"); show("s-help");
+  $("s-help").querySelector(".scroll").scrollTop = 0;
+}
+function renderHelp() {
+  const t = HELP.find(x => x.id === state.helpTopic);
+  $("hp-title").textContent = t ? t.t : "도우미";
+  if (!t) { renderHelpHome(); return; }
+  const head = `<button type="button" class="hp-back2" data-hp="">‹ 도우미 처음으로</button>
+    <div class="hp-head"><span class="hp-ic" style="background:${t.c}">${HIC[t.ic]}</span><div><h3>${t.t}</h3><p>${t.s}</p></div></div>`;
+  if (t.special === "install") { $("hp-body").innerHTML = head + helpInstall(); return; }
+  if (t.special === "privacy") { $("hp-body").innerHTML = head + helpPrivacy(); return; }
+  if (t.special === "faq") { $("hp-body").innerHTML = head + helpFaq(); return; }
+  $("hp-body").innerHTML = head + `<div class="hp-steps">${t.steps.map(([ic, b, d], i) => `
+      <div class="hp-step"><span class="no">${i + 1}</span><span class="si">${HIC[ic]}</span><b>${b}</b><p>${d}</p></div>`).join("")}</div>
+    ${(t.tips || []).length ? `<div class="hp-tips">${t.tips.map(([ic, x]) => `<span class="hp-tip">${HIC[ic]}<span>${x}</span></span>`).join("")}</div>` : ""}
+    ${t.go ? `<div class="hp-go"><button type="button" class="btn" style="max-width:240px" data-hpgo="${t.go[0]}">${t.go[1]}</button></div>` : ""}`;
+}
+function renderHelpHome() {
+  const q = (state.helpQ || "").trim();
+  const list = HELP.filter(helpWho).filter(t => !q || (t.t + t.s + JSON.stringify(t.steps || "") + JSON.stringify(t.tips || "")).replace(/<[^>]+>/g, "").includes(q));
+  $("hp-body").innerHTML = `
+    <div class="hp-hero">
+      <svg class="deco" width="140" height="140" viewBox="0 0 140 140" aria-hidden="true"><circle cx="100" cy="40" r="56" fill="var(--rose-bg)"/><circle cx="118" cy="22" r="20" fill="var(--rose-line)" opacity=".6"/></svg>
+      <div style="position:relative">
+        <h3>무엇을 도와드릴까요?</h3>
+        <p>그림과 짧은 단계로 기능을 안내해요. 막히면 '자주 묻는 질문'부터.</p>
+        <label class="hp-search">${HIC.faq.replace("<svg", '<svg width="18" height="18" style="color:var(--dim)"')}
+          <input id="hp-q" type="search" placeholder="찾기 — 예: 출석, 인턴, 구글" value="${esc(q)}" aria-label="도우미에서 찾기"></label>
+        <div class="hp-quick">
+          <button type="button" class="pri" data-hp="install">${HIC.phone.replace("<svg", '<svg width="18" height="18"')}홈 화면에 바로가기</button>
+          <button type="button" data-hp="start">${HIC.start.replace("<svg", '<svg width="18" height="18"')}처음 시작</button>
+          <button type="button" data-hp="faq">${HIC.faq.replace("<svg", '<svg width="18" height="18"')}자주 묻는 질문</button>
+        </div>
+      </div>
+    </div>
+    <p class="hp-sec">${q ? `'${esc(q)}' 찾은 결과 ${list.length}개` : "기능별 안내"}</p>
+    <div class="hp-grid">${list.map(t => `<button type="button" class="hp-tile" data-hp="${t.id}">
+        <span class="hp-ic" style="background:${t.c}">${HIC[t.ic]}</span><span><b>${t.t}</b><span class="s">${t.s}</span></span></button>`).join("")
+      || `<p class="muted">찾는 안내가 없어요. 다른 말로 찾아보세요.</p>`}</div>`;
+}
+function helpDevice() {
+  const ua = navigator.userAgent;
+  if (/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return "ios";
+  if (/Android/.test(ua)) return "android";
+  return "pc";
+}
+function helpInstall() {
+  const standalone = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+  const dev = state.helpDev || helpDevice();
+  const D = {
+    ios: { t: "아이폰 · 아이패드", note: "꼭 <b>사파리</b>에서 열어 주세요 (크롬 ✕)",
+      steps: [["share", "공유 버튼", `사파리 아래쪽 ${kb("share", "공유")} 누르기`],
+        ["addsq", "홈 화면에 추가", `목록을 내려 ${kb("addsq", "홈 화면에 추가")}`],
+        ["check", "추가", `오른쪽 위 ${kb("", "추가")} — 끝!`]] },
+    android: { t: "안드로이드", note: "<b>크롬</b>에서 열어 주세요",
+      steps: [["dots", "메뉴", `크롬 오른쪽 위 ${kb("dots", "")} 누르기`],
+        ["install", "앱 설치", `${kb("install", "앱 설치")} 또는 ${kb("addsq", "홈 화면에 추가")}`],
+        ["check", "설치", `${kb("", "설치")} — 홈 화면에 아이콘이 생겨요`]] },
+    pc: { t: "컴퓨터", note: "<b>크롬 · 엣지</b>에서 열어 주세요",
+      steps: [["install", "주소창 아이콘", `주소창 오른쪽 ${kb("install", "설치")} 아이콘 누르기`],
+        ["check", "설치", `${kb("", "설치")} — 바탕화면 · 독에서 바로 열려요`],
+        ["star", "작업 표시줄 고정", `아이콘을 오른쪽 클릭 → 고정해 두면 편해요`]] },
+  }[dev];
+  return `${standalone ? `<div class="hp-status ok">${HIC.check}지금 홈 화면 앱으로 쓰고 있어요. 따로 할 일이 없어요.</div>`
+      : deferredPrompt ? `<div class="hp-status go">${HIC.install}<span style="flex:1">이 기기는 바로 설치할 수 있어요.</span><button type="button" class="btn-sm" data-hpinstall="1">지금 설치</button></div>` : ""}
+    <div class="seg hp-dev">${[["ios", "아이폰"], ["android", "안드로이드"], ["pc", "컴퓨터"]].map(([k, l]) =>
+      `<button type="button" data-hpdev="${k}" class="${dev === k ? "on" : ""}">${l}</button>`).join("")}</div>
+    <div class="hp-install">
+      <div>
+        <div class="hp-tips" style="margin:0 0 12px">${`<span class="hp-tip">${HIC.eye}<span>${D.note}</span></span>`}</div>
+        <div class="hp-steps">${D.steps.map(([ic, b, d], i) => `<div class="hp-step"><span class="no">${i + 1}</span><span class="si">${HIC[ic]}</span><b>${b}</b><p>${d}</p></div>`).join("")}</div>
+        <div class="hp-tips">
+          <span class="hp-tip">${HIC.star}설치하면 주소창 없이 앱처럼 · 더 빨리 열려요</span>
+          <span class="hp-tip">${HIC.refresh}새 버전은 앱 위쪽 '새 버전' 알림으로 와요</span>
+        </div>
+      </div>
+      <div><div class="phone"><span class="notch"></span><div class="apps">
+          ${"<i></i>".repeat(5)}<span class="me"><img src="icons/icon-192.png" alt=""><span>목자의 삶</span></span>${"<i></i>".repeat(6)}
+        </div><span class="dock"></span></div><p class="hp-cap">이렇게 홈 화면에 생겨요</p></div>
+    </div>`;
+}
+function helpPrivacy() {
+  const W = (ic, c, t, items, k) => `<div class="w${k ? " key" : ""}"><div class="h"><span class="hp-ic" style="background:${c};width:36px;height:36px;border-radius:11px">${HIC[ic]}</span><b>${t}</b></div>
+    <ul>${items.map(x => `<li>${x}</li>`).join("")}</ul></div>`;
+  return `<div class="hp-who">
+    ${W("lock", "#6F6664", "나만 (셀리더)", ["'나만 보기'로 둔 만남 기록", "구글 캘린더 연결 상태", "내 카드 기본 내용"])}
+    ${W("souls", "#E3354B", "맡은 셀리더", ["내 셀 영혼 카드 전체 · 기도", "내 셀 사람들의 노션 명단(잠긴 칸)", "순서 · 인턴 정하기"])}
+    ${W("eye", "#9A8CF0", "코치 · 진장", ["공개 범위가 '코치 · 진장'인 기록", "진 전체 셀 보고 · 셀 건강", "명부 잠긴 칸 · 조직도"])}
+    ${W("dir", "#5B8DEF", "같은 진 누구나", ["교회 명부 (이름 · 사진 · 셀 · 생일 · 연락처 · 수료)", "셀 보고의 출석 · 주제", "공유를 켠 셀모임 사진 · 만남 일정(날짜만)"])}
+    ${W("key", "#2E9D8F", "본인은 못 봐요", ["나에 대해 셀리더 · 코치 · 진장이 쓴 기록", "나의 잠긴 칸(노션 명단)", "계정을 받아도 그대로"], 1)}
+  </div>
+  <div class="hp-tips"><span class="hp-tip">${HIC.lock}이 원칙은 앱 화면이 아니라 서버의 보안 규칙이 막아요</span>
+    <span class="hp-tip">${HIC.eye}공유 범위는 더보기 › 공유 설정에서</span></div>`;
+}
+function helpFaq() {
+  const Q = [
+    ["새 버전이 안 보여요", `앱 위쪽 '새 버전' 알림의 ${kb("refresh", "지금 새로고침")}. 그래도 안 되면 더보기 › 새로고침.`],
+    ["다른 셀 칸이 흐려요", `그 셀리더가 아직 가입 전이에요. 셀리더 명단에서 초대하고 그분이 로그인하면 열려요.`],
+    ["구글 캘린더 오류가 나요", `오류 글에 빠진 게 적혀 있어요 — 'API 켜기'면 설정 안내 ①번, '캘린더 허용'이면 다시 연결하며 체크.`],
+    ["생년 · 침례가 '—'로 보여요", `노션 명단(잠긴 칸)은 수퍼 · 진장 · 코치 · 그 셀 셀리더만 봐요. 본인 것은 본인에게 안 보여요.`],
+    ["화면이 너무 어두워요", `더보기 › 화면에서 ${kb("moon", "라이트")} 또는 '기기 설정 따르기'.`],
+    ["셀원 순서를 바꾸고 싶어요", `영혼들 ${kb("", "순서")} · 셀모임 ${kb("", "순서 정하기")} · 명부의 ${kb("", "순서 · 인턴")} — 어디서 바꿔도 모두 같아요.`],
+    ["진장님은 어디서 넣나요?", `조직 구성 → 진장 줄 ${kb("plus", "진장")} → 이름 + 구글 이메일. '교역자'가 아니라 '진장' 자리로.`],
+    ["사진은 얼마나 올릴 수 있나요?", `사진 모아보기 위쪽에 쓴 용량과 남은 양이 보여요. 셀모임 사진은 대략 4,000장까지.`],
+  ];
+  return `<div class="hp-faq">${Q.map(([q, a]) => `<details><summary><span class="q">Q</span>${q}</summary><div class="a">${a}</div></details>`).join("")}</div>`;
+}
+$("hp-back").onclick = () => { if (state.helpTopic) { state.helpTopic = ""; renderHelp(); } else openHome(); };
+$("hp-body").addEventListener("click", async (ev) => {
+  const t = ev.target.closest("[data-hp]");
+  if (t) { state.helpTopic = t.dataset.hp; renderHelp(); $("s-help").querySelector(".scroll").scrollTop = 0; return; }
+  const d = ev.target.closest("[data-hpdev]"); if (d) { state.helpDev = d.dataset.hpdev; renderHelp(); return; }
+  const i = ev.target.closest("[data-hpinstall]");
+  if (i && deferredPrompt) { deferredPrompt.prompt(); await deferredPrompt.userChoice; deferredPrompt = null; renderHelp(); return; }
+  const g = ev.target.closest("[data-hpgo]");
+  if (g) { const k = g.dataset.hpgo; ({ souls: openSouls, meet: openMeet, cal: openCal, dir: openDir, health: openHealth, orgchart: openOrgChart }[k] || openHome)(); }
+});
+$("hp-body").addEventListener("input", (ev) => {
+  if (ev.target.id !== "hp-q") return;
+  state.helpQ = ev.target.value; const pos = ev.target.selectionStart;
+  renderHelpHome(); const n = $("hp-q"); n.focus(); try { n.setSelectionRange(pos, pos); } catch {}
+});
+$("btn-home-help").onclick = () => openHelp("");
+$("btn-go-help").onclick = () => openHelp("");
+$("btn-install").onclick = () => openHelp("install");
+/* 홈 — 처음 쓰는 분께 한 줄 안내 (닫으면 이 기기에서는 다시 안 떠요) */
+function renderWelcome() {
+  let off = false; try { off = localStorage.getItem("mokja-welcome-off") === "1"; } catch {}
+  const standalone = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+  $("home-welcome").innerHTML = off ? "" : `<div class="hwel"><span class="hp-ic" style="background:#2E9D8F;width:40px;height:40px">${HIC.phone}</span>
+    <span class="t"><b>처음이세요?</b><p>${standalone ? "도우미에서 기능을 그림으로 볼 수 있어요." : "홈 화면에 바로가기를 만들면 앱처럼 열려요."}</p></span>
+    ${standalone ? "" : `<button type="button" class="btn-sm" data-hwgo="install">바로가기</button>`}
+    <button type="button" class="btn-sm" data-hwgo="">도우미</button>
+    <button type="button" class="x" data-hwoff="1" aria-label="닫기">×</button></div>`;
+}
+$("home-welcome").addEventListener("click", (ev) => {
+  if (ev.target.closest("[data-hwoff]")) { try { localStorage.setItem("mokja-welcome-off", "1"); } catch {} renderWelcome(); return; }
+  const g = ev.target.closest("[data-hwgo]"); if (g) openHelp(g.dataset.hwgo);
 });
