@@ -1466,6 +1466,192 @@
     .hwel .btn-sm + .btn-sm{margin-left:0}
     .hwel .x{position:absolute;top:8px;right:6px}
   }
+
+  /* ═══ 38단계 — 도우미: 문의 · 제안 창구 ═══ */
+  .tk-band{margin:18px 0 6px;padding:16px;border-radius:20px;border:1px solid var(--line);background:linear-gradient(150deg,var(--lead-bg),var(--surface) 60%);display:flex;flex-direction:column;gap:12px}
+  .tk-band .tb-t b{display:block;font-size:calc(16px*var(--fs,1));font-weight:500}
+  .tk-band .tb-t span{display:block;font-size:calc(12.5px*var(--fs,1));color:var(--dim);margin-top:3px;line-height:1.6}
+  .tk-band .tb-b{display:flex;flex-wrap:wrap;gap:8px}
+  .tk-band .tb-b button{display:inline-flex;align-items:center;gap:7px;height:42px;padding:0 14px;border-radius:13px;border:1px solid var(--line);background:var(--surface);color:var(--text);font:inherit;font-size:calc(13.5px*var(--fs,1));cursor:pointer}
+  .tk-band .tb-b button svg{color:var(--brand)}
+  .tk-band .tb-b button.mine{background:transparent}
+  .tk-band .tb-b .dot,.tk-row .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--brand)}
+  @media (min-width:900px){ .tk-band{flex-direction:row;align-items:center;justify-content:space-between} .tk-band .tb-t{max-width:420px} }
+  .tk-tabs{margin:4px 0 16px}
+  .tk-form{max-width:760px}
+  .tk-kinds{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:16px}
+  .tk-kinds button{display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:12px;border-radius:16px;border:1px solid var(--line);background:var(--surface);color:var(--text);font:inherit;cursor:pointer;text-align:left}
+  .tk-kinds .ki,.tk-row .ki,.tk-head .ki{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;color:#fff;background:var(--kc);margin-bottom:6px;flex-shrink:0}
+  .tk-kinds .ki svg,.tk-row .ki svg,.tk-head .ki svg{width:18px;height:18px}
+  .tk-kinds b{font-size:calc(14px*var(--fs,1));font-weight:500}.tk-kinds .s{font-size:calc(11.5px*var(--fs,1));color:var(--dim)}
+  .tk-kinds button.on{border-color:var(--kc);box-shadow:0 0 0 2px color-mix(in srgb,var(--kc) 30%,transparent)}
+  @media (max-width:420px){ .tk-kinds .s{display:none} }
+  .tk-drop{border:1.5px dashed var(--line3);border-radius:16px;padding:12px;background:var(--surface);display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+  .tk-drop.over{border-color:var(--brand);background:var(--rose-bg)}
+  .tk-thumbs{display:contents}
+  .tk-th{position:relative;width:88px;height:88px;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:var(--surface2);padding:0;cursor:pointer}
+  .tk-th img{width:100%;height:100%;object-fit:cover;display:block}
+  .tk-th button{position:absolute;top:4px;right:4px;width:24px;height:24px;border-radius:50%;border:none;background:rgba(0,0,0,.6);color:#fff;font-size:calc(15px*var(--fs,1));line-height:1;cursor:pointer}
+  .tk-th.big{width:132px;height:132px}
+  .tk-pick{display:inline-flex !important;align-items:center;gap:8px;height:88px;padding:0 16px;border-radius:12px;background:var(--rose-bg);color:var(--brand);font-size:calc(13.5px*var(--fs,1));font-weight:500;cursor:pointer;margin:0}
+  .tk-pick[hidden]{display:none !important}
+  .tk-hint{flex-basis:100%;font-size:calc(11.5px*var(--fs,1));color:var(--dim);line-height:1.6;margin:0}
+  .tk-warn,.tk-ctx{display:flex;gap:8px;align-items:flex-start;font-size:calc(12px*var(--fs,1));color:var(--sub-tx);line-height:1.6;margin:10px 0 0}
+  .tk-warn svg{color:var(--brand);flex-shrink:0;margin-top:2px}.tk-ctx svg{color:var(--gold);flex-shrink:0;margin-top:2px}
+  .tk-ctx{color:var(--dim)}
+  .tk-acts{display:flex;gap:8px;align-items:center;margin-top:14px}
+  .tk-acts .btn{width:auto;padding:0 24px;height:48px;display:inline-flex;align-items:center;gap:8px}
+  .tk-filt{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px}
+  .tk-kf{display:flex;gap:6px;flex-wrap:wrap}.tk-kf .pchip.on{border-color:var(--brand);color:var(--brand)}
+  .tk-list{display:flex;flex-direction:column;gap:8px;max-width:900px}
+  .tk-row{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border-radius:16px;border:1px solid var(--line);background:var(--surface);color:var(--text);font:inherit;text-align:left;cursor:pointer;width:100%}
+  .tk-row .ki{margin:0}
+  .tk-row .grow{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+  .tk-row .t1{display:flex;align-items:center;gap:6px}.tk-row .t1 b{font-size:calc(14.5px*var(--fs,1));font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tk-row .t2,.tk-row .t3{font-size:calc(12px*var(--fs,1));color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tk-row.un{border-color:var(--rose-line2)}
+  .tk-empty{text-align:center;padding:30px 12px;color:var(--dim)}.tk-empty svg{width:34px;height:34px;color:var(--brand)}.tk-empty p{margin:10px 0 14px;line-height:1.7}
+  .tk-one{max-width:820px}
+  .tk-head{display:flex;gap:12px;align-items:flex-start;margin:10px 0 12px}.tk-head .grow{flex:1;min-width:0}
+  .tk-head h3{font-size:calc(19px*var(--fs,1));font-weight:500;margin-top:2px}.tk-head .t2{font-size:calc(12px*var(--fs,1));color:var(--dim)}
+  .tk-body{white-space:pre-wrap;line-height:1.75;font-size:calc(14.5px*var(--fs,1));padding:14px 16px;border-radius:16px;background:var(--surface);border:1px solid var(--line);color:var(--body-tx)}
+  .tk-imgs{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+  .tk-st{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:16px 0 4px}.tk-st .lb{font-size:calc(12.5px*var(--fs,1));color:var(--dim)}
+  .tk-thread{display:flex;flex-direction:column;gap:8px;margin:16px 0 4px}
+  .tk-thread .bub{max-width:86%;padding:10px 13px;border-radius:16px;font-size:calc(14px*var(--fs,1));line-height:1.65;white-space:pre-wrap;background:var(--surface);border:1px solid var(--line)}
+  .tk-thread .bub.me{align-self:flex-end;background:var(--rose-bg);border-color:var(--rose-line)}
+  .tk-thread .bub{white-space:normal}.tk-thread .bub .tx{white-space:pre-wrap;display:block}
+  .tk-thread .bub .who{display:block;font-size:calc(11.5px*var(--fs,1));color:var(--dim);margin-bottom:3px;font-weight:500}
+  .tk-thread .bub .t{display:block;font-size:calc(10.5px*var(--fs,1));color:var(--faint);margin-top:4px;text-align:right}
+  .tk-reply{margin-top:12px}
+  .hp-go{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .hp-go .btn-ghost{width:auto;display:inline-flex;align-items:center;gap:8px;padding:0 16px;height:48px;font-size:calc(13.5px*var(--fs,1))}
+
+  /* ═══ 39단계 — 신앙 · 훈련 체크 · 눌러 고르기 · 아이패드 입력 ═══ */
+  .faith{display:flex;flex-direction:column;gap:2px;border:1px solid var(--line);border-radius:16px;background:var(--surface);padding:4px 14px}
+  .faith-wrap.card{padding:12px 14px}
+  .faith-wrap.card .faith{border:none;padding:0;background:transparent}
+  .frow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 0;border-top:1px solid var(--line2)}
+  .frow:first-child{border-top:none}
+  .frow .fl{width:84px;flex-shrink:0;font-size:calc(13px*var(--fs,1));color:var(--dim);font-weight:500}
+  .frow .fx{font-size:calc(12px*var(--fs,1));color:var(--dim)}
+  .fseg{display:inline-flex;gap:6px}
+  .fseg button,.fchips button{height:38px;padding:0 16px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--sub-tx);font:inherit;font-size:calc(13.5px*var(--fs,1));cursor:pointer;transition:background .12s,border-color .12s}
+  .fseg button.on.yes,.fchips button.on{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok-tx);font-weight:500}
+  .fseg button.on.no{background:var(--rose-bg);border-color:var(--rose-line);color:var(--rose-tx);font-weight:500}
+  .fchips{display:flex;flex-wrap:wrap;gap:6px;flex:1;min-width:0}
+  .ftr{align-items:flex-start}.ftr .fl{padding-top:9px}
+  .fv2{display:inline-flex;gap:8px;align-items:center}
+  @media (max-width:480px){ .frow .fl{width:100%} }
+  .segsel{display:flex;flex-wrap:wrap;gap:6px}
+  .segsel button{min-height:44px;padding:0 18px;border-radius:13px;border:1px solid var(--line);background:var(--surface);color:var(--sub-tx);font:inherit;font-size:calc(14px*var(--fs,1));cursor:pointer}
+  .segsel button.on{background:var(--rose-bg);border-color:var(--rose-line2);color:var(--text);font-weight:500}
+  .segsel button:disabled{opacity:.5}
+  .segsel-src{display:none !important}
+  #e-bap-seg,#md-bap-seg{margin-bottom:8px}
+  /* 키보드가 떠 있는 동안 — 왼쪽 메뉴 · 저장 막대를 종이에 붙여요 (iOS가 중간에 잘라 버리지 않게) */
+  html.kb-open body{position:relative}
+  html.kb-open #sidebar{position:absolute;top:0;bottom:0;height:auto;min-height:100vh}
+  html.kb-open .savebar{position:static !important}
+  html.kb-open .tabbar{display:none}
+  /* 손가락으로 누르는 기기 — 누르는 곳을 조금 더 크게 */
+  @media (pointer:coarse){
+    .btn-sm{min-height:42px}
+    .att button{width:46px;height:42px}
+    .seg button{min-height:42px}
+    .rsn button{min-height:40px}
+    .pchip{height:38px}
+    .crow .btn-sm{height:40px}
+    input,select{min-height:48px}
+  }
+
+  /* ═══════════ 40단계 — 규격 통일 (모든 버튼 · 칸 · 토글 · 아이콘) ═══════════
+     높이 3단계   S 36 (작은 버튼 · 토글 · 거르기)   M 44 (입력칸 · 고르기 · 아이콘 버튼)   L 52 (주요 버튼 · 닫기)
+                  손가락 기기는 S 40 · M 48 (L은 그대로)
+     표시(배지)   24 한 가지
+     아이콘       16 (작은 버튼 · 배지 안)   20 (기본 — 메뉴 · 버튼 · 목록 · 아이콘 상자)   22 (위 막대 아이콘 버튼)
+     아이콘 상자  40 × 40 · 모서리 12 (전시실 방 · 도우미 · 문의 종류 · 목록 앞)
+     모서리       작은 것 10 · 버튼 · 칸 12 · 카드 18 · 창 24
+     간격         4 · 8 · 12 · 16 · 24 · 32 — 버튼끼리 8, 카드끼리 12, 묶음 사이 24 */
+  :root{--h-s:36px;--h-m:44px;--h-l:52px;--h-chip:24px;--ic-s:16px;--ic:20px;--ic-l:22px;--box-ic:40px;
+    --r-s:10px;--r-m:12px;--r-l:18px;--r-xl:24px;--sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:16px;--sp-5:24px;--sp-6:32px}
+  @media (pointer:coarse){ :root{--h-s:40px;--h-m:48px} }
+
+  /* L — 주요 버튼 · 닫기 · 넓은 버튼 */
+  .btn,.btn-ghost{height:var(--h-l) !important;min-height:var(--h-l);border-radius:var(--r-m) !important;
+    display:inline-flex;align-items:center;justify-content:center;gap:var(--sp-2);padding:0 var(--sp-5)}
+  .btn{width:100%}
+  .dlg-btns .btn,.dlg-btns .btn-ghost{height:var(--h-l) !important}
+  /* 정사각 아이콘 자리로 쓰는 btn-ghost (기도 카드 › 같은 것) */
+  .btn-ghost.sq,#home-pray .btn-ghost{width:var(--h-l) !important;padding:0}
+  #home-pray .btn{height:var(--h-l) !important}
+  /* M — 입력칸 · 고르기 · 아이콘 버튼 · 서랍 버튼 */
+  input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=color]):not([type=range]),select{height:var(--h-m) !important;min-height:var(--h-m) !important;border-radius:var(--r-m)}
+  textarea{border-radius:var(--r-m)}
+  .icon-btn{width:var(--h-m) !important;height:var(--h-m) !important}
+  .drawer-in .btn-ghost{height:var(--h-m) !important;padding:0 var(--sp-4)}
+  .segsel button{min-height:var(--h-m) !important;height:var(--h-m);border-radius:var(--r-m)}
+  /* 칸 옆에 붙은 작은 버튼은 칸과 같은 높이로 (예: 주소 찾기) */
+  :is(div,label):has(> input:not([type=checkbox]):not([type=radio]):not([type=hidden]):not([type=file])) > .btn-sm,
+  :is(div,label):has(> select) > .btn-sm{height:var(--h-m) !important}
+  /* S — 작은 버튼 · 토글 · 거르기 칩 · 출석 칸 */
+  .btn-sm,.pchip,.seg button,.fseg button,.fchips button,.rsn button,.side-theme button,.tk-band .tb-b button,
+  .cbtn,.crow .btn-sm,.mtray .mt-r .btn-sm,.oc-mode button,.invpref button,.us-bar button{
+    height:var(--h-s) !important;min-height:var(--h-s) !important;border-radius:var(--r-s) !important;
+    display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:0 var(--sp-3) !important;box-sizing:border-box}
+  .seg{gap:var(--sp-1);padding:var(--sp-1);border-radius:calc(var(--r-s) + 4px) !important;align-items:center}
+  .att{gap:var(--sp-1)}
+  .att button{width:calc(var(--h-s) + 8px) !important;height:var(--h-s) !important;border-radius:var(--r-s) !important}
+  /* 배지 — 24 한 가지 */
+  .chip,.mc-role .chip,.mc-nm .chip,.it-card .nm .chip{height:var(--h-chip);padding:0 10px !important;font-size:calc(11px*var(--fs,1)) !important;box-sizing:border-box;line-height:1;vertical-align:middle}
+  .chip svg{width:12px !important;height:12px !important}
+
+  /* 아이콘 — 16 / 20 / 22 */
+  svg{flex-shrink:0}
+  :is(.btn,.btn-ghost,.row,.list .row,.hp-go button,.drawer-in .btn-ghost,.tabbar button) > svg,
+  :is(.btn,.btn-ghost) svg:not(.keep){width:var(--ic) !important;height:var(--ic) !important}
+  :is(.btn-sm,.pchip,.seg button,.side-theme button,.tk-band .tb-b button,.cbtn,label.hp-search,summary) > svg,
+  .hp-search svg,.tk-warn svg,.tk-ctx svg{width:var(--ic-s) !important;height:var(--ic-s) !important}
+  .icon-btn svg{width:var(--ic-l) !important;height:var(--ic-l) !important}
+  #sidebar button svg,#sidebar #side-nav button svg{width:var(--ic) !important;height:var(--ic) !important}
+  .tabbar button svg{width:var(--ic-l) !important;height:var(--ic-l) !important}
+  /* 아이콘 상자 — 40 × 40, 안의 아이콘 20 */
+  .room .ri,.hp-ic,.tk-kinds .ki,.tk-row .ki,.tk-head .ki{width:var(--box-ic) !important;height:var(--box-ic) !important;
+    border-radius:var(--r-m) !important;display:grid !important;place-items:center;flex-shrink:0}
+  .room .ri svg,.hp-ic svg,.tk-kinds .ki svg,.tk-row .ki svg,.tk-head .ki svg{width:var(--ic) !important;height:var(--ic) !important}
+  .mi svg{width:var(--ic-s) !important;height:var(--ic-s) !important;align-self:center}
+  .mcard{min-height:112px}
+  .room:nth-child(-n+2) .ri{width:var(--box-ic) !important;height:var(--box-ic) !important}
+
+  /* 모서리 */
+  .card,.room,.kpi,.fold,.drawer,.faith,.tk-band,.tk-body,.tk-row,.hp-tile{border-radius:var(--r-l) !important}
+  .row,.list .row{border-radius:var(--r-m) !important}
+  dialog{border-radius:var(--r-xl) !important}
+
+  /* 간격 — 버튼끼리 8, 카드끼리 12, 묶음 사이 24 */
+  .hp-go,.tk-acts,.tk-band .tb-b,.dlg-btns,.mb-acts,.tk-filt,.tk-kf,.fseg,.fchips,.segsel,.rsn,.crow .acts{gap:var(--sp-2) !important}
+  .rooms,.hp-grid,.people,.tk-kinds,.tk-imgs,.kpis,.kpi-row,.fgrid{gap:var(--sp-3) !important}
+  .list{gap:var(--sp-2)}
+  .sec-title,.mb-sec,.hp-sec,.room-h{margin-top:var(--sp-5) !important;margin-bottom:var(--sp-3) !important}
+  .hp-sec:first-child,.mb-sec:first-child{margin-top:var(--sp-2) !important}
+
+  /* 40단계 — 규격: 남은 것들 (메모 도구 막대 · 고르기 칩 · 도움 버튼 · 공유 · 닫기 · 왼쪽 메뉴) */
+  .rte-bar button{height:var(--h-s) !important;min-width:var(--h-s) !important;border-radius:var(--r-s) !important;padding:0 8px !important}
+  .rte-bar select{height:var(--h-s) !important;min-height:var(--h-s) !important;border-radius:var(--r-s) !important}
+  .rte-bar button svg,.rte-bar .cbtn svg{width:var(--ic) !important;height:var(--ic) !important}
+  .rte-bar .sep{height:var(--ic) !important}
+  .picks button,.hp-quick button,.sharebar button,.hwel .btn-sm{height:var(--h-s) !important;min-height:var(--h-s);border-radius:var(--r-s) !important;
+    display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:0 var(--sp-3) !important;box-sizing:border-box}
+  .picks,.hp-quick,.sharebar{gap:var(--sp-2) !important}
+  .hp-quick button svg,.picks button svg,.sharebar button svg{width:var(--ic-s) !important;height:var(--ic-s) !important}
+  [data-open-m]{width:var(--h-s) !important;height:var(--h-s) !important;padding:0 !important}
+  .hwel .x{width:var(--h-s) !important;height:var(--h-s) !important;border-radius:var(--r-s) !important}
+  .kpi .ki svg,.sb-h svg,.it-kpi svg{width:var(--ic) !important;height:var(--ic) !important}
+  @media (min-width:880px){ #sidebar #side-nav button{height:var(--h-m) !important;border-radius:var(--r-m) !important;gap:var(--sp-3)} }
+
+  /* 40단계 — 같은 줄 카드는 같은 높이로 (명부 카드 · 리더 카드) */
+  .mgrid{align-items:stretch !important;grid-auto-rows:1fr}
+  .mgrid > .mcard{height:auto;align-self:stretch}
 </style>
 <script>
   /* 27단계 — 화면 밝기: 다크(기본) · 라이트 · 기기 설정 따르기. 깜빡임 없게 그리기 전에 정해요. */
@@ -2157,7 +2343,7 @@
             <input id="e-bap" inputmode="numeric" placeholder="2020-05-10"></div>
           <div class="field"><label for="e-married">결혼기념일</label>
             <input id="e-married" inputmode="numeric" placeholder="5-20"></div>
-          <div class="field"><label for="e-position">직분</label><input id="e-position" placeholder="예) 집사"></div>
+          <div class="field"><label for="e-position">직분</label><input id="e-position" placeholder="예) 집사" list="dl-position"></div>
           <div class="field"><label for="e-invitedby">인도자 · 처음 온 계기</label><input id="e-invitedby"></div>
           <div class="field"><label for="e-verse">인생 말씀</label><input id="e-verse" placeholder="예) 빌립보서 1:6"></div>
         </div></div>
@@ -2328,7 +2514,7 @@
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5m6-6-6 6 6 6"/></svg>
       </button>
       <h2 style="font-size:calc(17px*var(--fs,1));font-weight:600">사용 현황 <small style="font-size:calc(11.5px*var(--fs,1));font-weight:500;color:var(--dim)">수퍼 관리자</small></h2>
-      <span style="width:44px"></span>
+      <button class="btn-sm" id="us-tk" type="button">문의 · 제안함</button>
     </div>
     <div class="scroll pad"><div id="us-body"></div><div style="height:28px"></div></div>
   </section>
@@ -2649,7 +2835,7 @@
     <div class="field"><label for="md-birth">생일 (월-일)</label><input id="md-birth" placeholder="예) 3-5"></div>
   </div>
   <label class="check" style="margin:-6px 0 14px"><input type="checkbox" id="md-lunar"> 음력</label>
-  <div class="field"><label for="md-position">직분</label><input id="md-position" placeholder="예) 집사"></div>
+  <div class="field"><label for="md-position">직분</label><input id="md-position" placeholder="예) 집사" list="dl-position"></div>
   <div class="two">
     <div class="field"><label for="md-reg">교회 등록일</label><input id="md-reg" placeholder="예) 2024-3-10"></div>
     <div class="field"><label for="md-bap">침례일</label><input id="md-bap" placeholder="예) 2024-5-19"></div>
@@ -3299,5 +3485,6 @@
 </dialog>
 
 <script type="module" src="./app.js"></script>
+<datalist id="dl-position"><option value="성도"><option value="집사"><option value="안수집사"><option value="권사"><option value="장로"><option value="전도사"><option value="목사"></datalist>
 </body>
 </html>

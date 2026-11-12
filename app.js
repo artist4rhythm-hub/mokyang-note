@@ -24,7 +24,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
 const APP_NAME = "목자의 삶";
-const APP_VERSION = "37.0 (2026-11-12)";
+const APP_VERSION = "40.0 (2026-11-13)";
 /* 35단계 — 버전 표시: v35.0 · 2026.11.12 업데이트 */
 const verNo = () => APP_VERSION.split(" ")[0];
 const verDate = () => (APP_VERSION.match(/\((.*)\)/) || [])[1] || "";
@@ -335,13 +335,22 @@ async function shrinkFit(file, spec, limit) {
 }
 
 /* ── 입력 편의 ── */
-function autoGrow(el){ if(!el.offsetParent) return; el.style.height="auto"; el.style.height=Math.min(el.scrollHeight+2,560)+"px"; }
+/* 39단계 — 글 칸 높이를 맞출 때 화면이 위로 튀지 않게 (잠깐 줄어든 사이 스크롤 위치가 깎이는 것을 되돌려요) */
+function autoGrow(el){ if(!el.offsetParent) return;
+  const sc = el.closest(".scroll"), sy = window.scrollY, st = sc ? sc.scrollTop : 0;
+  el.style.height="auto"; el.style.height=Math.min(el.scrollHeight+2,560)+"px";
+  if (window.scrollY !== sy) window.scrollTo(window.scrollX, sy);
+  if (sc && sc.scrollTop !== st) sc.scrollTop = st; }
 document.addEventListener("input", (ev) => { if (ev.target.tagName === "TEXTAREA") autoGrow(ev.target); });
 document.addEventListener("focusin", (ev) => {
   const t = ev.target;
   if (!t.matches || !t.matches("input,textarea,select")) return;
-  if (isWide()) return;
-  setTimeout(() => { try { t.scrollIntoView({ block:"center", behavior:"smooth" }); } catch {} }, 250);
+  /* 39단계 — 패드(넓은 화면 + 터치)도: 키보드가 올라온 뒤 칸이 가려졌을 때만 가운데로 (멀쩡하면 그대로 — 위로 튀지 않게) */
+  if (isWide() && !(navigator.maxTouchPoints > 0)) return;
+  setTimeout(() => { try {
+    const r = t.getBoundingClientRect(), vv = window.visualViewport, top = vv ? vv.offsetTop : 0, h = vv ? vv.height : innerHeight;
+    if (r.top < top + 60 || r.bottom > top + h - 80) t.scrollIntoView({ block:"center", behavior:"smooth" });
+  } catch {} }, 350);
 });
 
 /* ── 네비게이션 ── */
@@ -383,6 +392,7 @@ const RICON = {
   org: _ri('<circle cx="12" cy="5.5" r="2.5"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/><path d="M12 8v4M7.2 16.5 12 12l4.8 4.5"/>'),
   cellmgr: _ri('<rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><path d="M17 14v6M14 17h6"/>'),
   usage: _ri('<circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.5 2"/>'),
+  tickets: _ri('<path d="M4.5 5.5h15v10h-8l-4.5 3.5v-3.5h-2.5z"/><path d="M9 9.5h6M9 12.5h4"/>'),
   imp: _ri('<path d="M12 3.5v11M7.5 10l4.5 4.5 4.5-4.5"/><path d="M4.5 16v3a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5v-3"/>'),
   manage: _ri('<path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V6z"/><path d="m9 12 2.2 2.2L15.5 10"/>'),
   share: _ri('<circle cx="18" cy="5.5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="18.5" r="2.5"/><path d="m8.2 10.8 7.6-4.1M8.2 13.2l7.6 4.1"/>'),
@@ -1089,7 +1099,8 @@ function renderRooms() {
       + room("photos","사진", "보기", "셀모임 · 만남 사진")
       + room("orgchart","조직도", "보기", "진장 · 코치 · 셀")
       + room("interns","인턴 · 후보", internCount(), "공식 인턴")
-      + (me.role === "super" ? room("leaders","셀리더 명단", leaderSeatStats().n, leaderSeatStats().txt, leaderSeatStats().noe > 0) : "");
+      + (me.role === "super" ? room("leaders","셀리더 명단", leaderSeatStats().n, leaderSeatStats().txt, leaderSeatStats().noe > 0)
+          + room("tickets","문의 · 제안", tkSuperNew(), tkSuperNew() ? "새 문의" : "받은 함", tkSuperNew() > 0) : "");
   } else if (["coach","jinjang","pastor"].includes(me.role)) {
     const pastor = me.role === "pastor";
     const wait = state.meetings.filter(m=>m.reportedAt && (pastor || !m.check) && m.leaderUid!==uid()).length;
@@ -1111,7 +1122,8 @@ function renderRooms() {
       + room("orgchart","조직도", "보기", "진장 · 코치 · 셀")
       + room("cellmgr","셀 관리", state.jins.length, "진")
       + room("reports","셀 보고 모아보기", "보기", "모든 진 셀 보고")
-      + room("usage","사용 현황", "보기", "누가 · 언제 · 무엇을");
+      + room("usage","사용 현황", "보기", "누가 · 언제 · 무엇을")
+      + room("tickets","문의 · 제안", tkSuperNew(), tkSuperNew() ? "새 문의" : "받은 함", tkSuperNew() > 0);
   }
   $("home-rooms").innerHTML = html;
 }
@@ -1133,7 +1145,7 @@ $("s-home").addEventListener("click", async (ev) => {
     const k = rm.dataset.room;
     ({ souls:openSouls, meet:openMeet, cal:openCal, health:openHealth, dir:openDir, train:openTrainBoard,
        stats:openStats, photos:openPhotos, org:openOrg, orgchart:openOrgChart, interns:openInterns, cellmgr:openCellMgr, usage:openUsage,
-       reports:()=>openReports(""), leaders:openLeaders }[k] || (()=>{}))();
+       reports:()=>openReports(""), leaders:openLeaders, tickets:()=>openTickets("all") }[k] || (()=>{}))();
     return;
   }
   const more = ev.target.closest("[data-cmore]");
@@ -1733,6 +1745,9 @@ function renderSoulBody() {
       :`<p class="muted">아직 적은 정보가 없어요.</p>`)
       + (mine?`<button class="btn-ghost" id="btn-edit-here" style="height:44px;font-size:calc(13px*var(--fs,1));margin-top:12px;max-width:320px">프로필 수정</button>`:"");
     const e=$("btn-edit-here"); if(e) e.onclick=()=>openEdit(s.id);
+    /* 39단계 — 명부와 이어진 영혼이면 신앙 · 훈련 체크를 맨 위에 (명부 카드와 같은 칸) */
+    const fm = s.memberId && memberById(s.memberId);
+    if (fm) { box.insertAdjacentHTML("afterbegin", `<div id="sp-faith" class="faith-wrap card" style="margin-bottom:12px"></div>`); renderFaith(fm, $("sp-faith")); }
     /* 셀리더 카드라면, 그 셀리더가 스스로 적어 진장에게 열어둔 프로필도 같이 */
     const ls = state.linkedSelf;
     if (isLeaderCard(s) && ls) box.insertAdjacentHTML("afterbegin", `
@@ -3123,6 +3138,7 @@ function openEdit(soulId) {
   v("e-job",s&&s.job);
   v("e-reg", s&&s.registeredAt?fmtRaw(s.registeredAt):"");
   v("e-bap", s&&s.baptizedAt?fmtRaw(s.baptizedAt):"");
+  if ($("e-bap-seg")) $("e-bap-seg").set(s ? (s.bap || (s.baptizedAt ? "y" : "")) : "");
   v("e-married", s&&s.marriedAt?fmtRaw(s.marriedAt):"");
   v("e-position",s&&s.position); v("e-invitedby",s&&s.invitedBy); v("e-verse",s&&s.verse);
   v("e-hobby",s&&s.hobby); v("e-mbti",s&&s.mbti); v("e-food",s&&s.food);
@@ -3246,6 +3262,10 @@ $("btn-save-soul").onclick=async()=>{
       $(id).focus(); return; }
     dates[key]=parsed;
   }
+  /* 39단계 — 침례 받음 · 아직 (날짜는 몰라도 돼요) */
+  const bapV = bapSegVal("e-bap-seg") || (dates.baptizedAt ? "y" : "");
+  if (bapV !== "y") dates.baptizedAt = "";
+  dates.bap = bapV;
   const data={ name, gender:$("e-gender").value, lunar:$("e-lunar").checked,
     phone:$("e-phone").value.trim(), address:$("e-address").value.trim(),
     address2:$("e-address2").value.trim(), job:$("e-job").value.trim(),
@@ -3539,6 +3559,9 @@ function renderAttendance(mine) {
           `<button data-att="${lk}" data-v="${k}" class="${lv===k?"on":""}" ${mine?"":"disabled"}>${ATT[k].slice(0,2)}</button>`).join("")}</div>
       </div>
     </div>`;
+  const ae = document.activeElement, keep = ae && $("list-att").contains(ae)
+    ? { sel: ae.dataset.reason ? `[data-reason="${ae.dataset.reason}"]` : ae.dataset.note ? `[data-note="${ae.dataset.note}"][data-k="${ae.dataset.k}"]` : "", pos: ae.selectionStart } : null;
+  const keepY = window.scrollY, keepSc = $("list-att").closest(".scroll"), keepSt = keepSc ? keepSc.scrollTop : 0;
   $("list-att").innerHTML = head + leadRow + roster.map(s=>{
     const v=mt.attendance[s.id]||"", nt=mt.notes[s.id]||{}, open=!!mt.open[s.id];
     const has=(nt.update||nt.pray);
@@ -3566,6 +3589,9 @@ function renderAttendance(mine) {
     </div>`;
   }).join("") + (roster.length ? "" : `<p class="muted" style="grid-column:1/-1">이 셀에 등록된 영혼이 없어요. 영혼 카드를 만들 때 이 셀을 골라주세요.</p>`);
   $("list-att").querySelectorAll("textarea").forEach(autoGrow);
+  if (window.scrollY !== keepY) window.scrollTo(window.scrollX, keepY);
+  if (keepSc && keepSc.scrollTop !== keepSt) keepSc.scrollTop = keepSt;
+  if (keep && keep.sel) { const el = $("list-att").querySelector(keep.sel); if (el) { el.focus({ preventScroll: true }); try { el.setSelectionRange(keep.pos, keep.pos); } catch {} } }
 }
 $("list-att").addEventListener("click",(ev)=>{
   const o=ev.target.closest("[data-open-m]");
@@ -4182,7 +4208,8 @@ const ACT_NAME = { recordCreate:"기록 남김", planCreate:"만남 예약", mee
   soulCreate:"영혼 추가", trainSave:"훈련 기록", exportCsv:"내려받기", myNote:"내 기록", handover:"카드 인계",
   promote:"셀리더 세우기", comment:"댓글", dm:"쪽지", careContact:"챙김 연락", meetingReport:"셀 보고",
   gcalConnect:"구글 캘린더 연결", gcalSync:"구글 캘린더 맞추기", photoUpload:"셀모임 사진 올림", themeChange:"화면 밝기 바꿈", fontSize:"글자 크기 바꿈",
-  memoFormat:"메모 꾸미기 사용", installApp:"홈 화면 앱 설치", welcomeOff:"처음 안내 닫음" };
+  memoFormat:"메모 꾸미기 사용", installApp:"홈 화면 앱 설치", welcomeOff:"처음 안내 닫음",
+  faithSet:"신앙 · 훈련 체크", ticket_ask:"사용 문의 보냄", ticket_idea:"기능 제안 보냄", ticket_bug:"오류 알림 보냄", ticketReply:"문의 답 · 덧붙임" };
 const actName = (k) => ACT_NAME[k] || (k.startsWith("help_") ? `도우미 · ${(HELP.find(t => t.id === k.slice(5)) || {}).t || k.slice(5)}` : k);
 const US_PERIOD = [[7, "7일"], [30, "30일"], [90, "90일"]];
 const US_ROLE = [["all", "모두"], ["leader", "셀리더"], ["upline", "코치 · 진장 · 교역자"], ["super", "수퍼"]];
@@ -5278,6 +5305,22 @@ async function backfillThumbs() {
    올릴 때마다 version.json 도 같이 올립니다. 앱은 열 때 · 다시 볼 때 · 10분마다
    그 파일만 살짝 확인해서(아주 작은 파일), 지금 버전보다 새것이면 위에 알림을 띄웁니다. */
 const CHANGELOG = [
+  { v:"40.0", d:"2026-11-13", items:[
+    "규격 통일 — 버튼 · 칸 높이를 3단계(36 · 44 · 52)로, 배지는 24 한 가지로",
+    "아이콘 크기를 3가지(16 · 20 · 22)로, 아이콘 상자는 40 × 40으로 맞춤",
+    "모서리(10 · 12 · 18 · 24)와 간격(버튼끼리 8 · 카드끼리 12 · 묶음 사이 24)을 한 규칙으로",
+    "메모 도구 막대 · 고르기 칩 · 출석 칸 · 왼쪽 메뉴까지 같은 규격" ] },
+  { v:"39.0", d:"2026-11-12", items:[
+    "신앙 · 훈련을 눌러서 체크 — 명부 카드 · 영혼 카드: 침례(받음 · 아직) · 정회원 · 회원간증 · 수료한 훈련",
+    "체크한 값이 교회 명부 '한눈에 보기' 통계에 바로 (회원간증 줄 새로)",
+    "성별 · 상태 · 연락 주기도 눌러 고르는 버튼으로, 침례는 날짜를 몰라도 '받음'만",
+    "아이패드 · 폰: 셀모임에서 글을 쓰면 화면이 위로 튀던 것, 아래로 내리면 메뉴 · 저장 막대가 깨지던 것 고침",
+    "손가락으로 누르는 기기에서 버튼을 조금 더 크게" ] },
+  { v:"38.0", d:"2026-11-12", items:[
+    "도우미에 '문의 · 제안' 창구 — 사용 문의 · 기능 제안 · 오류 알리기, 스크린샷 3장까지 (고르기 · 끌어 놓기 · 붙여넣기)",
+    "문의는 쓴 사람과 수퍼 관리자만 봐요 · 답이 오면 소식(종)으로",
+    "수퍼 관리자 — 받은 함(상태 · 답), 새 문의 수가 홈 · 도우미 메뉴에 실시간으로, 사용 현황에서도 바로",
+    "도우미 안내를 다시 정리 — 묶음별(시작 · 매일 · 살펴보기 · 도움), 기능마다 '자세히 알아보기', 새 안내(화면 · 글자, 소식, 인턴 · 후보, 수퍼 관리자)" ] },
   { v:"37.0", d:"2026-11-12", items:[
     "글자를 전체적으로 한 단계 크게 (쑥쑥 글꼴에 맞춰 기본 110%)",
     "글자 크기 고르기 — 더보기 → 화면: 작게 · 보통 · 크게 · 아주 크게 (이 기기에 기억, 칸 배치는 그대로)",
@@ -5680,7 +5723,9 @@ function renderInbox() {
     $("inbox-list").innerHTML = (state.notices||[]).map(n => `
       <div class="row" data-notice="${n.id}" style="cursor:pointer;align-items:flex-start">
         ${n.read ? `<span style="width:8px"></span>` : `<span class="dot" style="margin-top:7px"></span>`}
-        <div class="grow"><p class="nm" style="white-space:normal">${n.kind==="handover"
+        <div class="grow"><p class="nm" style="white-space:normal">${n.kind==="ticket"
+            ? `${esc(n.fromName||"관리자")} — <b>${esc(n.title||"")}</b> 문의에 답이 왔어요`
+            : n.kind==="handover"
             ? `${esc(n.fromName||"")} 님 — <b>${esc(n.title||"")}</b>`
             : `${esc(n.fromName||"")} 님이 <b>${esc(n.title||"")}</b>에 댓글을 남겼어요`}</p>
           <p class="sub" style="white-space:normal;margin-top:4px">“${esc(n.snippet||"")}” · ${fmtAgo(n.atMs)}</p></div>
@@ -5721,6 +5766,7 @@ $("inbox-list").addEventListener("click", async (ev) => {
 async function goToNotice(n) {
   const t = n.target || {};
   if (t.kind === "handover") { if (isManager() && state.me.id !== t.fromUid) openCellMgr(); else openHome(); return; }
+  if (t.kind === "ticket") { state.tk.mine = null; state.tk.from = "mine"; state.tk.view = "one"; state.tk.one = t.id; openHelp("tickets"); return; }
   if (t.kind === "meeting") {
     await loadMeetings(true);
     const m = state.meetings.find(x=>x.id===t.id);
@@ -5754,8 +5800,16 @@ function startLive() {
       renderBadges();
     }, () => {});
   try { watch("notices","notice"); watch("messages","dm"); } catch {}
+  tkWatch();
 }
 function renderBadges() {
+  /* 38단계 — 수퍼: 새 문의 수를 도우미 메뉴 · 홈 도우미 버튼에 */
+  const tn = typeof tkSuperNew === "function" ? tkSuperNew() : 0;
+  [$("side-nav").querySelector('[data-side="help"]'), $("btn-home-help")].forEach(el => {
+    if (!el) return; let s2 = el.querySelector(".bdg");
+    if (!s2) { s2 = document.createElement("span"); s2.className = "bdg"; el.style.position = el.style.position || "relative"; el.appendChild(s2); }
+    s2.hidden = !tn; s2.textContent = tn > 99 ? "99+" : String(tn);
+  });
   const n = (state.live_notice||[]).length + (state.live_dm||[]).length;
   const b = $("bdg-home"); if (b) { b.hidden = !n; b.textContent = n > 99 ? "99+" : String(n); }
   const side = $("side-nav").querySelector('[data-side="inbox"]');
@@ -5769,6 +5823,7 @@ function alertNew(kind, r) {
   const P = notifyPrefs();
   if ((kind === "notice" && !P.comment) || (kind === "dm" && !P.dm)) return;
   const title = kind === "dm" ? `${r.fromName||""} 님의 쪽지`
+    : r.kind === "ticket" ? `${r.fromName||"관리자"} — 문의에 답이 왔어요`
     : (r.kind === "handover" || r.kind === "report") ? `${r.fromName||""} 님 — ${r.title||"셀 관리"}` : `${r.fromName||""} 님이 댓글을 남겼어요`;
   const body = kind === "dm" ? (r.body||"").slice(0,80) : `${r.title||""} — ${r.snippet||""}`;
   toast(`${title} · ${body.slice(0,40)}`);
@@ -5870,7 +5925,7 @@ const DIRK = ["name","thumb","gender","phone","position","registeredAt","baptize
 function dirFields(s) {
   return { name: s.name || "", thumb: s.thumb || "", gender: s.gender || "", phone: s.phone || "",
     position: s.position || "", registeredAt: s.registeredAt || "", baptizedAt: s.baptizedAt || "",
-    birthMD: mdOf(s.birth), lunar: !!s.lunar };
+    birthMD: mdOf(s.birth), lunar: !!s.lunar, ...(s.bap ? { bap: s.bap } : {}) };
 }
 /* 목양 카드에 명부의 기본 사항을 덧입힙니다 (진장이 명부에서 연락처를 고쳤으면 그게 보이게) */
 function mergeDir(list) {
@@ -6046,7 +6101,7 @@ async function syncMemberTrain(soulId, fresh) {
   if (!m || isLeaderCard(s)) return;
   let rows = (!fresh && state.soul && state.soul.id === soulId) ? state.trainings : null;
   if (!rows) { try { rows = pack(await getDocs(collection(db,"souls",soulId,"trainings"))); } catch { return; } }
-  const done = coursesDone(rows);
+  const done = faithSortCourses([...new Set([...coursesDone(rows), ...(m.trainDirect || [])])]);
   if (JSON.stringify(done) === JSON.stringify(m.trainingsDone || [])) return;
   try { await updateDoc(doc(db,"members",m.id), { trainingsDone: done, updatedAt: serverTimestamp() });
         m.trainingsDone = done; } catch {}
@@ -6219,15 +6274,14 @@ function openMember(id) {
     <a class="btn-ghost" href="sms:${tel}" style="height:42px;width:92px;flex-shrink:0;display:flex;align-items:center;justify-content:center;text-decoration:none;color:var(--text);font-size:calc(13px*var(--fs,1))">문자</a></div>` : "";
   const rows = [
     ["연락처", mine ? m.phone : ""], ["생일", mdText(m.birthMD, m.lunar)], ["성별", m.gender], ["직분", m.position],
-    ["교회 등록일", fmtDate(m.registeredAt, true)], ["침례", fmtDate(m.baptizedAt, true)],
-    ["수료한 훈련", (m.trainingsDone||[]).join(" · ")],
+    ["교회 등록일", fmtDate(m.registeredAt, true)],
     ["목양 담당", m.careUid ? (m.careUid === me.id ? "나" : userName(m.careUid)) : ""],
     ["초대 이메일", canGiveRole() && !m.uid ? m.linkedEmail : ""]
   ].filter(([,v]) => v);
   const trs = m.trainingsDone || [];
-  $("mb-rows").innerHTML = `<p class="mb-sec">기본 사항</p>` + (rows.length ? `<div class="fgrid">${rows.filter(([k]) => k !== "수료한 훈련")
-      .map(([k,v]) => fbox(k, v)).join("")}${trs.length ? `<div class="fbox fwide"><p class="fk">수료한 훈련</p><p class="fv">${trs.map(t => `<span class="tpill">${esc(t)}</span>`).join("")}</p></div>` : ""}</div>`
-    : `<p class="muted">아직 적힌 기본 사항이 없어요.</p>`);
+  $("mb-rows").innerHTML = `<p class="mb-sec">기본 사항</p>` + (rows.length ? `<div class="fgrid">${rows.map(([k,v]) => fbox(k, v)).join("")}</div>`
+    : `<p class="muted">아직 적힌 기본 사항이 없어요.</p>`) + `<div id="mb-faith" class="faith-wrap"></div>`;
+  renderFaith(m, $("mb-faith"));
   showMbAtt(m);
   showPriv(m);
   renderMbTier(m, rl.includes("셀리더"));
@@ -6292,6 +6346,7 @@ function openMEdit(m, cellId) {
   $("md-position").value = m ? (m.position||"") : "";
   $("md-reg").value = m && m.registeredAt ? fmtRaw(m.registeredAt) : "";
   $("md-bap").value = m && m.baptizedAt ? fmtRaw(m.baptizedAt) : "";
+  if ($("md-bap-seg")) $("md-bap-seg").set(m ? (m.bap || (m.baptizedAt ? "y" : "")) : "");
   syncMdAva(m && m.thumb);
   syncMdHint();
   $("md-err").textContent = "";
@@ -6336,6 +6391,9 @@ $("md-save").onclick = async () => {
     if (v === null) { $("md-err").textContent = `${label} 형식을 확인해 주세요. 2024-3-10 처럼 적어주세요.`; return; }
     dates[key] = v;
   }
+  const mdBap = bapSegVal("md-bap-seg") || (dates.baptizedAt ? "y" : "");
+  if (mdBap !== "y") dates.baptizedAt = "";
+  dates.bap = mdBap;
   const f = { name, phone: fmtPhone($("md-phone").value), gender: $("md-gender").value, birthMD: md,
     lunar: $("md-lunar").checked, position: $("md-position").value.trim(), ...dates, updatedAt: serverTimestamp() };
   if (mdPhoto !== undefined) f.thumb = mdPhoto ? mdPhoto.small : "";
@@ -8371,12 +8429,11 @@ async function showPriv(m) {
   const rows = [
     ["생년월일", P.birth ? fmtDate(P.birth, true) : ""], ["배우자", P.spouse],
     ["자녀", (P.children || []).map(kidText).join(", ")], ["차량", (P.cars || []).join(" / ")],
-    ["정회원", P.membership], ["침례 · 간증", (P.baptism || []).join(" · ")],
     ["셀역할", (P.roles || []).join(", ")], ["비고", P.memo],
     ["기도제목", (P.prayers || []).length ? `${P.prayers.length}개 (목양 카드에 들어가요)` : ""]
   ].filter(([, v]) => v);
   if (!rows.length) return;
-  const wide = new Set(["자녀", "비고", "침례 · 간증"]);
+  const wide = new Set(["자녀", "비고"]);
   box.innerHTML = `<p class="mb-sec">노션 명단 <span>🔒 셀리더 · 진장 · 코치만 보여요</span></p>
       <div class="fgrid lock">${rows.map(([k, v]) => fbox(k, v, wide.has(k) ? "fwide" : "")).join("")}</div>`;
 }
@@ -9737,32 +9794,42 @@ state.dirF = state.dirF || {};
 state.pv = state.pv || {};
 function pvOf(m) { return state.pv[m.id]; }
 async function loadPv(list) {
+  state.pf = state.pf || {};
   const need = list.filter(m => state.pv[m.id] === undefined && canSeePriv(m) && m.notionAt);
   list.forEach(m => { if (state.pv[m.id] === undefined && !(canSeePriv(m) && m.notionAt)) state.pv[m.id] = null; });
-  if (!need.length) return false;
-  await Promise.all(need.map(async m => { state.pv[m.id] = (await privOf(m)) || null; }));
+  state.pf = state.pf || {};
+  const needF = list.filter(m => state.pf[m.id] === undefined && canSeePriv(m));
+  list.forEach(m => { if (state.pf[m.id] === undefined && !canSeePriv(m)) state.pf[m.id] = null; });
+  if (!need.length && !needF.length) return false;
+  await Promise.all([...need.map(async m => { state.pv[m.id] = (await privOf(m)) || null; }),
+    ...needF.map(async m => { state.pf[m.id] = await faithOf(m); })]);
   return true;
 }
 const bapOf = (m) => {
+  if (m.bap === "y" || m.bap === "n") return m.bap;
   if (m.baptizedAt) return "y";
   const P = pvOf(m); const t = P ? (P.baptism || []).join(" ") : "";
   if (/침례\s*(O|o|○|Yes|예)|침례여부\s*(Yes|예|O)/.test(t)) return "y";
   if (/침례\s*(X|x|No|아니)|침례여부\s*(No|아니|X)/.test(t)) return "n";
   return "u";
 };
-const memOf = (m) => { const P = pvOf(m); const t = P ? String(P.membership || "") : ""; return /정회원/.test(t) && !/비회원/.test(t) ? "y" : /비회원/.test(t) ? "n" : "u"; };
+const memOf = (m) => { const F = (state.pf || {})[m.id]; if (F && (F.mem === "y" || F.mem === "n")) return F.mem;
+  const P = pvOf(m); const t = P ? String(P.membership || "") : ""; return /정회원/.test(t) && !/비회원/.test(t) ? "y" : /비회원/.test(t) ? "n" : "u"; };
+const testiOf = (m) => { const F = (state.pf || {})[m.id]; if (F && (F.testi === "y" || F.testi === "n")) return F.testi;
+  const P = pvOf(m); const t = P ? (P.baptism || []).join(" ") : ""; return /간증/.test(t) ? "y" : "u"; };
 const trOf = (m, t) => (m.trainingsDone || []).includes(t) ? "y" : "n";
 const DIR_ATTR = [
   { k: "bap", label: "침례", f: bapOf, parts: [["y", "받음", "var(--ok-strong)"], ["n", "안 받음", "var(--brand)"], ["u", "모름", ""]] },
   { k: "nl", label: "새로운 삶", f: (m) => trOf(m, "새로운 삶"), parts: [["y", "수료", "#5B8DEF"], ["n", "아직", "#C77A52"]] },
   { k: "dl", label: "제자의 삶", f: (m) => trOf(m, "제자의 삶"), parts: [["y", "수료", "#8C7CF0"], ["n", "아직", "#C77A52"]] },
   { k: "mem", label: "정회원", f: memOf, parts: [["y", "정회원", "#2E9D8F"], ["n", "비회원", "#B08A3E"], ["u", "모름", ""]] },
+  { k: "testi", label: "회원간증", f: testiOf, parts: [["y", "했음", "#9A7A3F"], ["n", "아직", "#C77A52"], ["u", "모름", ""]] },
 ];
 function dirAttrPass(m) { return DIR_ATTR.every(a => !state.dirF[a.k] || a.f(m) === state.dirF[a.k]); }
 function renderDirRatio(base, shown) {
   const box = $("dir-ratio");
   if (!base) { box.innerHTML = ""; return; }
-  if (base.length && base.some(m => state.pv[m.id] === undefined)) {
+  if (base.length && base.some(m => state.pv[m.id] === undefined || (state.pf || {})[m.id] === undefined)) {
     loadPv(base).then(ch => { if (ch && state.dirView !== "stats") renderDir(); });
   }
   const anyF = DIR_ATTR.some(a => state.dirF[a.k]);
@@ -9826,65 +9893,128 @@ const HIC = {
 const kb = (ic, t) => `<kbd>${ic ? HIC[ic] : ""}${t}</kbd>`;
 /* 주제 — 단계는 짧게, 그림(아이콘)과 함께 */
 const HELP = [
-  { id: "start", ic: "start", c: "#E3354B", t: "처음 시작", s: "초대받은 구글 계정으로 로그인", who: "all",
-    steps: [["mail", "초대 받기", `셀리더 명단 · 조직 구성에서 내 <b>구글 이메일</b>로 초대가 와요`],
-      ["key", "구글로 로그인", `앱 주소를 열고 ${kb("google", "구글로 시작")}`],
+  { id: "start", g: "start", ic: "start", c: "#E3354B", t: "처음 시작", s: "초대받은 구글 계정으로 로그인", who: "all",
+    steps: [["mail", "초대 받기", `셀리더 명단 · 조직 구성에서 내 <b>구글 이메일</b>로 자리가 만들어져요 (안내 메일은 올 수도, 직접 전해 받을 수도)`],
+      ["key", "구글로 로그인", `앱 주소를 열고 ${kb("google", "구글로 시작")} — 초대받은 그 구글 계정으로`],
       ["check", "초대 수락 · 동의", `내 자리(셀 · 역할) 확인 → 개인정보 동의`],
       ["home", "홈에서 시작", `오늘 기도할 영혼과 챙길 사람이 바로 보여요`]],
-    tips: [["phone", "홈 화면에 바로가기를 만들어 두면 앱처럼 열려요"], ["lock", "초대받은 구글 계정으로만 들어올 수 있어요"]], go: ["install", "홈 화면에 바로가기"] },
-  { id: "install", ic: "phone", c: "#2E9D8F", t: "홈 화면에 바로가기", s: "아이폰 · 안드로이드 · 컴퓨터", who: "all", special: "install" },
-  { id: "home", ic: "home", c: "#5B8DEF", t: "홈 화면", s: "오늘 할 일이 한눈에", who: "lead",
+    tips: [["phone", "홈 화면에 바로가기를 만들어 두면 앱처럼 열려요"], ["lock", "초대받은 구글 계정으로만 들어올 수 있어요"]],
+    more: [["다른 구글 계정으로 들어가졌어요", `오른쪽 위 계정에서 로그아웃 → 초대받은 계정으로 다시 ${kb("google", "구글로 시작")}. 초대받은 이메일이 기억나지 않으면 셀리더 명단을 관리하는 분께 물어보세요.`],
+      ["'승인 기다림'에서 멈춰 있어요", `초대 없이 들어온 계정이에요. 관리자가 자리를 만들고 같은 이메일로 초대하면 바로 열려요.`],
+      ["폰과 컴퓨터 둘 다 써도 되나요?", `네. 같은 구글 계정으로 로그인하면 어디서든 같은 내용이 보여요. 글자 크기 · 밝기는 기기마다 따로 기억해요.`]],
+    go: ["install", "홈 화면에 바로가기"] },
+  { id: "install", g: "start", ic: "phone", c: "#2E9D8F", t: "홈 화면에 바로가기", s: "아이폰 · 안드로이드 · 컴퓨터", who: "all", special: "install" },
+  { id: "screen", g: "start", ic: "moon", c: "#6F5BA8", t: "화면 · 글자 크기", s: "라이트 · 블랙 · 글자 4단계", who: "all",
+    steps: [["moon", "라이트 · 블랙", `홈 위 ${kb("moon", "")} 달 · 해 버튼 — 누르면 바로 바뀌어요 (컴퓨터는 왼쪽 메뉴 맨 아래에도)`],
+      ["pen", "글자 크기", `더보기 › 화면 › 글자 크기 — ${kb("", "작게")} ${kb("", "보통")} ${kb("", "크게")} ${kb("", "아주 크게")}`],
+      ["phone", "기기마다 따로", `폰은 크게, 컴퓨터는 보통처럼 기기마다 기억해요`],
+      ["refresh", "새 버전", `앱 위 '새 버전' 알림 → ${kb("refresh", "지금 새로고침")}`]],
+    tips: [["eye", "글자만 커지고 카드 배치는 그대로라 화면이 밀리지 않아요"], ["star", "'기기 설정 따르기'로 두면 폰이 어두울 때 블랙으로"]],
+    more: [["글자가 흐리게 보여요", `본문은 가는 글꼴(쑥쑥 Light)이에요. 더보기 › 화면에서 ${kb("", "크게")}로 올리면 훨씬 또렷해요.`],
+      ["버전은 어디서 보나요?", `홈 오른쪽 위 'v00.0 · 날짜 업데이트'를 누르면 무엇이 바뀌었는지 목록이 나와요.`]] },
+  { id: "home", g: "daily", ic: "home", c: "#5B8DEF", t: "홈 화면", s: "오늘 할 일이 한눈에", who: "lead",
     steps: [["pray", "오늘의 전시", `기도할 영혼 한 사람 → ${kb("", "기도했어요")}`],
       ["heart", "오늘 챙길 사람", `결석 · 오래 못 만난 사람 · 다가오는 예정`],
-      ["chart", "전시실", `영혼들 · 셀모임 · 캘린더 · 명부 … 숫자를 누르면 그 화면`],
-      ["dots", "관리 서랍", `조직 구성 · 셀리더 명단 · 보고서 가져오기`]],
-    tips: [["plus", "오른쪽 위 ＋ 로 빠른 기록"], ["star", "홈 위 '버전'을 누르면 바뀐 것"]] },
-  { id: "souls", ic: "souls", c: "#E07B5A", t: "영혼 카드", s: "만남 · 기도 · 상태를 한 장에", who: "lead",
+      ["chart", "전시실", `영혼들 · 셀모임 · 캘린더 · 명부 … 방을 누르면 그 화면`],
+      ["dots", "관리 서랍", `조직 구성 · 셀리더 명단 · 사진 · 알림 · 설정`]],
+    tips: [["plus", "오른쪽 위 ＋ 로 빠른 기록"], ["star", "홈 위 '버전'을 누르면 바뀐 것"]],
+    more: [["오늘의 전시에는 누가 뜨나요?", `기도제목이 있는 영혼이 하루에 한 사람씩 떠요. ${kb("", "기도했어요")}를 누르면 다음 사람, 오늘 모두 기도하면 내일 아침에 다시 떠요.`],
+      ["오늘 챙길 사람은 어떻게 정해지나요?", `연속으로 결석한 사람, 1:1로 만난 지 30일이 넘은 사람, 다가오는 만남 예약 · 기념일 · 챙길 일이 모여요. 옆 버튼(1:1 잡기 등)으로 바로 기록해요.`],
+      ["전시실 숫자는 무엇인가요?", `방마다 한 가지 숫자 — 영혼들은 맡은 영혼, 셀모임은 최근 출석률, 캘린더는 이번 주 일정. <b>빨간 점</b>이 붙은 글은 지금 챙길 것이 있다는 뜻이에요.`]] },
+  { id: "souls", g: "daily", ic: "souls", c: "#E07B5A", t: "영혼 카드", s: "만남 · 기도 · 상태를 한 장에", who: "lead",
     steps: [["plus", "영혼 더하기", `영혼들 오른쪽 위 ${kb("plus", "")} — 명부에서 고르거나 새로`],
-      ["pen", "만남 기록", `카드를 열고 ${kb("", "만남")} · ${kb("", "1:1")} · 심방`],
+      ["pen", "만남 기록", `카드를 열고 ${kb("", "만남 기록")} — 만남 · 1:1 · 심방 · 전화`],
       ["pray", "기도제목", `기도 중 → 응답됨으로 바꿔 가며`],
       ["sort", "순서 · 인턴 · 후보", `${kb("", "순서")} — 영적 순서, ${kb("", "인턴")}(공식) · ${kb("", "후보")}(비공식 · 본인은 못 봄)`]],
-    tips: [["lock", "기록마다 공개 범위: 나만 · 코치·진장 · 교역자"], ["star", "명함 카드 네 칸 = 만남 · 1:1 · 출석 · 기도"]], go: ["souls", "영혼들 열기"] },
-  { id: "meet", ic: "meet", c: "#7FA8E8", t: "셀모임 · 보고", s: "출석 체크 → 보고까지 한 번에", who: "lead",
+    tips: [["lock", "기록마다 공개 범위: 나만 · 코치 · 진장 · 교역자까지"], ["star", "명함 카드 네 칸 = 셀모임 출석 · 함께한 모임 · 1:1 · 훈련"]],
+    more: [["공개 범위는 어떻게 고르나요?", `기록을 쓸 때 고르는 범위대로만 보여요. '나만'은 나 혼자, '코치 공유'는 코치 · 진장까지, '교역자'는 담당 교역자까지. 기록 대상 본인에게는 어떤 범위든 보이지 않아요.`],
+      ["기록 안에서 찾고 싶어요", `카드 안 '기록 안에서 찾기' 칸, 또는 더보기 › 기록 검색에서 모든 영혼의 기록을 단어로 찾아요.`],
+      ["셀 담당이 바뀌면 카드는요?", `셀 관리에서 담당이 바뀌면 소식으로 '카드 넘기기' 요청이 가요. 넘겨받은 셀리더가 이어서 기록해요.`],
+      ["사진은 어떻게 저장되나요?", `폰에서 고른 사진을 앱이 작게 줄여서 올려요. 원본은 올라가지 않아요.`]],
+    go: ["souls", "영혼들 열기"] },
+  { id: "meet", g: "daily", ic: "meet", c: "#7FA8E8", t: "셀모임 · 보고", s: "출석 체크 → 보고까지 한 번에", who: "lead",
     steps: [["plus", "셀모임 열기", `셀모임 ${kb("plus", "")} — 날짜 · 시간 · 장소 · 주제`],
-      ["check", "출석 체크", `한 사람씩 ${kb("", "출석")} ${kb("", "온라인")} ${kb("", "결석")}`],
-      ["camera", "나눔 · 사진", `사람별 나눔과 셀모임 사진`],
+      ["check", "출석 체크", `한 사람씩 ${kb("", "출석")} ${kb("", "온라인")} ${kb("", "결석")} · ${kb("", "모두 출석")}`],
+      ["camera", "나눔 · 사진 · 메모", `사람별 나눔, 셀모임 사진, 워드처럼 꾸미는 모임 메모`],
       ["send", "보고", `${kb("send", "보고하기")} → 코치 · 진장이 확인`]],
-    tips: [["eye", "보고 사본은 같은 진이 봐요 — 나눔 공유는 공유 설정에서"], ["chart", "셀 보고 모아보기 = 캘린더 · 출석 그래프"]], go: ["meet", "셀모임 열기"] },
-  { id: "cal", ic: "cal", c: "#9A8CF0", t: "캘린더", s: "셀모임 · 만남 · 생일", who: "lead",
+    tips: [["eye", "보고 사본은 같은 진이 봐요 — 나눔 공유는 공유 설정에서"], ["chart", "셀 보고 모아보기 = 캘린더 · 출석 그래프"]],
+    more: [["모임 메모를 꾸미고 싶어요", `메모 칸 위 막대에서 굵게 · 밑줄 · 글자색 · 형광펜 · 목록 · 인용을 써요. 오른쪽 ${kb("", "넓게 쓰기")}를 누르면 화면 가득 써요.`],
+      ["나눔 내용은 누가 보나요?", `사람별 나눔은 그 사람의 영혼 카드에도 쌓여요(셀리더 · 공개 범위대로). 보고 사본에 나눔을 함께 보낼지는 공유 설정에서 정해요.`],
+      ["순서를 바꾸고 싶어요", `${kb("", "순서")}를 누르면 셀원 순서 · 인턴 · 후보를 한 창에서 정해요. 영혼들 · 명부와 순서가 같이 바뀌어요.`],
+      ["연속 결석하면 어떻게 되나요?", `홈 '오늘 챙길 사람'에 결석 돌봄으로 떠요. 연락한 것을 남기면 단계가 넘어가요.`]],
+    go: ["meet", "셀모임 열기"] },
+  { id: "cal", g: "daily", ic: "cal", c: "#9A8CF0", t: "캘린더 · 구글 캘린더", s: "셀모임 · 만남 · 생일", who: "lead",
     steps: [["cal", "날짜 누르기", `그날 일정 · ${kb("plus", "이 날 기록")}`],
-      ["souls", "다른 셀 보기", `맨 위 ${kb("", "1B01 김준")} — 같은 진 셀리더 캘린더`],
-      ["google", "구글 캘린더", `${kb("", "구글 캘린더 연결하기")} 한 번이면 내 폰 캘린더에`],
+      ["souls", "다른 셀 보기", `맨 위 셀 이름 — 같은 진 셀리더 캘린더`],
+      ["google", "구글 캘린더", `${kb("", "구글 캘린더 연결하기")} 한 번이면 내 폰 캘린더에 '목자의 삶'이 생겨요`],
       ["refresh", "실시간", `연결해 두면 저장하는 순간 몇 초 안에 내 구글 캘린더로`]],
-    tips: [["lock", "다른 셀 만남은 날짜 · 시간 · 종류만 보여요"]], go: ["cal", "캘린더 열기"] },
-  { id: "dir", ic: "dir", c: "#C9A227", t: "교회 명부", s: "셀별 가지 · 목록 · 통계", who: "all",
-    steps: [["dir", "셀별로", `셀마다 맨 위 셀리더, 아래로 셀원이 가지처럼`],
+    tips: [["lock", "다른 셀 만남은 날짜 · 시간 · 종류만 보여요"], ["lock", "구글에는 제목 · 시간 · 장소만 — 기록 · 기도 내용은 가지 않아요"]],
+    more: [["'확인하지 않은 앱'이라고 나와요", `교회용 작은 앱이라 구글 심사를 받지 않아서 그래요. ${kb("", "고급")} → ${kb("", "목자의 삶(으)로 이동")} → 캘린더 체크 → ${kb("", "계속")}.`],
+      ["연결이 끊겼다고 나와요", `구글 계정에서 허락을 지웠거나 오래 안 썼을 때예요. 캘린더 화면의 ${kb("", "실시간으로 다시 연결")}을 누르세요.`],
+      ["구글에서 캘린더를 지워 버렸어요", `${kb("refresh", "지금 맞추기")}를 누르면 새로 만들어 다시 넣어요.`],
+      ["연결을 끊고 싶어요", `${kb("", "연결 끊기")} — 구글의 '목자의 삶' 캘린더와 그 안 일정을 함께 지워요.`]],
+    go: ["cal", "캘린더 열기"] },
+  { id: "inbox", g: "daily", ic: "mail", c: "#C77A52", t: "소식 · 쪽지 · 댓글", s: "알림을 한곳에서", who: "all",
+    steps: [["heart", "종 모양", `홈 위 종(소식) — 숫자가 안 읽은 소식`],
+      ["pen", "댓글", `셀모임 · '코치 공유' 기록에 댓글이 달리면 소식으로`],
+      ["send", "쪽지", `소식 › 쪽지 ${kb("plus", "새 쪽지")} — 같은 진 셀리더 · 코치 · 진장에게`],
+      ["faq", "문의 답변", `도우미에 남긴 문의에 답이 오면 여기로`]],
+    tips: [["phone", "관리 서랍 › 알림 설정에서 기기 알림 켜기"], ["refresh", "읽은 소식은 60일 뒤 저절로 정리돼요"]] },
+  { id: "dir", g: "look", ic: "dir", c: "#C9A227", t: "교회 명부", s: "셀별 가지 · 목록 · 통계", who: "all",
+    steps: [["dir", "셀별로", `맨 위 '섬기는 분들'(진장 · 코치), 그 아래 셀마다 셀리더와 셀원이 가지처럼`],
       ["sort", "목록 · 정렬", `${kb("", "셀원")} ${kb("", "리더들")} → 가나다 · 나이 · 출석률 · 생일순`],
-      ["chart", "한눈에 보기", `침례 · 새로운 삶 · 제자의 삶 · 정회원 비율 — 막대를 누르면 거르기`],
+      ["star", "직분 배지", `진장 · 코치 · 셀리더 · 인턴 배지 (후보는 볼 수 있는 분에게만)`],
       ["chart", "통계 · 그래프", `평균 나이 · 연령대 · 출석률 · 셀별 표`]],
-    tips: [["lock", "생년 · 가족 · 침례는 잠긴 칸 — 볼 수 있는 분만"], ["eye", "카드를 누르면 출석 줄 · 기본 사항"]], go: ["dir", "교회 명부 열기"] },
-  { id: "health", ic: "chart", c: "#2E7D54", t: "셀 건강 · 통계 · 사진", s: "그래프로 보는 우리 셀", who: "all",
+    tips: [["lock", "생년 · 가족 · 침례는 잠긴 칸 — 볼 수 있는 분만"], ["eye", "카드를 누르면 출석 줄 · 기본 사항 · 전화 · 문자"]],
+    more: [["침례 · 정회원 · 수료는 어디서 체크하나요?", `명부 카드(또는 영혼 카드 › 프로필) '신앙 · 훈련'에서 ${kb("", "받음")} ${kb("", "정회원")} ${kb("", "✓ 새로운 삶")}처럼 눌러요. 바로 저장되고 명부 '한눈에 보기' 통계에 반영돼요. 한 번 더 누르면 '모름'으로.`],
+      ["진장님 연락처는 어디서 보나요?", `교회 명부 맨 위 '섬기는 분들'에서 진장 · 코치 카드를 누르면 전화 · 문자 버튼이 있어요.`],
+      ["명부를 고치고 싶어요", `카드 아래 ${kb("", "명부 고치기")} — 셀리더는 자기 셀(계정 없는 분), 진장 · 소유자는 진 전체를 고쳐요.`]],
+    go: ["dir", "교회 명부 열기"] },
+  { id: "health", g: "look", ic: "chart", c: "#2E7D54", t: "셀 건강 · 통계 · 사진", s: "그래프로 보는 우리 셀", who: "all",
     steps: [["chart", "셀 건강", `출석률 고리 · 8주 막대 · 사람별 출석 줄`],
       ["sort", "자주 빠지는 순", `${kb("", "자주 빠지는 순")} 으로 먼저 챙길 사람`],
-      ["chart", "활동 통계", `종류별 모임 · 달마다 — 다른 셀도 골라서`],
-      ["camera", "사진 모아보기", `셀모임 사진 · 셀원 얼굴`]],
+      ["chart", "활동 통계", `종류별 모임 · 누구를 얼마나 만났나 — 기간을 골라서`],
+      ["camera", "사진 모아보기", `셀모임 사진 · 셀원 얼굴 · 남은 용량`]],
     go: ["health", "셀 건강 열기"] },
-  { id: "org", ic: "org", c: "#B4384A", t: "조직도 · 관리", s: "진장 · 코치 · 셀 자리", who: "manage",
-    steps: [["org", "조직도", `교회 → 진 → 진장 → 코치 → 셀을 한 그림으로`],
+  { id: "interns", g: "look", ic: "star", c: "#2E9D6A", t: "인턴 · 후보", s: "공식 인턴과 마음에 둔 후보", who: "lead",
+    steps: [["star", "인턴 (공식)", `공식 리더 후보 — 초록 '인턴' 배지, 명부에도 보여요`],
+      ["eye", "후보 (비공식)", `셀리더가 마음에 둔 분 — 점선 '후보', 셀별 잠긴 칸에만`],
+      ["sort", "정하는 곳", `인턴 · 후보 화면 ${kb("", "인턴 · 후보 정하기")}, 명부 카드의 '리더 후보', 셀모임 · 영혼들의 ${kb("", "순서")}`],
+      ["chart", "한눈에", `셀별 그림 · 명단 · 평균 기간 · 출석률 · 인턴을 세울 셀`]],
+    tips: [["lock", "후보는 그 셀 셀리더 · 코치 · 진장 · 소유자만 — 본인 · 다른 셀리더는 못 봐요"]],
+    more: [["누가 정할 수 있나요?", `셀리더는 자기 셀, 코치는 맡은 셀, 진장은 진 전체, 소유자(수퍼)는 모든 셀.`],
+      ["'분가 준비' · '인턴을 세울 때' 표시는?", `셀원이 10명 넘고 인턴이 있으면 '분가 준비', 8명 넘는데 인턴이 없으면 '인턴을 세울 때'로 표시해요.`]],
+    go: ["interns", "인턴 · 후보 열기"] },
+  { id: "org", g: "look", ic: "org", c: "#B4384A", t: "조직도 · 관리", s: "진장 · 코치 · 셀 자리", who: "manage",
+    steps: [["org", "조직도", `교회 → 진 → 진장 → (진장 보좌) 코치 → 셀을 한 그림으로`],
       ["plus", "자리 넣기", `조직 구성 → ${kb("plus", "진장")} ${kb("plus", "코치")} — 이름 + 구글 이메일`],
       ["mail", "셀리더 초대", `셀리더 명단 → 이메일 넣고 ${kb("send", "초대 보내기")}`],
       ["dir", "셀 관리", `분가 · 담당 바꾸기 · 이름 · 보관`]],
-    tips: [["key", "진장은 '교역자'가 아니라 '진장' 자리로"]], go: ["orgchart", "조직도 열기"] },
-  { id: "privacy", ic: "lock", c: "#6F6664", t: "누가 무엇을 보나", s: "보안 원칙 한눈에", who: "all", special: "privacy" },
-  { id: "faq", ic: "faq", c: "#5F5654", t: "자주 묻는 질문", s: "막힐 때 여기부터", who: "all", special: "faq" },
+    tips: [["key", "진장은 '교역자'가 아니라 '진장' 자리로"]],
+    more: [["조직도를 코치별로 나누지 않고 보고 싶어요", `조직도의 진 아래 ${kb("", "통합")} — 셀을 한 판에, 코치는 진장 보좌로만. 진장 · 소유자가 바꿀 수 있고 진마다 기억해요.`],
+      ["초대 메일을 꼭 보내야 하나요?", `아니요. 셀리더 명단 위 '초대 안내 메일'을 ${kb("", "등록만")}으로 두면 조용히 자리만 만들어요. 그분이 그 구글 계정으로 로그인하면 바로 들어와요.`],
+      ["셀리더이면서 코치도 해요", `코치 자리 창에서 '코치도 겸함'을 체크하세요.`]],
+    go: ["orgchart", "조직도 열기"] },
+  { id: "super", g: "look", ic: "key", c: "#5F5654", t: "수퍼 관리자", s: "사용 현황 · 문의함 · 서버 설정", who: "super",
+    steps: [["chart", "사용 현황", `더보기 › 사용 현황 — 누가 · 언제 · 어떤 화면을 · 오류`],
+      ["faq", "문의 · 제안함", `도우미 › 문의 · 제안 › ${kb("", "받은 함")} — 답하고 상태를 바꿔요`],
+      ["google", "구글 캘린더 서버", `캘린더 › 구글 캘린더 상자 › '실시간 서버 연결 설정'`],
+      ["mail", "조직 · 초대", `조직 구성 · 셀리더 명단 · 보고서 가져오기`]],
+    tips: [["lock", "문의에 붙은 스크린샷은 쓴 사람과 수퍼만 봐요"]] },
+  { id: "tickets", g: "help", ic: "send", c: "#B8253F", t: "문의 · 제안", s: "사용 문의 · 기능 제안 · 오류 (스크린샷)", who: "all", special: "tickets" },
+  { id: "privacy", g: "help", ic: "lock", c: "#6F6664", t: "누가 무엇을 보나", s: "보안 원칙 한눈에", who: "all", special: "privacy" },
+  { id: "faq", g: "help", ic: "faq", c: "#5F5654", t: "자주 묻는 질문", s: "막힐 때 여기부터", who: "all", special: "faq" },
 ];
+const HELP_G = [["start", "시작하기"], ["daily", "매일 쓰는 기능"], ["look", "살펴보기 · 관리"], ["help", "도움 · 문의"]];
 function helpWho(t) {
   const r = state.me ? state.me.role : "";
   if (t.who === "lead") return canLead() || ["coach", "jinjang"].includes(r);
   if (t.who === "manage") return ["super", "jinjang", "coach"].includes(r);
+  if (t.who === "super") return r === "super";
   return true;
 }
 async function openHelp(topic) {
+  if (usage.cur && usage.cur !== "help") state.tkFrom = usage.cur;
   state.helpTopic = topic || "";
   renderHelp(); markSide("help"); show("s-help");
   $("s-help").querySelector(".scroll").scrollTop = 0;
@@ -9898,10 +10028,13 @@ function renderHelp() {
   if (t.special === "install") { $("hp-body").innerHTML = head + helpInstall(); return; }
   if (t.special === "privacy") { $("hp-body").innerHTML = head + helpPrivacy(); return; }
   if (t.special === "faq") { $("hp-body").innerHTML = head + helpFaq(); return; }
+  if (t.special === "tickets") { $("hp-body").innerHTML = head + `<div id="tk-box"></div>`; renderTickets(); return; }
   $("hp-body").innerHTML = head + `<div class="hp-steps">${t.steps.map(([ic, b, d], i) => `
       <div class="hp-step"><span class="no">${i + 1}</span><span class="si">${HIC[ic]}</span><b>${b}</b><p>${d}</p></div>`).join("")}</div>
     ${(t.tips || []).length ? `<div class="hp-tips">${t.tips.map(([ic, x]) => `<span class="hp-tip">${HIC[ic]}<span>${x}</span></span>`).join("")}</div>` : ""}
-    ${t.go ? `<div class="hp-go"><button type="button" class="btn" style="max-width:240px" data-hpgo="${t.go[0]}">${t.go[1]}</button></div>` : ""}`;
+    ${(t.more || []).length ? `<p class="hp-sec" style="margin-top:22px">자세히 알아보기</p><div class="hp-faq">${t.more.map(([q, a]) => `<details><summary><span class="q">Q</span>${q}</summary><div class="a">${a}</div></details>`).join("")}</div>` : ""}
+    <div class="hp-go">${t.go ? `<button type="button" class="btn" style="max-width:240px" data-hpgo="${t.go[0]}">${t.go[1]}</button>` : ""}
+      <button type="button" class="btn-ghost" style="max-width:240px" data-tkgo="ask">${HIC.send.replace("<svg", '<svg width="17" height="17"')} 그래도 모르겠어요 — 문의하기</button></div>`;
 }
 function renderHelpHome() {
   const q = (state.helpQ || "").trim();
@@ -9921,11 +10054,21 @@ function renderHelpHome() {
         </div>
       </div>
     </div>
-    <p class="hp-sec">${q ? `'${esc(q)}' 찾은 결과 ${list.length}개` : "기능별 안내"}</p>
-    <div class="hp-grid">${list.map(t => `<button type="button" class="hp-tile" data-hp="${t.id}">
-        <span class="hp-ic" style="background:${t.c}">${HIC[t.ic]}</span><span><b>${t.t}</b><span class="s">${t.s}</span></span></button>`).join("")
-      || `<p class="muted">찾는 안내가 없어요. 다른 말로 찾아보세요.</p>`}</div>`;
+    <div class="tk-band">
+      <div class="tb-t"><b>문의 · 제안</b><span>쓰다가 막힌 것, 있었으면 하는 기능을 스크린샷과 함께 보내 주세요. 나와 수퍼 관리자만 봐요.</span></div>
+      <div class="tb-b">
+        <button type="button" data-tkgo="ask">${HIC.faq.replace("<svg", '<svg width="18" height="18"')}사용 문의</button>
+        <button type="button" data-tkgo="idea">${HIC.star.replace("<svg", '<svg width="18" height="18"')}기능 제안</button>
+        <button type="button" data-tkgo="bug">${HIC.refresh.replace("<svg", '<svg width="18" height="18"')}오류 알리기</button>
+        <button type="button" class="mine" data-tkgo="mine">내 문의${state.tkMineUn ? ` <i class="dot"></i>` : ""}</button>
+        ${state.me && state.me.role === "super" ? `<button type="button" class="mine" data-tkgo="all">받은 함${tkSuperNew() ? ` <span class="chip rose">${tkSuperNew()}</span>` : ""}</button>` : ""}
+      </div>
+    </div>
+    ${q ? `<p class="hp-sec">'${esc(q)}' 찾은 결과 ${list.length}개</p><div class="hp-grid">${list.map(helpTile).join("") || `<p class="muted">찾는 안내가 없어요. 다른 말로 찾아보거나 <button type="button" class="link" data-tkgo="ask">문의하기</button></p>`}</div>`
+      : HELP_G.map(([g, gl]) => { const L = list.filter(t => t.g === g); return L.length ? `<p class="hp-sec">${gl}</p><div class="hp-grid">${L.map(helpTile).join("")}</div>` : ""; }).join("")}`;
 }
+const helpTile = (t) => `<button type="button" class="hp-tile" data-hp="${t.id}">
+        <span class="hp-ic" style="background:${t.c}">${HIC[t.ic]}</span><span><b>${t.t}</b><span class="s">${t.s}</span></span></button>`;
 function helpDevice() {
   const ua = navigator.userAgent;
   if (/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return "ios";
@@ -9986,7 +10129,12 @@ function helpFaq() {
     ["다른 셀 칸이 흐려요", `그 셀리더가 아직 가입 전이에요. 셀리더 명단에서 초대하고 그분이 로그인하면 열려요.`],
     ["구글 캘린더 오류가 나요", `오류 글에 빠진 게 적혀 있어요 — 'API 켜기'면 설정 안내 ①번, '캘린더 허용'이면 다시 연결하며 체크.`],
     ["생년 · 침례가 '—'로 보여요", `노션 명단(잠긴 칸)은 수퍼 · 진장 · 코치 · 그 셀 셀리더만 봐요. 본인 것은 본인에게 안 보여요.`],
-    ["화면이 너무 어두워요", `더보기 › 화면에서 ${kb("moon", "라이트")} 또는 '기기 설정 따르기'.`],
+    ["화면이 너무 어둡거나 밝아요", `홈 위 ${kb("moon", "")} 달 · 해 버튼으로 라이트 · 블랙을 바로 바꿔요. 더보기 › 화면에서 '기기 설정 따르기'도 있어요.`],
+    ["글씨가 작아요", `더보기 › 화면 › 글자 크기에서 ${kb("", "크게")} · ${kb("", "아주 크게")}. 이 기기에만 적용돼요.`],
+    ["인턴 후보는 누가 보나요?", `그 셀 셀리더 · 그 셀 코치 · 진장 · 소유자만. 후보 본인과 다른 셀리더에게는 보이지 않고, 명부에도 넘어가지 않아요.`],
+    ["초대 메일 없이 등록만 하고 싶어요", `셀리더 명단 위 '초대 안내 메일' → ${kb("", "등록만")}. 나중에 직접 연락해 전해도 돼요.`],
+    ["문의한 내용은 누가 보나요?", `쓴 사람과 수퍼 관리자만 봐요. 답이 오면 소식(종)으로 알려 드려요.`],
+    ["스크린샷은 어떻게 찍나요?", `아이폰: 옆 버튼 + 볼륨 올리기 · 안드로이드: 전원 + 볼륨 내리기 · 맥: ⌘ Shift 4 · 윈도우: 윈도우키 Shift S → 문의 창에서 ${kb("", "붙여넣기")}(⌘V · Ctrl V)해도 돼요.`],
     ["셀원 순서를 바꾸고 싶어요", `영혼들 ${kb("", "순서")} · 셀모임 ${kb("", "순서 정하기")} · 명부의 ${kb("", "순서 · 인턴")} — 어디서 바꿔도 모두 같아요.`],
     ["진장님은 어디서 넣나요?", `조직 구성 → 진장 줄 ${kb("plus", "진장")} → 이름 + 구글 이메일. '교역자'가 아니라 '진장' 자리로.`],
     ["앱이 내 사용을 기록하나요?", `어떤 화면을 몇 번 · 몇 분 · 어떤 기기로 썼는지만 세요 (앱 개선용, 수퍼 관리자만 봄). 기록 · 기도 · 메모의 <b>글 내용과 위치는 모으지 않아요</b>.`],
@@ -10002,7 +10150,7 @@ $("hp-body").addEventListener("click", async (ev) => {
   const i = ev.target.closest("[data-hpinstall]");
   if (i && deferredPrompt) { deferredPrompt.prompt(); const ch = await deferredPrompt.userChoice; if (ch && ch.outcome === "accepted") bump("installApp"); deferredPrompt = null; renderHelp(); return; }
   const g = ev.target.closest("[data-hpgo]");
-  if (g) { const k = g.dataset.hpgo; ({ souls: openSouls, meet: openMeet, cal: openCal, dir: openDir, health: openHealth, orgchart: openOrgChart }[k] || openHome)(); }
+  if (g) { const k = g.dataset.hpgo; ({ souls: openSouls, meet: openMeet, cal: openCal, dir: openDir, health: openHealth, orgchart: openOrgChart, interns: openInterns }[k] || openHome)(); }
 });
 $("hp-body").addEventListener("input", (ev) => {
   if (ev.target.id !== "hp-q") return;
@@ -10576,3 +10724,441 @@ document.addEventListener("click", (ev) => {
   applyInvMail(); if (!$("s-leaders").hidden) syncLeadersBtn();
   toast({ ask: "초대할 때마다 안내 메일을 쓸지 물어요.", send: "초대하면 늘 안내 메일 쓰기 창을 열어요.", none: "초대는 등록만 해요 (메일 안 씀)." }[b.dataset.invpref]);
 });
+
+/* ════════ 38단계 — 문의 · 제안 (도우미 안 창구 · 스크린샷 첨부) ════════
+   tickets/{id}      — 쓴 사람 · 수퍼만 읽어요 (보안 규칙). 작은 사본(thumbs)만 들어 있어 목록이 가벼워요.
+   ticketImgs/{id_n} — 큰 스크린샷 (한 장씩 · 누를 때만 읽음)
+   답이 오면 쓴 사람에게 소식(notices, kind "ticket")이 가고, 수퍼에게는 새 문의 수가 실시간으로 떠요. */
+const TK_KIND = { ask: ["사용 문의", "#5B8DEF", "faq"], idea: ["기능 제안", "#B08A3E", "star"], bug: ["오류 알리기", "#E3354B", "refresh"] };
+const TK_ST = { new: ["접수됨", "warn"], seen: ["확인함", "lock"], doing: ["반영 예정", "rose"], done: ["해결됨", "ok"], hold: ["보류", ""] };
+const TK_PH = {
+  ask: "어느 화면에서 무엇을 하려다 막혔는지 적어 주세요.\n예) 셀모임 보고를 보냈는데 코치님 화면에 안 보여요.",
+  idea: "있었으면 하는 기능과, 그게 있으면 무엇이 편해지는지 적어 주세요.\n예) 셀원 생일 전날 알림이 오면 좋겠어요.",
+  bug: "언제 · 어느 화면에서 · 무엇을 눌렀더니 어떻게 됐는지 적어 주세요.\n빨간 오류 글이 있었다면 스크린샷이 가장 정확해요."
+};
+state.tk = { view: "new", kind: "ask", imgs: [], mine: null, all: null, one: null, filter: "open", kf: "" };
+const tkSuperNew = () => (state.live_tk || []).length;
+const tkDev = () => innerWidth >= 1100 ? "컴퓨터" : innerWidth >= 600 ? "패드" : "폰";
+function tkCtx() {
+  const ua = navigator.userAgent;
+  const br = /Edg\//.test(ua) ? "엣지" : /SamsungBrowser/.test(ua) ? "삼성 인터넷" : /CriOS|Chrome\//.test(ua) ? "크롬" : /Safari\//.test(ua) ? "사파리" : "기타";
+  const os = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) ? "iOS" : /Android/.test(ua) ? "안드로이드" : /Mac/.test(ua) ? "맥" : /Windows/.test(ua) ? "윈도우" : "";
+  const fs = { s: "작게", m: "보통", l: "크게", xl: "아주 크게" }[fsPref()] || "보통";
+  return { ver: verNo(), dev: tkDev(), w: innerWidth, os, br, theme: document.documentElement.dataset.theme === "dark" ? "블랙" : "라이트", fs,
+    from: state.tkFrom ? (SCREEN_NAME[state.tkFrom] || state.tkFrom) : "" };
+}
+const tkCtxTxt = (c) => c ? [`v${c.ver}`, [c.dev, c.w ? c.w + "px" : ""].filter(Boolean).join(" "), [c.os, c.br].filter(Boolean).join(" · "), c.theme, `글자 ${c.fs}`, c.from ? `'${c.from}' 화면에서` : ""].filter(Boolean).join(" · ") : "";
+const tkWhen = (ms) => { if (!ms) return ""; const d = new Date(ms); return `${d.getMonth() + 1}.${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
+
+function openTickets(view, kind) {
+  state.tk.view = view || "new"; state.tk.one = null;
+  if (kind) state.tk.kind = kind;
+  if (state.helpTopic === "tickets" && !$("s-help").hidden) { renderTickets(); return; }
+  openHelp("tickets");
+}
+async function tkLoad(which, force) {
+  if (which === "mine") {
+    if (state.tk.mine && !force) return;
+    state.tk.mine = pack(await getDocs(query(collection(db, "tickets"), where("uid", "==", uid()))))
+      .sort((a, b) => (b.updatedAtMs || b.atMs || 0) - (a.updatedAtMs || a.atMs || 0));
+    state.tkMineUn = state.tk.mine.some(t => t.unreadMe);
+  } else {
+    if (state.tk.all && !force && !state.tk.allStale) return;
+    state.tk.allStale = false;
+    state.tk.all = pack(await getDocs(collection(db, "tickets")))
+      .sort((a, b) => (b.updatedAtMs || b.atMs || 0) - (a.updatedAtMs || a.atMs || 0));
+  }
+}
+async function renderTickets() {
+  const box = $("tk-box"); if (!box) return;
+  const T = state.tk, sup = state.me && state.me.role === "super";
+  if (T.view === "all" && !sup) T.view = "mine";
+  const tabs = `<div class="seg tk-tabs">
+      <button type="button" data-tkv="new" class="${T.view === "new" ? "on" : ""}">새로 쓰기</button>
+      <button type="button" data-tkv="mine" class="${T.view === "mine" || (T.view === "one" && T.from !== "all") ? "on" : ""}">내 문의${state.tkMineUn ? " ●" : ""}</button>
+      ${sup ? `<button type="button" data-tkv="all" class="${T.view === "all" || (T.view === "one" && T.from === "all") ? "on" : ""}">받은 함${tkSuperNew() ? ` · ${tkSuperNew()}` : ""}</button>` : ""}
+    </div>`;
+  if (T.view === "new") { box.innerHTML = tabs + tkFormHTML(); tkPreview(); return; }
+  box.innerHTML = tabs + `<p class="muted" style="margin-top:14px">불러오는 중…</p>`;
+  try {
+    if (T.view === "one") await tkLoad(T.from === "all" ? "all" : "mine");
+    else await tkLoad(T.view);
+  } catch (e) { box.innerHTML = tabs + `<p class="err">${esc(msgOf(e))}</p>`; return; }
+  if (T.view === "one") { box.innerHTML = tabs + tkOneHTML(); tkMarkRead(); return; }
+  box.innerHTML = tabs + tkListHTML(T.view);
+}
+function tkFormHTML() {
+  const T = state.tk, k = T.kind, cx = tkCtx();
+  const shot = helpDevice() === "ios" ? "아이폰: 옆 버튼 + 볼륨 올리기" : helpDevice() === "android" ? "안드로이드: 전원 + 볼륨 내리기"
+    : /Mac/.test(navigator.userAgent) ? "맥: ⌘ Shift 4 → 이 창에서 ⌘V" : "윈도우: 윈도우키 Shift S → 이 창에서 Ctrl V";
+  return `<div class="tk-form" id="tk-form">
+    <div class="tk-kinds">${Object.entries(TK_KIND).map(([key, [l, c, ic]]) => `<button type="button" data-tkk="${key}" class="${k === key ? "on" : ""}" style="--kc:${c}">
+        <span class="ki">${HIC[ic]}</span><b>${l}</b><span class="s">${{ ask: "쓰다가 막혔어요", idea: "이런 기능이 있으면", bug: "이상하게 동작해요" }[key]}</span></button>`).join("")}</div>
+    <div class="field"><label for="tk-title">제목</label><input id="tk-title" maxlength="80" placeholder="${{ ask: "예) 셀 보고가 코치님께 안 보여요", idea: "예) 생일 전날 알림", bug: "예) 사진을 올리면 멈춰요" }[k]}" value="${esc(T.title || "")}"></div>
+    <div class="field"><label for="tk-body">내용</label><textarea id="tk-body" maxlength="3000" rows="6" placeholder="${esc(TK_PH[k])}">${esc(T.body || "")}</textarea></div>
+    <div class="field"><label>스크린샷 · 사진 <span class="muted" style="font-size:calc(11px*var(--fs,1))">(3장까지)</span></label>
+      <div class="tk-drop" id="tk-drop">
+        <div class="tk-thumbs" id="tk-thumbs"></div>
+        <label class="tk-pick">${HIC.camera.replace("<svg", '<svg width="20" height="20"')}<span>사진 고르기</span>
+          <input type="file" id="tk-file" accept="image/*" multiple hidden></label>
+        <p class="tk-hint">여기로 끌어다 놓거나, 스크린샷을 찍은 뒤 붙여넣기(⌘V · Ctrl V)해도 돼요.<br><span class="muted">${shot}</span></p>
+      </div>
+      <p class="tk-warn">${HIC.lock.replace("<svg", '<svg width="15" height="15"')}<span>문의는 <b>나와 수퍼 관리자만</b> 봐요. 그래도 영혼 이름 · 기도 내용 같은 개인 이야기가 화면에 보이면 가린 뒤 올려 주세요.</span></p>
+    </div>
+    <p class="tk-ctx">${HIC.phone.replace("<svg", '<svg width="15" height="15"')}<span>함께 보내는 정보 — ${esc(tkCtxTxt(cx))}<br><span class="muted">(어떤 기기 · 화면에서 생긴 일인지 알면 더 빨리 고칠 수 있어요)</span></span></p>
+    <p class="err" id="tk-err"></p>
+    <div class="tk-acts"><button type="button" class="btn" id="tk-send">${HIC.send.replace("<svg", '<svg width="18" height="18"')} 보내기</button></div>
+  </div>`;
+}
+function tkPreview() {
+  const box = $("tk-thumbs"); if (!box) return;
+  box.innerHTML = state.tk.imgs.map((m, i) => `<span class="tk-th"><img src="${m.thumb}" alt="첨부 ${i + 1}"><button type="button" data-tkrm="${i}" aria-label="빼기">×</button></span>`).join("");
+  const pick = document.querySelector(".tk-pick"); if (pick) pick.hidden = state.tk.imgs.length >= 3;
+}
+async function tkAddFiles(files) {
+  const err = $("tk-err");
+  const list = [...files].filter(f => f && /^image\//.test(f.type));
+  if (!list.length) { if (err) err.textContent = "사진(이미지) 파일만 붙일 수 있어요."; return; }
+  for (const f of list) {
+    if (state.tk.imgs.length >= 3) { if (err) err.textContent = "스크린샷은 3장까지예요."; break; }
+    try {
+      const full = await shrinkFit(f, { max: 1800, q: 0.85 }, 900000);
+      const thumb = await shrink(f, { max: 320, q: 0.6 });
+      state.tk.imgs.push({ full, thumb });
+      if (err) err.textContent = "";
+    } catch (e) { if (err) err.textContent = msgOf(e); }
+  }
+  tkPreview();
+}
+function tkListHTML(which) {
+  const T = state.tk, sup = which === "all";
+  let rows = (sup ? T.all : T.mine) || [];
+  if (sup) {
+    rows = rows.filter(t => T.filter === "all" ? true : T.filter === "open" ? ["new", "seen", "doing"].includes(t.status) : ["done", "hold"].includes(t.status));
+    if (T.kf) rows = rows.filter(t => t.kind === T.kf);
+  }
+  const all = (sup ? T.all : T.mine) || [];
+  const cnt = (f) => all.filter(f).length;
+  const filt = sup ? `<div class="tk-filt">
+      <div class="seg" style="margin:0">${[["open", `진행 중 ${cnt(t => ["new", "seen", "doing"].includes(t.status))}`], ["closed", `끝남 ${cnt(t => ["done", "hold"].includes(t.status))}`], ["all", `전체 ${all.length}`]]
+        .map(([k, l]) => `<button type="button" data-tkf="${k}" class="${T.filter === k ? "on" : ""}">${l}</button>`).join("")}</div>
+      <div class="tk-kf">${[["", "모두"], ...Object.entries(TK_KIND).map(([k, v]) => [k, v[0]])].map(([k, l]) => `<button type="button" class="pchip ${T.kf === k ? "on" : ""}" data-tkkf="${k}">${l}</button>`).join("")}</div>
+    </div>` : "";
+  const empty = sup ? `<p class="muted" style="margin-top:14px">해당하는 문의가 없어요.</p>`
+    : `<div class="tk-empty">${HIC.send}<p>아직 보낸 문의가 없어요.<br>쓰다가 막히거나 바라는 기능이 생기면 편하게 남겨 주세요.</p><button type="button" class="btn-sm" data-tkv="new">새로 쓰기</button></div>`;
+  return filt + (rows.length ? `<div class="tk-list">${rows.map(t => {
+    const [kl, kc, ki] = TK_KIND[t.kind] || TK_KIND.ask, [sl, sc] = TK_ST[t.status] || TK_ST.new;
+    const un = sup ? t.unreadSuper : t.unreadMe, last = (t.replies || []).slice(-1)[0];
+    return `<button type="button" class="tk-row${un ? " un" : ""}" data-tkone="${t.id}">
+      <span class="ki" style="--kc:${kc}">${HIC[ki]}</span>
+      <span class="grow"><span class="t1">${un ? `<i class="dot"></i>` : ""}<b>${esc(t.title)}</b></span>
+        <span class="t2">${sup ? `${esc(t.name || "")} · ${esc(t.cell || ROLE[t.role] || "")} · ` : ""}${kl} · ${tkWhen(t.atMs)}${t.imgN ? ` · 사진 ${t.imgN}` : ""}${(t.replies || []).length ? ` · 답 ${(t.replies || []).length}` : ""}</span>
+        ${last ? `<span class="t3">${last.by === "admin" ? "관리자" : "나"}: ${esc(String(last.text || "").slice(0, 60))}</span>` : ""}</span>
+      <span class="chip ${sc}">${sl}</span></button>`;
+  }).join("")}</div>` : empty);
+}
+function tkFind(id) { return ((state.tk.all || []).find(t => t.id === id)) || ((state.tk.mine || []).find(t => t.id === id)); }
+function tkOneHTML() {
+  const T = state.tk, t = tkFind(T.one), sup = state.me.role === "super", mineT = t && t.uid === uid();
+  if (!t) return `<p class="muted" style="margin-top:14px">지금은 볼 수 없는 문의예요.</p>`;
+  const [kl, kc, ki] = TK_KIND[t.kind] || TK_KIND.ask, [sl, sc] = TK_ST[t.status] || TK_ST.new;
+  const thumbs = (t.thumbs || []).map((src, i) => `<button type="button" class="tk-th big" data-tkimg="${i}"><img src="${src}" alt="스크린샷 ${i + 1}"></button>`).join("");
+  return `<div class="tk-one">
+    <button type="button" class="hp-back2" data-tkv="${T.from === "all" ? "all" : "mine"}">‹ 목록으로</button>
+    <div class="tk-head"><span class="ki" style="--kc:${kc}">${HIC[ki]}</span>
+      <div class="grow"><p class="t2">${kl} · ${tkWhen(t.atMs)}${sup && !mineT ? ` · ${esc(t.name || "")} (${esc(ROLE[t.role] || t.role || "")}${t.cell ? " · " + esc(t.cell) : ""})` : ""}</p><h3>${esc(t.title)}</h3></div>
+      <span class="chip ${sc}">${sl}</span></div>
+    ${t.body ? `<div class="tk-body">${esc(t.body)}</div>` : ""}
+    ${thumbs ? `<div class="tk-imgs">${thumbs}</div>` : ""}
+    ${t.ctx ? `<p class="tk-ctx">${HIC.phone.replace("<svg", '<svg width="15" height="15"')}<span>${esc(tkCtxTxt(t.ctx))}</span></p>` : ""}
+    ${sup ? `<div class="tk-st"><span class="lb">상태</span><div class="seg" style="margin:0">${Object.entries(TK_ST).map(([k, [l]]) => `<button type="button" data-tkst="${k}" class="${t.status === k ? "on" : ""}">${l}</button>`).join("")}</div></div>` : ""}
+    <div class="tk-thread">${(t.replies || []).map(r => `<div class="bub ${(r.by === "admin") === sup ? "me" : "them"}"><span class="who">${r.by === "admin" ? `관리자${r.name ? " · " + esc(r.name) : ""}` : esc(r.name || "나")}</span><span class="tx">${esc(r.text)}</span><span class="t">${tkWhen(r.atMs)}</span></div>`).join("")
+      || `<p class="muted">${sup ? "아직 답을 하지 않았어요." : "보낸 문의를 확인하고 답을 드릴게요. 답이 오면 소식(종)으로 알려 드려요."}</p>`}</div>
+    ${(sup || mineT) ? `<div class="tk-reply"><textarea id="tk-rep" rows="3" maxlength="2000" placeholder="${sup ? "답을 적어 주세요 — 쓴 분에게 소식으로 가요" : "덧붙일 내용이 있으면 적어 주세요"}"></textarea>
+      <div class="tk-acts"><button type="button" class="btn" id="tk-repsend">${sup ? "답 보내기" : "덧붙이기"}</button>
+      ${(sup || (mineT && t.status === "new" && !(t.replies || []).length)) ? `<button type="button" class="btn-sm danger" id="tk-del">문의 지우기</button>` : ""}</div>
+      <p class="err" id="tk-err"></p></div>` : ""}
+  </div>`;
+}
+async function tkMarkRead() {
+  const t = tkFind(state.tk.one); if (!t) return;
+  const sup = state.me.role === "super";
+  try {
+    if (t.uid === uid() && t.unreadMe) { await updateDoc(doc(db, "tickets", t.id), { unreadMe: false }); t.unreadMe = false; state.tkMineUn = (state.tk.mine || []).some(x => x.unreadMe); }
+    if (sup && (t.unreadSuper || t.status === "new")) {
+      const up = { unreadSuper: false }; if (t.status === "new") up.status = "seen";
+      await updateDoc(doc(db, "tickets", t.id), up); Object.assign(t, up);
+    }
+  } catch {}
+}
+async function tkSend() {
+  const T = state.tk, title = $("tk-title").value.trim(), body = $("tk-body").value.trim(), err = $("tk-err");
+  if (!title) { err.textContent = "제목을 적어 주세요."; $("tk-title").focus(); return; }
+  if (!body && !T.imgs.length) { err.textContent = "내용을 적거나 스크린샷을 붙여 주세요."; $("tk-body").focus(); return; }
+  const btn = $("tk-send"); btn.disabled = true; err.textContent = "";
+  const me = state.me, cell = (state.cells || []).find(c => c.id === me.cellId);
+  try {
+    const row = { uid: uid(), name: me.name || "", role: me.role || "", jinId: me.jinId || "", cell: cell ? cell.name : "",
+      kind: T.kind, title: title.slice(0, 80), body: body.slice(0, 3000), imgN: T.imgs.length, thumbs: T.imgs.map(m => m.thumb),
+      status: "new", ctx: tkCtx(), replies: [], atMs: Date.now(), at: serverTimestamp(), updatedAtMs: Date.now(), unreadMe: false, unreadSuper: true };
+    const ref = await addDoc(collection(db, "tickets"), row);
+    let lost = 0;
+    for (let i = 0; i < T.imgs.length; i++) {
+      try { await setDoc(doc(db, "ticketImgs", `${ref.id}_${i}`), { tid: ref.id, uid: uid(), n: i, data: T.imgs[i].full }); } catch { lost++; }
+    }
+    bump("ticket_" + T.kind);
+    state.tk.mine = null; T.imgs = []; T.title = ""; T.body = "";
+    toast(lost ? `보냈어요. 다만 사진 ${lost}장은 올라가지 못했어요.` : "보냈어요. 답이 오면 소식으로 알려 드릴게요.");
+    T.view = "one"; T.one = ref.id; T.from = "mine"; renderTickets();
+  } catch (e) { err.textContent = msgOf(e); btn.disabled = false; }
+}
+async function tkReply() {
+  const t = tkFind(state.tk.one), text = ($("tk-rep").value || "").trim(), err = $("tk-err");
+  if (!t || !text) { if (err) err.textContent = "내용을 적어 주세요."; return; }
+  const sup = state.me.role === "super" && t.uid !== uid();
+  const btn = $("tk-repsend"); btn.disabled = true;
+  try {
+    const r = { by: sup ? "admin" : "me", name: state.me.name || "", text: text.slice(0, 2000), atMs: Date.now() };
+    if ((t.replies || []).length >= 60) { if (err) err.textContent = "주고받은 글이 많아 더 덧붙일 수 없어요. 새 문의로 남겨 주세요."; btn.disabled = false; return; }
+    const replies = [...(t.replies || []), r];
+    const up = sup ? { replies, updatedAtMs: Date.now(), unreadMe: t.uid !== uid(), unreadSuper: false, status: t.status === "new" ? "seen" : t.status }
+                   : { replies, updatedAtMs: Date.now(), unreadSuper: true, unreadMe: false };
+    await updateDoc(doc(db, "tickets", t.id), up); Object.assign(t, up);
+    if (sup && t.uid !== uid()) {
+      try { await addDoc(collection(db, "notices"), { from: uid(), to: t.uid, fromName: `관리자 ${state.me.name || ""}`.trim(), kind: "ticket",
+        title: t.title, snippet: text.slice(0, 80), target: { kind: "ticket", id: t.id }, read: false, atMs: Date.now(), at: serverTimestamp() }); } catch {}
+    }
+    bump("ticketReply"); renderTickets();
+  } catch (e) { if (err) err.textContent = msgOf(e); btn.disabled = false; }
+}
+async function tkSetStatus(st) {
+  const t = tkFind(state.tk.one); if (!t || t.status === st) return;
+  try { await updateDoc(doc(db, "tickets", t.id), { status: st, updatedAtMs: Date.now(), unreadMe: t.uid !== uid() ? true : t.unreadMe });
+    t.status = st; if (t.uid !== uid()) t.unreadMe = true;
+    if (t.uid !== uid() && ["doing", "done", "hold"].includes(st)) {
+      try { await addDoc(collection(db, "notices"), { from: uid(), to: t.uid, fromName: `관리자 ${state.me.name || ""}`.trim(), kind: "ticket",
+        title: t.title, snippet: `상태: ${TK_ST[st][0]}`, target: { kind: "ticket", id: t.id }, read: false, atMs: Date.now(), at: serverTimestamp() }); } catch {}
+    }
+    renderTickets();
+  } catch (e) { toast(msgOf(e)); }
+}
+async function tkDelete() {
+  const t = tkFind(state.tk.one); if (!t) return;
+  if (!confirm("이 문의와 붙은 스크린샷을 지울까요? 되돌릴 수 없어요.")) return;
+  try {
+    for (let i = 0; i < (t.imgN || 0); i++) { try { await deleteDoc(doc(db, "ticketImgs", `${t.id}_${i}`)); } catch {} }
+    await deleteDoc(doc(db, "tickets", t.id));
+    ["mine", "all"].forEach(k => { if (state.tk[k]) state.tk[k] = state.tk[k].filter(x => x.id !== t.id); });
+    state.tk.view = state.tk.from === "all" ? "all" : "mine"; state.tk.one = null; toast("지웠어요."); renderTickets();
+  } catch (e) { toast(msgOf(e)); }
+}
+async function tkShowImg(i) {
+  const t = tkFind(state.tk.one); if (!t) return;
+  $("pv-img").src = (t.thumbs || [])[i] || ""; $("photo-view").showModal();
+  try { const d = await getDoc(doc(db, "ticketImgs", `${t.id}_${i}`)); if (d.exists()) $("pv-img").src = d.data().data; } catch (e) { toast(msgOf(e)); }
+}
+$("hp-body").addEventListener("click", (ev) => {
+  const go = ev.target.closest("[data-tkgo]");
+  if (go) { const k = go.dataset.tkgo; if (k === "mine" || k === "all") openTickets(k); else openTickets("new", k); return; }
+  if (!ev.target.closest("#tk-box")) return;
+  const v = ev.target.closest("[data-tkv]"); if (v) { state.tk.view = v.dataset.tkv; state.tk.one = null; renderTickets(); return; }
+  const k = ev.target.closest("[data-tkk]");
+  if (k) { state.tk.kind = k.dataset.tkk; state.tk.title = $("tk-title").value; state.tk.body = $("tk-body").value; renderTickets(); return; }
+  const rm = ev.target.closest("[data-tkrm]"); if (rm) { state.tk.imgs.splice(Number(rm.dataset.tkrm), 1); tkPreview(); return; }
+  if (ev.target.closest("#tk-send")) { tkSend(); return; }
+  const one = ev.target.closest("[data-tkone]");
+  if (one) { state.tk.from = state.tk.view; state.tk.view = "one"; state.tk.one = one.dataset.tkone; renderTickets(); $("s-help").querySelector(".scroll").scrollTop = 0; return; }
+  const f = ev.target.closest("[data-tkf]"); if (f) { state.tk.filter = f.dataset.tkf; renderTickets(); return; }
+  const kf = ev.target.closest("[data-tkkf]"); if (kf) { state.tk.kf = kf.dataset.tkkf; renderTickets(); return; }
+  const st = ev.target.closest("[data-tkst]"); if (st) { tkSetStatus(st.dataset.tkst); return; }
+  const im = ev.target.closest("[data-tkimg]"); if (im) { tkShowImg(Number(im.dataset.tkimg)); return; }
+  if (ev.target.closest("#tk-repsend")) { tkReply(); return; }
+  if (ev.target.closest("#tk-del")) { tkDelete(); return; }
+});
+$("hp-body").addEventListener("change", (ev) => { if (ev.target.id === "tk-file") { tkAddFiles(ev.target.files); ev.target.value = ""; } });
+$("hp-body").addEventListener("input", (ev) => { if (ev.target.id === "tk-title") state.tk.title = ev.target.value; if (ev.target.id === "tk-body") state.tk.body = ev.target.value; });
+$("hp-body").addEventListener("dragover", (ev) => { const d = ev.target.closest("#tk-drop"); if (!d) return; ev.preventDefault(); d.classList.add("over"); });
+$("hp-body").addEventListener("dragleave", (ev) => { const d = ev.target.closest("#tk-drop"); if (d) d.classList.remove("over"); });
+$("hp-body").addEventListener("drop", (ev) => { const d = ev.target.closest("#tk-drop"); if (!d) return; ev.preventDefault(); d.classList.remove("over"); tkAddFiles(ev.dataTransfer.files); });
+document.addEventListener("paste", (ev) => {
+  if (!$("tk-form") || $("s-help").hidden) return;
+  const files = [...(ev.clipboardData ? ev.clipboardData.items : [])].filter(i => i.kind === "file" && /^image\//.test(i.type)).map(i => i.getAsFile());
+  if (!files.length) return;
+  ev.preventDefault(); tkAddFiles(files);
+});
+/* 수퍼 — 새 문의(안 읽은 것)만 실시간으로 지켜봐요 */
+function tkWatch() {
+  if (state.tkWatchOn || !state.me || state.me.role !== "super") return;
+  state.tkWatchOn = true;
+  try {
+    onSnapshot(query(collection(db, "tickets"), where("unreadSuper", "==", true)), (snap) => {
+      const rows = pack(snap), prev = state.live_tk;
+      state.live_tk = rows;
+      if (prev) rows.filter(r => !prev.some(p => p.id === r.id)).forEach(r => toast(`새 ${(TK_KIND[r.kind] || TK_KIND.ask)[0]} — ${r.name || ""}: ${String(r.title || "").slice(0, 30)}`));
+      state.tk.allStale = true; renderBadges();
+      if (!$("s-home").hidden) renderRooms();
+      if (!$("s-help").hidden && state.helpTopic === "tickets" && state.tk.view === "all") renderTickets();
+    }, () => {});
+  } catch {}
+}
+/* 사용 현황 위 — 문의 · 제안함으로 (개선 요청을 같이 보도록) */
+$("us-tk").onclick = () => openTickets("all");
+
+/* ════════ 39단계 — 신앙 · 훈련은 눌러서 체크 (글로 적지 않고 → 통계로 바로) ════════
+   침례(받음 · 아직) · 수료 훈련 — 명부 카드(members)에 (같은 진이 보는 기본 사항, 예전 침례일 · 수료와 같은 자리)
+   정회원 · 회원간증 — 잠긴 칸 members/{id}/private/faith (그 셀 셀리더 · 목양 담당 · 진장 · 코치 · 수퍼, 본인은 못 봄)
+   노션에서 가져온 글(예: '0 정회원', '회원간증 0')은 처음 값으로만 읽고, 한 번 누르면 그 값이 기준이 돼요. */
+const FAITH_DEF = ["새로운 삶", "제자의 삶"];
+function courseNames() { const n = (state.courses || []).map(c => c.name).filter(Boolean); return [...new Set([...FAITH_DEF, ...n])]; }
+function faithSortCourses(list) { const names = courseNames(); const ord = (n) => { const i = names.indexOf(n); return i < 0 ? 99 : i; };
+  return [...new Set(list)].sort((a, b) => ord(a) - ord(b)); }
+function faithOf(m) {
+  if (!canSeePriv(m)) return Promise.resolve(null);
+  state.faithCache = state.faithCache || {};
+  if (!state.faithCache[m.id]) state.faithCache[m.id] = getDoc(doc(db, "members", m.id, "private", "faith"))
+    .then(d => d.exists() ? d.data() : {}).catch(() => null);
+  return state.faithCache[m.id];
+}
+/* 누가 바꿀 수 있나 — 보안 규칙과 같게 */
+function canFaithPub(m) {
+  const me = state.me; if (!m || !me || m.uid === me.id) return false;
+  if (me.role === "super") return true;
+  if (["jinjang", "coach"].includes(me.role) && m.jinId === me.jinId) return true;
+  return canLead() && m.jinId === me.jinId && ((!!me.cellId && m.cellId === me.cellId) || m.careUid === me.id);
+}
+const FAITH_ROWS = [
+  { k: "bap", label: "침례", opts: [["y", "받음"], ["n", "아직"]], priv: false },
+  { k: "mem", label: "정회원", opts: [["y", "정회원"], ["n", "비회원"]], priv: true },
+  { k: "testi", label: "회원간증", opts: [["y", "했음"], ["n", "아직"]], priv: true },
+];
+async function renderFaith(m, box) {
+  if (!box || !m) return;
+  const edPub = canFaithPub(m), seePriv = canSeePriv(m);
+  let F = null;
+  if (seePriv) { await loadPv([m]); F = (state.pf || {})[m.id] || null; }
+  if (box.dataset.mid && box.dataset.mid !== m.id) return;
+  box.dataset.mid = m.id;
+  const val = { bap: bapOf(m), mem: seePriv ? memOf(m) : "", testi: seePriv ? testiOf(m) : "" };
+  const done = new Set(m.trainingsDone || []), names = faithSortCourses([...courseNames(), ...done]);
+  const rows = FAITH_ROWS.filter(r => !r.priv || seePriv).map(r => {
+    const ed = r.priv ? seePriv : edPub, v = val[r.k];
+    const extra = r.k === "bap" && m.baptizedAt ? `<span class="fx">${esc(fmtDate(m.baptizedAt, true))}</span>` : "";
+    if (!ed) return `<div class="frow"><span class="fl">${r.label}${r.priv ? " 🔒" : ""}</span><span class="fv2">${v === "u" || !v ? `<span class="muted">모름</span>` : `<span class="chip ${v === "y" ? "ok" : ""}">${(r.opts.find(o => o[0] === v) || [])[1] || ""}</span>`}${extra}</span></div>`;
+    return `<div class="frow"><span class="fl">${r.label}${r.priv ? " 🔒" : ""}</span>
+      <span class="fseg">${r.opts.map(([o, l]) => `<button type="button" class="${v === o ? "on " + (o === "y" ? "yes" : "no") : ""}" data-faith="${r.k}" data-v="${o}">${v === o && o === "y" ? "✓ " : ""}${l}</button>`).join("")}</span>${extra}</div>`;
+  }).join("");
+  const tr = `<div class="frow ftr"><span class="fl">수료한 훈련</span><span class="fchips">${names.map(n => edPub
+      ? `<button type="button" class="${done.has(n) ? "on" : ""}" data-ftrain="${esc(n)}">${done.has(n) ? "✓ " : ""}${esc(n)}</button>`
+      : (done.has(n) ? `<span class="tpill">${esc(n)}</span>` : "")).join("") || `<span class="muted">아직 없어요</span>`}</span></div>`;
+  box.innerHTML = `<p class="mb-sec">신앙 · 훈련 <span>${edPub || seePriv ? "눌러서 바로 바꿔요 · 교회 명부 통계에 그대로" : ""}</span></p>
+    <div class="faith">${rows}${tr}</div>
+    ${seePriv ? `<p class="hint" style="margin-top:6px">🔒 정회원 · 회원간증은 잠긴 칸 — 그 셀 셀리더 · 진장 · 코치만 보고, 본인에게는 안 보여요.</p>` : ""}`;
+}
+async function setFaith(m, k, v, box) {
+  const row = FAITH_ROWS.find(r => r.k === k); if (!row) return;
+  const cur = k === "bap" ? bapOf(m) : k === "mem" ? memOf(m) : testiOf(m);
+  const nv = cur === v ? "" : v;   // 한 번 더 누르면 '모름'으로
+  try {
+    if (!row.priv) {
+      const patch = { bap: nv, updatedAt: serverTimestamp() };
+      if (nv !== "y" && m.baptizedAt) {
+        if (!confirm(`침례일(${fmtDate(m.baptizedAt, true)})도 지울까요?`)) return;
+        patch.baptizedAt = "";
+      }
+      await updateDoc(doc(db, "members", m.id), patch); Object.assign(m, patch);
+      for (const s of (state.souls || []).filter(x => x.memberId === m.id && isLeaderOf(x))) {
+        const sp = { bap: nv }; if ("baptizedAt" in patch) sp.baptizedAt = "";
+        try { await updateDoc(doc(db, "souls", s.id), sp); Object.assign(s, sp); } catch {}
+      }
+    } else {
+      const F = { ...((state.pf || {})[m.id] || {}) }; F[k] = nv;
+      const d = { mem: F.mem || "", testi: F.testi || "", by: uid(), at: new Date().toISOString() };
+      await setDoc(doc(db, "members", m.id, "private", "faith"), d);
+      state.pf[m.id] = d; if (state.faithCache) state.faithCache[m.id] = Promise.resolve(d);
+    }
+    bump("faithSet");
+    renderFaith(m, box);
+    if (!$("s-dir").hidden && state.dirView !== "stats") renderDir();
+  } catch (e) { toast(msgOf(e)); }
+}
+async function toggleTrain(m, name, box) {
+  const done = new Set(m.trainingsDone || []), dir = new Set(m.trainDirect || []);
+  if (done.has(name)) { done.delete(name); dir.delete(name); } else { done.add(name); dir.add(name); }
+  const patch = { trainingsDone: faithSortCourses([...done]), trainDirect: [...dir], updatedAt: serverTimestamp() };
+  try { await updateDoc(doc(db, "members", m.id), patch); Object.assign(m, patch); bump("faithSet"); renderFaith(m, box);
+    if (!$("s-dir").hidden && state.dirView !== "stats") renderDir(); }
+  catch (e) { toast(msgOf(e)); }
+}
+document.addEventListener("click", (ev) => {
+  const box = ev.target.closest(".faith-wrap"); if (!box) return;
+  const m = (state.dir || []).find(x => x.id === box.dataset.mid) || memberById(box.dataset.mid); if (!m) return;
+  const f = ev.target.closest("[data-faith]"); if (f) { setFaith(m, f.dataset.faith, f.dataset.v, box); return; }
+  const t = ev.target.closest("[data-ftrain]"); if (t) toggleTrain(m, t.dataset.ftrain, box);
+});
+
+/* ── 고르는 칸(select)을 눌러 고르는 버튼으로 — 성별 · 상태 · 연락 주기 · 카드 종류 ──
+   select는 그대로 두고(저장 코드가 그대로 읽어요) 위에 버튼을 덮어 씌웁니다. 값이 바뀌면 서로 맞춰요. */
+const _selDesc = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value");
+function segSelect(sel, opts = {}) {
+  if (!sel || sel.dataset.segged) return;
+  sel.dataset.segged = "1";
+  const box = document.createElement("div"); box.className = "segsel" + (opts.wrap ? " wrap" : "");
+  sel.after(box); sel.classList.add("segsel-src");
+  const draw = () => {
+    const v = _selDesc.get.call(sel);
+    box.innerHTML = [...sel.options].filter(o => o.value !== "" || opts.keepEmpty).map(o =>
+      `<button type="button" data-sv="${esc(o.value)}" class="${o.value === v ? "on" : ""}" ${sel.disabled ? "disabled" : ""}>${esc(o.textContent)}</button>`).join("");
+    box.hidden = sel.hidden;
+  };
+  Object.defineProperty(sel, "value", { configurable: true, get() { return _selDesc.get.call(this); }, set(v) { _selDesc.set.call(this, v); draw(); } });
+  new MutationObserver(draw).observe(sel, { childList: true, attributes: true, attributeFilter: ["disabled", "hidden"] });
+  sel.addEventListener("change", draw);
+  box.addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-sv]"); if (!b) return;
+    const nv = (_selDesc.get.call(sel) === b.dataset.sv && opts.toggle) ? "" : b.dataset.sv;
+    _selDesc.set.call(sel, nv); draw(); sel.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  draw();
+}
+["e-gender", "md-gender"].forEach(id => segSelect($(id), { toggle: true }));
+["e-status", "e-cycle"].forEach(id => segSelect($(id), { wrap: true }));
+
+/* 침례 — 날짜를 몰라도 '받음'만 눌러 둘 수 있게 (영혼 수정 · 명부 고치기) */
+function bapSeg(inputId, segId) {
+  const inp = $(inputId); if (!inp || $(segId)) return;
+  const box = document.createElement("div"); box.className = "segsel"; box.id = segId;
+  inp.before(box);
+  const draw = () => { const v = box.dataset.v || ""; box.innerHTML = [["y", "받음"], ["n", "아직"]].map(([k, l]) =>
+    `<button type="button" data-bv="${k}" class="${v === k ? "on" : ""}">${l}</button>`).join(""); inp.hidden = v !== "y"; };
+  box.addEventListener("click", (ev) => { const b = ev.target.closest("[data-bv]"); if (!b) return;
+    box.dataset.v = box.dataset.v === b.dataset.bv ? "" : b.dataset.bv; draw(); });
+  inp.placeholder = "침례일 (몰라도 돼요) — 예) 2020-05-10";
+  box.set = (v) => { box.dataset.v = v || ""; draw(); };
+  draw();
+}
+bapSeg("e-bap", "e-bap-seg"); bapSeg("md-bap", "md-bap-seg");
+const bapSegVal = (id) => { const b = $(id); return b ? (b.dataset.v || "") : ""; };
+
+/* ── 39단계 — 아이패드 · 폰: 글을 쓰는 동안(키보드가 떠 있는 동안) 화면이 깨지지 않게 ──
+   iOS는 키보드가 뜨면 '고정된 것'(왼쪽 메뉴 · 아래 저장 막대)을 줄어든 화면에 붙여 버려요.
+   그래서 아래로 내리면 메뉴가 중간에서 잘리고 저장 막대가 가운데 떠 보였어요.
+   글을 쓰는 동안에는 둘 다 '종이에 붙은 것'처럼 바꿨다가, 다 쓰면 원래대로 돌려요. */
+(function kbGuard() {
+  if (!(navigator.maxTouchPoints > 0)) return;
+  const isField = (el) => el && (el.matches && el.matches("input:not([type=checkbox]):not([type=radio]):not([type=button]):not([type=file]),textarea,select,[contenteditable=true],[contenteditable='']"));
+  let t = null;
+  document.addEventListener("focusin", (ev) => { if (!isField(ev.target)) return; clearTimeout(t); document.documentElement.classList.add("kb-open"); });
+  document.addEventListener("focusout", () => {
+    clearTimeout(t);
+    t = setTimeout(() => { if (!isField(document.activeElement)) { document.documentElement.classList.remove("kb-open");
+      requestAnimationFrame(() => window.scrollTo(window.scrollX, window.scrollY)); } }, 120);
+  });
+  const vv = window.visualViewport;
+  if (vv) vv.addEventListener("resize", () => {
+    /* 키보드가 내려갔는데 화면이 밀린 채로 남는 경우 — 제자리로 */
+    if (vv.height > innerHeight * 0.9 && !isField(document.activeElement)) {
+      document.documentElement.classList.remove("kb-open");
+      requestAnimationFrame(() => window.scrollTo(window.scrollX, window.scrollY));
+    }
+  });
+})();
