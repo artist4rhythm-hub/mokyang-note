@@ -24,7 +24,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
 const APP_NAME = "목자의 삶";
-const APP_VERSION = "35.0 (2026-11-12)";
+const APP_VERSION = "36.1 (2026-11-12)";
 /* 35단계 — 버전 표시: v35.0 · 2026.11.12 업데이트 */
 const verNo = () => APP_VERSION.split(" ")[0];
 const verDate = () => (APP_VERSION.match(/\((.*)\)/) || [])[1] || "";
@@ -365,13 +365,43 @@ const SIDE = [["home","홈"],["inbox","소식"],["souls","영혼들"],["dir","�
   ["health","셀 건강"],["train","훈련 현황"],["stats","활동 통계"],["photos","사진 모아보기"],["interns","인턴 · 후보"],["help","도우미"],["more","더보기"]];
 ICON.interns = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7.5" r="3.2"/><path d="M5.5 20v-1.2A4.8 4.8 0 0 1 10.3 14h3.4a4.8 4.8 0 0 1 4.8 4.8V20"/><path d="m16.8 3.8.8 1.6 1.7.2-1.3 1.2.3 1.7-1.5-.8-1.5.8.3-1.7-1.3-1.2 1.7-.2z" fill="currentColor" stroke-width="1"/></svg>`;
 ICON.help = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.1-2.4 3.7M12 16.9v.1"/></svg>`;
+/* 36단계 — 전시실 · 관리 서랍 아이콘 (선 아이콘, 글자색을 따라가요) */
+const _ri = (d) => `<svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const RICON = {
+  souls: _ri('<circle cx="9" cy="8" r="3.4"/><path d="M2.8 20a6.2 6.2 0 0 1 12.4 0"/><path d="M16 4.8a3.4 3.4 0 0 1 0 6.4M21.2 20a6.2 6.2 0 0 0-3.7-5.7"/>'),
+  meet: _ri('<rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="m8 12.2 2.8 2.8L16.2 9.4"/>'),
+  reports: _ri('<path d="M6 3.5h8.5L19 8v12.5H6z"/><path d="M14 3.5V8h5M9 12.5h6M9 16h4"/>'),
+  cal: _ri('<rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8.5 3v4M15.5 3v4"/>'),
+  health: _ri('<path d="M3 12h4l2.4-5.5 4.2 11 2.4-5.5H21"/>'),
+  dir: _ri('<rect x="4.5" y="3" width="15" height="18" rx="2.5"/><circle cx="12" cy="10" r="2.8"/><path d="M8 17a4 4 0 0 1 8 0"/>'),
+  train: _ri('<path d="m2.5 9 9.5-4.5L21.5 9 12 13.5z"/><path d="M6.5 11v4.6c3 2.4 8 2.4 11 0V11"/>'),
+  stats: _ri('<path d="M4 20V11M10 20V4.5M16 20v-6.5M21 20H3"/>'),
+  photos: _ri('<rect x="3" y="4.5" width="18" height="15" rx="3"/><circle cx="9" cy="10" r="1.9"/><path d="m21 15.5-4.8-4.8L7 19.5"/>'),
+  orgchart: _ri('<rect x="9" y="2.5" width="6" height="5" rx="1.2"/><rect x="2.5" y="16.5" width="6" height="5" rx="1.2"/><rect x="15.5" y="16.5" width="6" height="5" rx="1.2"/><path d="M12 7.5V12M5.5 16.5V12h13v4.5"/>'),
+  interns: _ri('<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>'),
+  leaders: _ri('<circle cx="12" cy="7.5" r="3.3"/><path d="M5.5 20.5v-1a5 5 0 0 1 5-5h3a5 5 0 0 1 5 5v1"/><path d="M12 14.5v3"/>'),
+  org: _ri('<circle cx="12" cy="5.5" r="2.5"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/><path d="M12 8v4M7.2 16.5 12 12l4.8 4.5"/>'),
+  cellmgr: _ri('<rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><path d="M17 14v6M14 17h6"/>'),
+  usage: _ri('<circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.5 2"/>'),
+  imp: _ri('<path d="M12 3.5v11M7.5 10l4.5 4.5 4.5-4.5"/><path d="M4.5 16v3a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5v-3"/>'),
+  manage: _ri('<path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V6z"/><path d="m9 12 2.2 2.2L15.5 10"/>'),
+  share: _ri('<circle cx="18" cy="5.5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="18.5" r="2.5"/><path d="m8.2 10.8 7.6-4.1M8.2 13.2l7.6 4.1"/>'),
+  notify: _ri('<path d="M6 16.5V11a6 6 0 1 1 12 0v5.5l1.5 2h-15z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/>'),
+  more: _ri('<circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/>'),
+  set: _ri('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/>')
+};
+/* 관리 서랍 버튼에도 아이콘 */
+[["btn-home-org","org"],["btn-home-leaders","leaders"],["btn-home-orgchart","orgchart"],["btn-home-import","imp"],["btn-manage","manage"],
+ ["btn-home-cellmgr","cellmgr"],["btn-home-dir","dir"],["btn-home-photos","photos"],["btn-home-share","share"],["btn-home-notify","notify"],["btn-home-more","set"]]
+  .forEach(([id,k]) => { const b = document.getElementById(id); if (b && !b.querySelector("svg")) b.insertAdjacentHTML("afterbegin", RICON[k]); });
 function renderNav() {
   document.querySelectorAll("[data-nav]").forEach(nav => {
     nav.innerHTML = NAV.map(([k,label]) =>
       `<button data-tab="${k}" class="${nav.dataset.nav === k ? "on" : ""}">${ICON[k]}${label}</button>`).join("");
   });
+  const GRP = { home:"매일 쓰는", health:"살펴보기", help:"도움" };   // 36.1 — 메뉴를 세 묶음으로
   $("side-nav").innerHTML = SIDE.map(([k,label]) =>
-    `<button data-tab="${k}" data-side="${k}">${ICON[k]}${label}</button>`).join("");
+    (GRP[k] ? `<p class="side-g">${GRP[k]}</p>` : "") + `<button data-tab="${k}" data-side="${k}">${ICON[k]}${label}</button>`).join("");
 }
 renderNav();
 function markSide(which) {
@@ -1022,8 +1052,8 @@ function renderCoachCare() {
 /* ── 전시실 — 방 타일 ── */
 function renderRooms() {
   const me = state.me, room = (k, label, big, small, hot) =>
-    `<button class="room" data-room="${k}"><span class="k">${label}</span>
-      <span class="v"><b>${big}</b>${small?`<span class="${hot?"hot":""}">${small}</span>`:""}</span></button>`;
+    `<button class="room" data-room="${k}"><span class="rh"><span class="ri">${RICON[k]||RICON.more}</span><span class="ra" aria-hidden="true">›</span></span><span class="k">${label}</span>
+      <span class="v${["보기","진"].includes(String(big))?" nv":""}"><b>${big}</b>${small?`<span class="${hot?"hot":""}">${small}</span>`:""}</span></button>`;
   const recs = state.allRecords;
   const weekEv = () => {
     let n = state.meetings.filter(m=>{ const d=daysUntil(m.date); return d!==null && d>=0 && d<=7; }).length;
@@ -1048,7 +1078,7 @@ function renderRooms() {
       && daysSince(m.date)!==null && daysSince(m.date)>=0 && daysSince(m.date)<=14).length;
     const monthMeets = recs ? recs.filter(r=>r.type==="meet" && !r.planned && !r.away
       && String(r.date||"").slice(0,7)===todayStr().slice(0,7)).length : "—";
-    html = room("souls","영혼들", mine.length, careN?`돌봄 필요 ${careN}`:"명", careN>0)
+    html = room("souls","영혼들", mine.length, careN?`돌봄 필요 ${careN}`:"맡은 영혼", careN>0)
       + room("meet","셀모임", rate8(), checkN?`확인할 보고 ${checkN}`:unrep?`보고 전 ${unrep}`:"최근 출석률", unrep>0||checkN>0)
       + room("reports","셀 보고 모아보기", "진", "모든 셀 보고")
       + room("cal","캘린더", weekEv(), "이번 주 일정")
@@ -1064,7 +1094,7 @@ function renderRooms() {
     const pastor = me.role === "pastor";
     const wait = state.meetings.filter(m=>m.reportedAt && (pastor || !m.check) && m.leaderUid!==uid()).length;
     const careN = state.souls.filter(s=>!isLeaderCard(s) && careStreak(attKey(s),attCell(s)).n>=CARE_AT).length;
-    html = room("souls", pastor?"공유된 카드":"영혼들", state.souls.length, careN?`결석 돌봄 ${careN}`:"명", careN>0)
+    html = room("souls", pastor?"공유된 카드":"영혼들", state.souls.length, careN?`결석 돌봄 ${careN}`:"영혼 카드", careN>0)
       + room("meet","셀 보고", wait, pastor?"공유된 보고":wait?"확인 기다림":"기다리는 보고 없음", !pastor && wait>0)
       + room("reports","셀 보고 모아보기", "진", pastor ? "공유된 셀 보고" : "모든 셀 보고")
       + room("health","셀 건강", seenCells().length, `셀 · 인턴 ${interns()}`)
@@ -1075,7 +1105,7 @@ function renderRooms() {
       + room("interns","인턴 · 후보", internCount(), "공식 인턴");
   } else {
     const pendingN = state.invites.filter(i=>i.status==="pending").length;
-    html = room("dir","교회 명부", dirCountTxt(), "명")
+    html = room("dir","교회 명부", dirCountTxt(), "명부 인원")
       + room("leaders","셀리더 명단", leaderSeatStats().n, leaderSeatStats().txt, leaderSeatStats().noe > 0)
       + room("org","조직 구성", state.cells.length, `셀 · 초대 중 ${pendingN}`, pendingN>0)
       + room("orgchart","조직도", "보기", "진장 · 코치 · 셀")
@@ -1236,8 +1266,8 @@ function renderSouls() {
           st >= 2 ? `<span class="tpill streak">결석 ${st}주</span>` : ""] });
     }
     const bt = birthText(s), bd = annivIn(s.birth), od = isLeaderCard(s) ? null : oneDays(s);
-    return scard({ attr: `data-open="${s.id}"`, ava: avatar(s, 52), name: esc(s.name) + (s.intern ? ` <span class="chip intern" style="font-size:10.5px;padding:2px 8px;vertical-align:2px">인턴</span>`
-        : s.cand ? ` <span class="chip cand" style="font-size:10.5px;padding:2px 8px;vertical-align:2px" title="비공식 — 셀리더 · 코치 · 진장만 봐요">후보</span>` : ""),
+    return scard({ attr: `data-open="${s.id}"`, ava: avatar(s, 52), name: esc(s.name) + (tierOfSoul(s) === "intern" ? ` <span class="chip intern" style="font-size:10.5px;padding:2px 8px;vertical-align:2px">인턴</span>`
+        : tierOfSoul(s) === "cand" ? ` <span class="chip cand" style="font-size:10.5px;padding:2px 8px;vertical-align:2px" title="비공식 — 셀리더 · 코치 · 진장만 봐요">후보</span>` : ""),
       sub: (bt ? esc(bt) : "생일 미입력") + (bd !== null && bd <= 14 ? ` · 🎂 ${bd === 0 ? "오늘" : "D-" + bd}` : ""),
       chip: isLeaderCard(s) ? KINDLABEL[s.kind] : esc(STATUS[s.status] || "—"),
       chipCls: isLeaderCard(s) ? "" : s.status === "care" ? "warn" : "rose",
@@ -1289,7 +1319,8 @@ function openOrderDlg(cellId, after) {
   const mine = state.souls.filter(s=>isLeaderOf(s) && (!cellId || s.cellId === cellId));
   if (!mine.length) { toast("순서를 정할 영혼이 없어요."); return; }
   orderList = mine.slice(); orderAfter = after || null;
-  orderIntern = Object.fromEntries(mine.map(s => [s.id, s.intern ? "intern" : s.cand ? "cand" : ""]));
+  orderIntern = Object.fromEntries(mine.map(s => [s.id, tierOfSoul(s)]));
+  loadPipe().then(() => { orderIntern = Object.fromEntries(mine.map(s => [s.id, tierOfSoul(s)])); if (dlgOrder.open) renderOrder(); }).catch(() => {});
   $("order-err").textContent = ""; renderOrder(); dlgOrder.showModal();
 }
 function renderOrder() {
@@ -1323,16 +1354,21 @@ $("ord-save").onclick = async () => {
   $("ord-save").disabled = true;
   try {
     /* 자리가 바뀐 사람만 저장해서 쓸데없는 쓰기를 줄입니다 */
-    const writes = [], today = todayStr();
+    const writes = [], today = todayStr(), tierJobs = [];
     orderList.forEach((s,i)=>{
       const p = {};
       if (s.seq !== i+1) p.seq = i+1;
       const tv = orderIntern[s.id] || "", iv = tv === "intern", cv = tv === "cand";
-      if (!!s.intern !== iv) { p.intern = iv; p.internSince = iv ? (s.internSince || today) : ""; }
-      if (!!s.cand !== cv) { p.cand = cv; p.candSince = cv ? (s.candSince || today) : ""; }
+      const mm = s.memberId ? memberById(s.memberId) : null;
+      if (mm && mm.cellId) { if (tierOfMember(mm) !== tv) tierJobs.push(() => setTier(mm, tv)); }   /* 명부와 이어진 분 — 명부 · 셀별 잠긴 문서 */
+      else {
+        if (!!s.intern !== iv) { p.intern = iv; p.internSince = iv ? (s.internSince || today) : ""; }
+        if (!!s.cand !== cv) { p.cand = cv; p.candSince = cv ? (s.candSince || today) : ""; }
+      }
       if (Object.keys(p).length) writes.push(updateDoc(doc(db,"souls",s.id), p).then(() => Object.assign(s, p)));
     });
     await Promise.all(writes);
+    for (const j of tierJobs) await j();
     state.soulsAt = 0;
     orderList.forEach((s,i)=>{
       s.seq = i+1;
@@ -1376,8 +1412,8 @@ async function openSoul(soulId) {
   $("soul-chips").innerHTML =
     (isLeaderCard(s) ? `<span class="chip">${KINDLABEL[s.kind]}</span>` : "")
     + `<span class="chip rose">${esc(STATUS[s.status]||"—")}</span>`
-    + (s.intern?`<span class="chip intern">인턴${s.internSince?` · ${fmtDate(s.internSince)}~`:""}</span>`
-       : s.cand?`<span class="chip cand" title="비공식 — 셀리더 · 코치 · 진장만 봐요. 본인에게는 안 보여요">인턴 후보 (비공식)</span>`:"")
+    + (tierOfSoul(s)==="intern"?`<span class="chip intern">인턴</span>`
+       : tierOfSoul(s)==="cand"?`<span class="chip cand" title="비공식 — 셀리더 · 코치 · 진장만 봐요. 본인에게는 안 보여요">인턴 후보 (비공식)</span>`:"")
     + (careDue(s)?`<span class="chip warn">결석 ${careDue(s).n}주 · 연락할 때</span>`:"")
     + (cell?`<span class="chip">${esc(cell.name)}${isLeaderCard(s)?" 담당":""}</span>`:"");
   const tel = (s.phone||"").replace(/\D/g,"");
@@ -3960,7 +3996,7 @@ $("btn-invite-open").onclick=()=>{
   $("iv-jin").innerHTML=state.jins.map(j=>`<option value="${j.id}">${esc(j.name)}</option>`).join("");
   fillInviteCells(); $("iv-role").onchange=syncRole; $("iv-jin").onchange=()=>{ fillInviteCells(); fillInviteMembers(); };
   fillInviteMembers();
-  syncRole(); dlg.showModal();
+  syncRole(); applyInvMail(); dlg.showModal();
 };
 /* 명부에 이미 있는 분(아직 계정 없음)을 고르면 그 카드와 이어서 초대합니다 */
 function fillInviteMembers() {
@@ -5242,6 +5278,24 @@ async function backfillThumbs() {
    올릴 때마다 version.json 도 같이 올립니다. 앱은 열 때 · 다시 볼 때 · 10분마다
    그 파일만 살짝 확인해서(아주 작은 파일), 지금 버전보다 새것이면 위에 알림을 띄웁니다. */
 const CHANGELOG = [
+  { v:"36.1", d:"2026-11-12", items:[
+    "오늘 기도할 영혼 카드를 은은하게 (왼쪽 와인색 선 하나 · 버튼 작게)",
+    "2안 다크 사이드 갤러리를 은은하게 — 왼쪽 메뉴 · 대표 방 두 개를 모카빛으로, 금빛 아이콘",
+    "왼쪽 메뉴를 '매일 쓰는 / 살펴보기 / 도움' 세 묶음으로",
+    "전시실 방을 같은 틀로 — 아이콘 · 이름 · 숫자 한 줄, 오른쪽 위 › 표시",
+    "라이트 · 블랙 바로 바꾸기 — 왼쪽 메뉴 아래, 홈 위 달 · 해 버튼" ] },
+  { v:"36.0", d:"2026-11-12", items:[
+    "새 디자인 — 아이보리 갤러리 + 와인 조명 (밝은 화면이 기본, 다크는 '전시실'로 그대로)",
+    "글꼴 — 카페24 쑥쑥 (본문은 Light, 제목 · 버튼 · 이름은 Regular)",
+    "홈 '오늘의 전시'를 조명 받는 어두운 액자로, 전시실 방 · 관리 서랍에 아이콘",
+    "둥근 카드 · 부드러운 그림자 · 폰 아래 탭을 떠 있는 둥근 막대로",
+    "넓은 화면에서 셀모임 · 영혼 · 명부 목록을 더 여러 칸으로" ] },
+  { v:"35.1", d:"2026-11-12", items:[
+    "인턴 · 후보를 진장 · 코치 · 소유자도 정해요 — 인턴 화면 [인턴 · 후보 정하기], 명부 카드에서 바로",
+    "인턴 후보는 셀마다 잠긴 칸에 (셀리더 · 그 셀 코치 · 진장 · 소유자만, 본인은 못 봄)",
+    "카드마다 직분 표시 — 진장 · 코치 · 셀리더 · 인턴 · 후보, 명부 맨 위에 '섬기는 분들'(진장 · 코치)",
+    "조직도 — 진마다 '통합 / 코치별' 고르기 (진장 · 소유자)",
+    "초대 안내 메일 기본값 — 매번 묻기 · 항상 쓰기 · 등록만" ] },
   { v:"35.0", d:"2026-11-12", items:[
     "인턴(공식 리더 후보)과 인턴 후보(비공식 — 셀리더 · 코치 · 진장만 봐요, 본인에게는 안 보여요)를 나눠서 표시",
     "인턴 · 후보 화면 — 셀별 그림, 명단(기간 · 출석 · 수료), 통계",
@@ -6005,6 +6059,7 @@ async function openDir() {
   $("btn-dir-new").hidden = !canRegister();
   $("btn-dir-cellmgr").hidden = !isManager();
   renderDir(); show("s-dir");
+  loadPipe().then(() => { if (!$("s-dir").hidden) renderDir(); }).catch(() => {});
 }
 const dirCellsShown = () => state.me.role === "super" ? activeCells() : activeCells().filter(c => c.jinId === state.me.jinId);
 function dirPool() {
@@ -6087,21 +6142,26 @@ function renderDir() {
       const single = state.dirCell !== "all";   // 셀 하나만 볼 땐 셀리더도 같은 크기 카드로 한 판에
       return `<section class="cgrp">
         <div class="cgh"><span class="cbadge">${esc(c.name)}</span>
-          <span class="cgm">${esc(jinName(c))}</span>${myCellIds.has(c.id) ? `<button type="button" class="btn-sm" data-ordcell="${c.id}" style="height:30px;font-size:12px;padding:0 10px">순서 · 인턴</button>` : ""}<span class="cgc" data-cellatt="${c.id}">셀원 ${ms.length}명</span></div>
+          <span class="cgm">${esc(jinName(c))}</span>${myCellIds.has(c.id) ? `<button type="button" class="btn-sm" data-ordcell="${c.id}" style="height:30px;font-size:12px;padding:0 10px;white-space:nowrap;flex:none">순서 · 인턴</button>` : ""}<span class="cgc" data-cellatt="${c.id}">셀원 ${ms.length}명</span></div>
         ${single ? `<div class="mgrid one">${leadH}${ms.map(m => card(m, { rank: true })).join("")}</div>`
           : `${leadH}${ms.length ? `<div class="twigs">${ms.map(m => card(m, { twig: true, rank: true })).join("")}</div>`
           : `<p class="muted twig-empty">아직 등록된 셀원이 없어요.</p>`}`}
       </section>`;
     });
-    if (none.length) secs.push(`<section class="cgrp">
-        <div class="cgh"><span class="cbadge plain">셀 없음</span><span class="cgm">진장 · 코치 등</span><span class="cgc">${none.length}명</span></div>
-        <div class="mlist">${none.map(m => card(m, {})).join("")}</div></section>`);
+    const serve = state.dirCell === "all" && !kw ? serveList() : [];
+    const serveIds = new Set(serve.map(x => x.m && x.m.id).filter(Boolean));
+    const none2 = none.filter(m => !serveIds.has(m.id));
+    if (none2.length) secs.push(`<section class="cgrp">
+        <div class="cgh"><span class="cbadge plain">셀 없음</span><span class="cgm">교역자 · 새로 온 분 등</span><span class="cgc">${none2.length}명</span></div>
+        <div class="mlist">${none2.map(m => card(m, {})).join("")}</div></section>`);
+    state.dirServeHTML = serve.length ? `<section class="serve-band"><div class="sb-h">${SV_ICON}<b>섬기는 분들</b><span>진장 · 코치</span></div>
+        <div class="sb-grid">${serve.map(x => x.m ? card(x.m, { roles: x.roles }) : serveGhost(x)).join("")}</div></section>` : "";
     /* 화면 넓이에 맞춰 1 · 2 · 3줄 — 번호가 왼→오로 읽히게 차례로 나눠 담아요 */
     const n = secs.length <= 1 ? 1 : dirCols();
     state.dirColsNow = n;
     const cols = Array.from({ length: n }, () => []);
     secs.forEach((h, i) => cols[i % n].push(h.replace('<section class="cgrp">', `<section class="cgrp" style="order:${i}">`)));
-    $("dir-list").innerHTML = `<div class="ctree${n === 1 && secs.length <= 1 ? " one" : ""}" style="--cols:${n}">${cols.map(c => `<div class="ccol">${c.join("")}</div>`).join("")}</div>`;
+    $("dir-list").innerHTML = (state.dirServeHTML || "") + `<div class="ctree${n === 1 && secs.length <= 1 ? " one" : ""}" style="--cols:${n}">${cols.map(c => `<div class="ccol">${c.join("")}</div>`).join("")}</div>`;
   } else {
     state.dirColsNow = 0;
     $("dir-list").innerHTML = list.length ? `<div class="mgrid">${list.map(m => card(m, { showCell: true })).join("")}</div>`
@@ -6140,8 +6200,11 @@ function openMember(id) {
   $("mb-ava").style.backgroundImage = m.thumb ? `url(${m.thumb})` : "";
   $("mb-ava").textContent = m.thumb ? "" : initial(m.name);
   $("mb-name").textContent = m.name || "";
+  const rl = seatRolesOf(m, cellLeadEntries(state.cells.find(c => c.id === m.cellId) || {}).some(e => e.m && e.m.id === m.id));
+  const tr = tierOfMember(m);
   $("mb-chips").innerHTML = [
-    `<span class="chip ${m.role && m.role !== "member" ? "rose" : ""}">${esc(ROLEBADGE[m.role] || "셀원")}</span>`,
+    ...(rl.length ? rl.map(r => `<span class="chip role-${ROLE_CLS[r] || "x"}">${esc(r)}</span>`) : [`<span class="chip">셀원</span>`]),
+    tr === "intern" ? `<span class="chip intern">인턴</span>` : tr === "cand" ? `<span class="chip cand">인턴 후보 (비공식)</span>` : "",
     m.cellId ? `<span class="chip">${esc(cellNameOf(m.cellId))}</span>` : "",
     mine ? `<span class="chip rose">나</span>` : "",
     pendingInvite(m) ? `<span class="chip warn">초대 중</span>` : "",
@@ -6163,6 +6226,7 @@ function openMember(id) {
     : `<p class="muted">아직 적힌 기본 사항이 없어요.</p>`);
   showMbAtt(m);
   showPriv(m);
+  renderMbTier(m, rl.includes("셀리더"));
   const sv = !mine && soulOfMember(m);
   $("mb-note").textContent = mine
     ? "진장 · 코치가 나를 위해 적는 목양 카드는 나에게 보이지 않아요. 여기는 교회 명부에 보이는 내 기본 사항이에요."
@@ -7030,7 +7094,7 @@ function openSeat(S) {
   $("sx-del").hidden = !(e && (e.t === "inv" || e.t === "noe"));
   $("sx-err").textContent = "";
   syncSeatPick();
-  dlgSt.showModal();
+  applyInvMail(); dlgSt.showModal();
 }
 function syncSeatPick() {
   const v = $("sx-pick").value, S = state.seat;
@@ -8388,7 +8452,7 @@ async function openLeaders() {
   if (!state.orgAt) show("s-loading");
   await orgOpen(() => { if (!$("s-leaders").hidden && !leaderEdits().length && $("btn-ld-run").disabled !== true) renderLeaders(); });
   $("ld-err").textContent = ""; $("ld-log").textContent = "";
-  renderLeaders(); show("s-leaders");
+  renderLeaders(); applyInvMail(); syncLeadersBtn(); show("s-leaders");
 }
 function renderLeaders() {
   const st = leaderSeatStats();
@@ -8438,7 +8502,7 @@ function leaderEdits() {
 function syncLeadersBtn() {
   const ed = leaderEdits(), inv = ed.filter(e => e.email).length, only = ed.length - inv;
   $("btn-ld-run").hidden = !ed.length;
-  const mo = $("ld-mail") && $("ld-mail").closest(".mailopt"); if (mo) mo.hidden = !inv;   /* 이메일을 넣었을 때만 고르기 */
+  const mo = $("ld-mail") && $("ld-mail").closest(".mailopt"); if (mo) mo.hidden = !inv || invMailPref() === "none";   /* 이메일을 넣었을 때만 고르기 */
   $("btn-ld-run").textContent = inv ? `초대 보내기 (${inv}명)${only ? ` · 이름만 ${only}` : ""}` : `이름만 넣기 (${only})`;
 }
 $("ld-list").addEventListener("input", () => syncLeadersBtn());
@@ -8559,11 +8623,12 @@ function memCardHTML(m, o) {
     if (e.p.sub) chips.push(`<span class="chip">${esc(e.p.sub)}</span>`);
   }
   if (m.uid === me.id) chips.push(`<span class="chip rose">나</span>`);
-  if (m.intern && !lead) chips.push(`<span class="chip intern">인턴</span>`);
-  else if (!lead) { const sv = soulOfMember(m); if (sv && !isLeaderCard(sv) && sv.cand) chips.push(`<span class="chip cand" title="비공식 — 셀리더 · 코치 · 진장만 봐요">후보</span>`); }
+  const tier = lead ? "" : tierOfMember(m);
+  if (tier === "intern") chips.push(`<span class="chip intern">인턴</span>`);
+  else if (tier === "cand") chips.push(`<span class="chip cand" title="비공식 — 셀리더 · 코치 · 진장만 봐요">후보</span>`);
   if (!e && pendingInvite(m)) chips.push(`<span class="chip warn">초대 중</span>`);
   if (handPendingFor(m)) chips.push(`<span class="chip warn">카드 넘어가는 중</span>`);
-  const role = lead ? "셀리더" : (m.role && m.role !== "member" ? (ROLEBADGE[m.role] || "") : "");
+  const role = (o.roles || seatRolesOf(m, lead)).join(" · ");
   const bd = mdText(m.birthMD, m.lunar);
   const yr = canSeePriv(m) && !!m.notionAt;
   const slot = (cls, k, v, attr) => `<div class="mi ${cls}"${attr || ""} title="${k}">${cls in MI_ICON ? MI_ICON[cls] : `<span class="mk">${k}</span>`}<span class="mv">${v ? esc(v) : "<em>—</em>"}</span>${cls === "yr" ? `<span class="mk">년생</span>` : ""}</div>`;
@@ -8852,13 +8917,29 @@ $("ph-body").addEventListener("click", (ev) => {
 });
 
 /* ════════ 27단계 — 화면 밝기 (다크 · 라이트 · 기기 설정) ════════ */
-function themePref() { try { return localStorage.getItem("mokja-theme") || "dark"; } catch { return "dark"; } }
+function themePref() { try { return localStorage.getItem("mokja-theme") || "light"; } catch { return "light"; } }
 function applyTheme(pref) {
   const t = pref === "system" ? (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark") : pref;
   document.documentElement.dataset.theme = t;
-  const m = document.querySelector('meta[name="theme-color"]'); if (m) m.content = t === "light" ? "#F5F3F2" : "#0F0F0F";
+  const m = document.querySelector('meta[name="theme-color"]'); if (m) m.content = t === "light" ? "#F6F1EA" : "#0F0D0C";
   document.querySelectorAll("#more-theme [data-theme]").forEach(b => b.classList.toggle("on", b.dataset.theme === pref));
+  syncThemeBtns();
 }
+/* 36.1 — 라이트 · 블랙 바로 바꾸기 (사이드바 아래 · 홈 위 달/해 버튼) */
+function setThemePref(t) {
+  try { localStorage.setItem("mokja-theme", t); } catch {}
+  applyTheme(t); syncThemeBtns(); bump("themeChange");
+}
+function syncThemeBtns() {
+  const cur = document.documentElement.dataset.theme;
+  document.querySelectorAll("[data-settheme]").forEach(b => b.classList.toggle("on", b.dataset.settheme === cur));
+}
+document.addEventListener("click", (ev) => {
+  const b = ev.target.closest("[data-settheme]");
+  if (b) return setThemePref(b.dataset.settheme);
+  if (ev.target.closest("#btn-theme")) setThemePref(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+});
+syncThemeBtns();
 $("more-theme").addEventListener("click", (ev) => {
   const b = ev.target.closest("[data-theme]"); if (!b) return;
   try { localStorage.setItem("mokja-theme", b.dataset.theme); } catch {}
@@ -9404,8 +9485,8 @@ async function syncRankToDir(souls) {
   const ws = [];
   for (const s of souls) {
     const m = s.memberId ? memberById(s.memberId) : null; if (!m || m.uid) continue;
-    const want = { rank: s.seq || 0, intern: !!s.intern, internSince: s.intern ? (s.internSince || "") : "" };
-    if ((m.rank || 0) !== want.rank || !!m.intern !== want.intern || (m.internSince || "") !== want.internSince)
+    const want = { rank: s.seq || 0 };
+    if ((m.rank || 0) !== want.rank)
       ws.push(updateDoc(doc(db, "members", m.id), want).then(() => Object.assign(m, want)).catch(e => console.warn("명부 순서", m.name, e)));
   }
   await Promise.all(ws);
@@ -9579,10 +9660,12 @@ function renderOrgChart() {
     const groups = co.map(p => { const ids = cellIdsOf(p).filter(id => cells.some(c => c.id === id)); ids.forEach(id => used.add(id));
       return { p, cells: cells.filter(c => ids.includes(c.id)) }; });
     const rest = cells.filter(c => !used.has(c.id));
+    const mode = j.ocMode || "coach", flat = mode === "flat";
+    const canMode = sup || (me.role === "jinjang" && me.jinId === j.id);
     const jjHTML = jj.length ? jj.map(p => ocPerson(p, "진장", "oc-jj")).join("")
       : `<div class="oc-node empty">진장 자리 비어 있음${sup ? " — '자리 고치기'에서" : ""}</div>`;
     /* 진장 옆 — 보좌하는 코치 */
-    const aide = co.length ? co.map((p, i) => ocPerson({ ...p, sub: groups[i].cells.length ? `담당 셀 ${groups[i].cells.length}개` : "담당 셀 미정" }, "코치", "oc-coach")).join("")
+    const aide = co.length ? co.map((p, i) => ocPerson({ ...p, sub: flat ? "진장 보좌" : groups[i].cells.length ? `담당 셀 ${groups[i].cells.length}개` : "담당 셀 미정" }, "코치", "oc-coach")).join("")
       : `<button type="button" class="oc-node oc-coach none"${sup ? ` data-ocaddcoach="1"` : ""}><span class="t"><span class="r">코치</span>
           <span class="n" style="display:block;color:var(--dim)">코치 자리 비어 있음</span>
           <span class="s" style="display:block">${sup ? "눌러서 조직 구성 → ＋ 코치" : "진장님이 바로 셀을 돌봐요"}</span></span></button>`;
@@ -9592,7 +9675,7 @@ function renderOrgChart() {
       </div>`;
     /* 진장 → 코치 → 셀 */
     let lower;
-    if (groups.length) {
+    if (groups.length && !flat) {
       const head = (p, n) => `<div class="oc-gh"><span class="oc-dot coach"></span><b>${esc(p.name || "")}</b> 코치 담당 <span>${n}개 셀</span></div>`;
       const cols = groups.map(g => `<div class="oc-col">${head(g.p, g.cells.length)}
           ${g.cells.length ? `<div class="oc-cells${gridCls(g.cells.length)}">${g.cells.map(ocCell).join("")}</div>` : `<div class="oc-node empty" style="min-width:200px">아직 맡은 셀이 없어요</div>`}</div>`);
@@ -9600,12 +9683,13 @@ function renderOrgChart() {
           <div class="oc-cells${gridCls(rest.length)}">${rest.map(ocCell).join("")}</div></div>`);
       lower = `<div class="oc-v"></div><div class="oc-scroll"><div class="oc-cols">${cols.join("")}</div></div>`;
     } else {
-      lower = `<div class="oc-v"></div>${cells.length ? `<div class="oc-band"><span class="oc-band-l">셀 ${cells.length}개 · 진장 직접</span>
+      lower = `<div class="oc-v"></div>${cells.length ? `<div class="oc-band"><span class="oc-band-l">셀 ${cells.length}개 · ${flat && co.length ? "통합 운영" : "진장 직접"}</span>
           <div class="oc-grid">${cells.map(ocCell).join("")}</div></div>` : `<div class="oc-node empty">아직 셀이 없어요</div>`}`;
     }
     return `<div class="oc-jinwrap">
       <div class="oc-node oc-jin"><span class="t"><span class="r">진</span><span class="n" style="display:block">${esc(j.name)}</span>
         <span class="s" style="display:block">셀 ${cells.length}개 · ${people}명${co.length ? ` · 코치 ${co.length}명` : ""}</span></span></div>
+      ${canMode ? `<div class="seg mini oc-mode" role="group" aria-label="${esc(j.name)} 셀 나누기">${[["flat", "통합"], ["coach", "코치별"]].map(([k, l]) => `<button type="button" data-ocmode="${k}" data-jin="${j.id}" class="${mode === k ? "on" : ""}">${l}</button>`).join("")}</div>` : ""}
       <div class="oc-v"></div>${lead}${lower}</div>`;
   }).join("");
   $("oc-body").innerHTML = `<div class="oc">
@@ -9618,6 +9702,14 @@ $("btn-home-orgchart").onclick = () => openOrgChart();
 $("oc-body").addEventListener("click", (ev) => {
   const p = ev.target.closest("[data-ocmem]"); if (p) { openMember(p.dataset.ocmem); return; }
   if (ev.target.closest("[data-ocaddcoach]")) { openOrg(); return; }
+  const mo = ev.target.closest("[data-ocmode]");
+  if (mo) {
+    const j = state.jins.find(x => x.id === mo.dataset.jin); if (!j || (j.ocMode || "coach") === mo.dataset.ocmode) return;
+    j.ocMode = mo.dataset.ocmode; renderOrgChart();
+    updateDoc(doc(db, "jins", j.id), { ocMode: j.ocMode }).then(() => toast(j.ocMode === "flat" ? "통합으로 보여요 (코치는 진장 보좌로)" : "코치별로 나눠 보여요"))
+      .catch(e => toast(msgOf(e)));
+    return;
+  }
   const c = ev.target.closest("[data-occell]");
   if (c) { state.dirCell = c.dataset.occell; state.dirView = "list"; state.dirRole = "all"; openDir(); }
 });
@@ -10181,6 +10273,7 @@ async function openInterns() {
   if (!state.orgAt) show("s-loading");
   await loadOrg();
   if (canLead() || ["coach", "jinjang"].includes(state.me.role)) await loadSouls();
+  await loadPipe();
   renderInterns(); markSide("interns"); show("s-interns");
   loadAttReps().then(() => { if (!$("s-interns").hidden) renderInterns(); }).catch(() => {});
 }
@@ -10194,9 +10287,9 @@ function internData() {
   dir.forEach(m => {
     if (lead.has(m.id)) return;
     let sv = soulOfMember(m); if (sv && isLeaderCard(sv)) sv = null; if (sv) seenSoul.add(sv.id);
-    const intern = !!m.intern || !!(sv && sv.intern), cand = !intern && !!(sv && sv.cand);
-    if (intern || cand) P.push({ key: m.id, name: m.name, cellId: m.cellId, m, s: sv, tier: intern ? "intern" : "cand",
-      since: intern ? ((sv && sv.internSince) || m.internSince || "") : ((sv && sv.candSince) || "") });
+    const t = tierOfMember(m);
+    if (t) P.push({ key: m.id, name: m.name, cellId: m.cellId, m, s: sv, tier: t,
+      since: t === "intern" ? (m.internSince || (sv && sv.internSince) || "") : (String(candOf(m)).length === 10 ? candOf(m) : "") });
   });
   (state.souls || []).forEach(sv => {
     if (seenSoul.has(sv.id) || isLeaderCard(sv) || !ids.has(sv.cellId) || sv.active === false) return;
@@ -10215,7 +10308,7 @@ function internData() {
 function renderInterns() {
   const D = internData(), V = state.itv, me = state.me;
   const I = D.P.filter(x => x.tier === "intern"), C = D.P.filter(x => x.tier === "cand");
-  const seesCand = canLead() || ["coach", "jinjang"].includes(me.role);
+  const seesCand = D.cells.some(c => canPipe(c.id));
   const avg = (a) => a.length ? a.reduce((n, v) => n + v, 0) / a.length : null;
   const moAvg = avg(I.map(x => x.mo).filter(v => v !== null)), rAvg = avg(I.map(x => x.rate).filter(v => v !== null));
   const withI = D.rows.filter(r => r.it.length).length, need = D.rows.filter(r => r.tag && r.tag[1] === "인턴을 세울 때").length;
@@ -10263,7 +10356,7 @@ function renderInterns() {
         </div>
         ${V.tab === "cand" ? `<p class="it-note">${HIC.lock.replace("<svg", '<svg width="15" height="15"')}비공식 — 셀리더 · 그 셀 코치 · 진장만 봐요. 본인과 같은 진의 다른 분에게는 보이지 않고, 명부에도 나오지 않아요.</p>` : ""}
         <div class="it-cards">${list.map(card).join("") || `<p class="muted" style="padding:10px 2px">${V.tab === "cand" ? "아직 인턴 후보가 없어요." : "아직 공식 인턴이 없어요."}</p>`}</div>
-        ${canLead() ? `<div class="acts" style="margin-top:12px"><button type="button" class="btn-sm" id="it-order">우리 셀 인턴 · 후보 정하기</button></div>` : ""}
+        ${seesCand ? `<div class="acts" style="margin-top:12px"><button type="button" class="btn-sm" id="it-order">${TIER_ICON}인턴 · 후보 정하기</button></div>` : ""}
       </div>
     </div>`;
 }
@@ -10272,7 +10365,7 @@ $("it-body").addEventListener("click", (ev) => {
   const t = ev.target.closest("[data-itt]"); if (t) { state.itv.tab = t.dataset.itt; renderInterns(); return; }
   const m = ev.target.closest("[data-itmem]"); if (m) { openMember(m.dataset.itmem); return; }
   const so = ev.target.closest("[data-itsoul]"); if (so) { openSoul(so.dataset.itsoul); return; }
-  if (ev.target.closest("#it-order")) openOrderDlg(null, () => renderInterns());
+  if (ev.target.closest("#it-order")) openTierDlg(null, () => renderInterns());
 });
 $("it-body").addEventListener("change", (ev) => { if (ev.target.id === "it-sort") { state.itv.sort = ev.target.value; renderInterns(); } });
 
@@ -10283,3 +10376,187 @@ function internCount() {
   (state.souls || []).forEach(sv => { if (sv.intern && !isLeaderCard(sv) && ids.has(sv.cellId)) fromDir.add(sv.memberId || "s" + sv.id); });
   return fromDir.size;
 }
+
+
+/* ════════ 35.1단계 — 인턴 후보는 셀마다 잠긴 칸 · 누구나(맡은 분) 정하기 ════════ */
+const TIER_ICON = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;vertical-align:-2px"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.5 9.7l5.9-.9z"/></svg>`;
+const SV_ICON = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.6-7 10-7 10z"/></svg>`;
+const ROLE_CLS = { "진장": "jj", "코치": "co", "셀리더": "ld", "교역자": "ps" };
+async function loadPipe(force) {
+  const me = state.me; if (!me) return {};
+  if (state.pipe && !force && Date.now() - (state.pipeAt || 0) < ORG_TTL) return state.pipe;
+  if (state.pipeP) return state.pipeP;
+  state.pipeP = (async () => {
+    const out = {};
+    try {
+      if (me.role === "super") (await getDocs(collection(db, "cellPipe"))).docs.forEach(d => { out[d.id] = d.data(); });
+      else if (me.role === "jinjang" && me.jinId) (await getDocs(query(collection(db, "cellPipe"), where("jinId", "==", me.jinId)))).docs.forEach(d => { out[d.id] = d.data(); });
+      else {
+        const ids = new Set([...(me.role === "coach" ? (me.cellIds || []) : []), ...(canLead() && me.cellId ? [me.cellId] : [])]);
+        await Promise.all([...ids].map(async id => { try { const d = await getDoc(doc(db, "cellPipe", id)); if (d.exists()) out[id] = d.data(); } catch {} }));
+      }
+    } catch (e) { console.warn("인턴 후보", e); }
+    state.pipe = out; state.pipeAt = Date.now(); state.pipeP = null;
+    migrateCand().catch(() => {});
+    return out;
+  })();
+  return state.pipeP;
+}
+/* 35.0에서 목양 카드에 적었던 '후보'를 셀별 잠긴 칸으로 옮겨요 (명부와 이어진 분만, 내 카드만) */
+async function migrateCand() {
+  if (!canLead()) return;
+  for (const sv of (state.souls || []).filter(x => x.cand && x.memberId && x.leaderUid === uid() && !isLeaderCard(x))) {
+    const m = memberById(sv.memberId); if (!m || !m.cellId || !canPipe(m.cellId)) continue;
+    const P = state.pipe[m.cellId] || { jinId: (state.cells.find(c => c.id === m.cellId) || {}).jinId, cand: {} };
+    if (!(P.cand || {})[m.id]) {
+      const cand = { ...(P.cand || {}), [m.id]: sv.candSince || todayStr() };
+      await setDoc(doc(db, "cellPipe", m.cellId), { jinId: P.jinId, cand, by: uid(), at: todayStr() });
+      state.pipe[m.cellId] = { ...P, cand };
+    }
+    await updateDoc(doc(db, "souls", sv.id), { cand: false, candSince: "" }); sv.cand = false; sv.candSince = "";
+  }
+}
+function canPipe(cellId) {
+  const me = state.me; if (!me || !cellId) return false;
+  const c = state.cells.find(x => x.id === cellId); if (!c) return false;
+  return me.role === "super" || (c.jinId === me.jinId && (me.role === "jinjang" || (me.role === "coach" && (me.cellIds || []).includes(cellId)) || (canLead() && me.cellId === cellId)));
+}
+function candOf(m) {
+  const P = state.pipe && state.pipe[m.cellId], v = P && P.cand && P.cand[m.id];
+  if (v) return v;
+  const sv = soulOfMember(m); return sv && !isLeaderCard(sv) && sv.cand ? (sv.candSince || "1") : "";
+}
+function tierOfMember(m) { return m.intern ? "intern" : candOf(m) ? "cand" : ""; }
+function tierOfSoul(s) {
+  const m = s.memberId ? memberById(s.memberId) : null;
+  if (m && m.cellId) return tierOfMember(m);
+  return s.intern ? "intern" : s.cand ? "cand" : "";
+}
+async function setTier(m, t) {
+  const today = todayStr(); if (tierOfMember(m) === t) return;
+  const iv = t === "intern", cv = t === "cand";
+  if (!!m.intern !== iv) {
+    const p = { intern: iv, internSince: iv ? (m.internSince || today) : "", updatedAt: serverTimestamp() };
+    await updateDoc(doc(db, "members", m.id), p); m.intern = iv; m.internSince = p.internSince;
+  }
+  state.pipe = state.pipe || {};
+  const P = state.pipe[m.cellId] || { jinId: (state.cells.find(c => c.id === m.cellId) || {}).jinId, cand: {} };
+  if (!!(P.cand || {})[m.id] !== cv) {
+    const cand = { ...(P.cand || {}) }; if (cv) cand[m.id] = today; else delete cand[m.id];
+    await setDoc(doc(db, "cellPipe", m.cellId), { jinId: P.jinId, cand, by: uid(), at: today });
+    state.pipe[m.cellId] = { ...P, cand };
+  }
+  const sv = soulOfMember(m);
+  if (sv && sv.leaderUid === uid() && !isLeaderCard(sv)) {
+    const p = {};
+    if (sv.cand) { p.cand = false; p.candSince = ""; }
+    if (!!sv.intern !== iv) { p.intern = iv; p.internSince = iv ? (sv.internSince || today) : ""; }
+    if (Object.keys(p).length) { try { await updateDoc(doc(db, "souls", sv.id), p); Object.assign(sv, p); } catch {} }
+  }
+}
+/* 직분 — 진장 · 코치 · 셀리더 (가입 전 자리 · 초대 중도) */
+function seatRolesOf(m, lead) {
+  const r = [], add = (x) => { if (!r.includes(x)) r.push(x); };
+  const u = m.uid ? userOf(m.uid) : null;
+  const iv = (state.invites || []).find(i => i.status === "pending" && i.memberId === m.id);
+  const ps = m.pendingSeat && m.pendingSeat.role;
+  const roles = [u && u.role, ps, iv && iv.role, m.role].filter(Boolean);
+  if (roles.includes("jinjang")) add("진장");
+  if (roles.includes("coach") || roles.includes("coachleader")) add("코치");
+  if (roles.includes("pastor")) add("교역자");
+  if (lead) add("셀리더");
+  return r;
+}
+/* 명부 맨 위 — 섬기는 분들 (진장 · 코치) */
+function serveList() {
+  const me = state.me, out = [], seen = new Set();
+  const jins = state.jins.filter(j => j.active !== false && (me.role === "super" || j.id === me.jinId));
+  const mOf = (p) => p.t === "acc" ? memberOfUid(p.uid) : p.t === "noe" ? p.m : (p.inv && p.inv.memberId ? memberById(p.inv.memberId) : null);
+  jins.forEach(j => [["jinjang", "진장"], ["coach", "코치"]].forEach(([k, label]) => seatList(k, j.id).forEach(p => {
+    const m = mOf(p), key = m ? m.id : p.name + k;
+    if (seen.has(key)) { const x = out.find(o => (o.m ? o.m.id : o.name + o.k) === key); if (x && !x.roles.includes(label)) x.roles.push(label); return; }
+    seen.add(key);
+    const roles = [label]; if (m && cellLeadEntries(state.cells.find(c => c.id === m.cellId) || {}).some(e => e.m && e.m.id === m.id)) roles.push("셀리더");
+    out.push({ m, p, k, name: p.name, roles });
+  })));
+  return out;
+}
+function serveGhost(x) {
+  const st = x.p.t === "inv" ? `<span class="chip warn">초대 중</span>` : `<span class="chip lock">가입 전</span>`;
+  return `<div class="mcard lead"><span class="ava" style="width:48px;height:48px;font-size:18px">${esc(initial(x.name || "?"))}</span>
+    <div class="mc-body"><p class="mc-role">${esc(x.roles.join(" · "))} ${st}</p><p class="mc-nm">${esc(x.name || "")}</p>
+    <p class="muted" style="font-size:12px;margin-top:4px">명부 카드가 아직 없어요</p></div></div>`;
+}
+/* 명부 카드 창 — 인턴 구분 (맡은 분만) */
+function renderMbTier(m, isLead) {
+  const box = $("mb-tier"); if (!box) return;
+  if (isLead || !m.cellId || !canPipe(m.cellId) || m.uid === uid() || (m.role && !["member", ""].includes(m.role))) { box.innerHTML = ""; return; }
+  const t = tierOfMember(m);
+  box.innerHTML = `<div class="mb-tier"><span class="k">${TIER_ICON}리더 후보</span>
+    <div class="seg mini" role="group" aria-label="인턴 구분">${[["", "일반"], ["cand", "후보 (비공식)"], ["intern", "인턴 (공식)"]].map(([k, l]) =>
+      `<button type="button" data-mbtier="${k}" class="${t === k ? "on" : ""}">${l}</button>`).join("")}</div>
+    <p class="hint">후보는 셀리더 · 그 셀 코치 · 진장 · 소유자만 봐요. 인턴은 명부에도 보여요.</p></div>`;
+}
+document.addEventListener("click", async (ev) => {
+  const b = ev.target.closest("[data-mbtier]"); if (!b || !state.mb) return;
+  const m = state.mb; b.closest(".seg").querySelectorAll("button").forEach(x => x.disabled = true);
+  try { await setTier(m, b.dataset.mbtier); toast(b.dataset.mbtier === "intern" ? "인턴으로 정했어요." : b.dataset.mbtier === "cand" ? "후보로 적어 두었어요 (비공식)." : "일반으로 바꿨어요."); openMember(m.id);
+    if (!$("s-dir").hidden) renderDir(); if (!$("s-interns").hidden) renderInterns(); }
+  catch (e) { $("mb-err").textContent = msgOf(e); b.closest(".seg").querySelectorAll("button").forEach(x => x.disabled = false); }
+});
+/* 인턴 · 후보 정하기 창 — 셀을 골라 한 번에 */
+let tierDraft = {}, tierAfter = null;
+function openTierDlg(cellId, after) {
+  const cells = activeCells().filter(c => canPipe(c.id));
+  if (!cells.length) { toast("인턴 · 후보는 셀리더 · 코치 · 진장 · 소유자가 정해요."); return; }
+  state.tierCell = cellId && cells.some(c => c.id === cellId) ? cellId : (state.tierCell && cells.some(c => c.id === state.tierCell) ? state.tierCell : (cells.find(c => c.id === state.me.cellId) || cells[0]).id);
+  tierAfter = after || null; tierDraft = {}; $("tr-err").textContent = "";
+  renderTierDlg(); $("dlg-tier").showModal();
+}
+function tierPeople(cellId) {
+  const c = state.cells.find(x => x.id === cellId) || {};
+  const lids = new Set(cellLeadEntries(c).map(e => e.m && e.m.id).filter(Boolean));
+  return (state.dir || []).filter(m => m.cellId === cellId && m.active !== false && !lids.has(m.id) && m.uid !== uid())
+    .sort((a, b) => (a.rank || 99) - (b.rank || 99) || (a.name || "").localeCompare(b.name || "", "ko"));
+}
+function renderTierDlg() {
+  const cells = activeCells().filter(c => canPipe(c.id)), ps = tierPeople(state.tierCell);
+  $("tr-cells").innerHTML = cells.map(c => `<button type="button" data-trcell="${c.id}" class="${c.id === state.tierCell ? "on" : ""}">${esc(c.name)}</button>`).join("");
+  $("tr-list").innerHTML = ps.map(m => { const t = m.id in tierDraft ? tierDraft[m.id] : tierOfMember(m);
+    return `<div class="tr-row">${avatar(m, 34)}<span class="who">${esc(m.name || "")}</span>
+      <span class="tier"><button type="button" class="cand${t === "cand" ? " on" : ""}" data-trm="${m.id}" data-trt="cand">후보</button>
+      <button type="button" class="int${t === "intern" ? " on" : ""}" data-trm="${m.id}" data-trt="intern">인턴</button></span></div>`; }).join("")
+    || `<p class="muted">이 셀에 정할 셀원이 없어요.</p>`;
+  const n = Object.keys(tierDraft).length; $("tr-save").textContent = n ? `저장 (${n}명)` : "저장"; $("tr-save").disabled = !n;
+}
+$("tr-cells").addEventListener("click", (ev) => { const b = ev.target.closest("[data-trcell]"); if (!b) return;
+  if (Object.keys(tierDraft).length && !confirm("저장하지 않은 것이 있어요. 다른 셀로 옮길까요?")) return;
+  state.tierCell = b.dataset.trcell; tierDraft = {}; renderTierDlg(); });
+$("tr-list").addEventListener("click", (ev) => { const b = ev.target.closest("[data-trm]"); if (!b) return;
+  const m = memberById(b.dataset.trm); const cur = b.dataset.trm in tierDraft ? tierDraft[b.dataset.trm] : tierOfMember(m);
+  const nv = cur === b.dataset.trt ? "" : b.dataset.trt;
+  if (nv === tierOfMember(m)) delete tierDraft[b.dataset.trm]; else tierDraft[b.dataset.trm] = nv;
+  renderTierDlg(); });
+$("tr-cancel").onclick = () => $("dlg-tier").close();
+$("tr-save").onclick = async () => {
+  $("tr-save").disabled = true; $("tr-err").textContent = "";
+  try {
+    for (const [id, t] of Object.entries(tierDraft)) { const m = memberById(id); if (m) await setTier(m, t); }
+    tierDraft = {}; $("dlg-tier").close(); toast("저장했어요."); if (tierAfter) tierAfter();
+  } catch (e) { $("tr-err").textContent = msgOf(e); $("tr-save").disabled = false; }
+};
+
+/* ════════ 35.1단계 — 초대 안내 메일 기본값 (이 기기) ════════
+   ask: 매번 체크칸으로 고르기(꺼진 채) · send: 체크칸이 켜진 채 · none: 등록만 (체크칸 숨김) */
+function invMailPref() { try { return localStorage.getItem("mokja-invmail") || "ask"; } catch { return "ask"; } }
+function applyInvMail() {
+  const v = invMailPref();
+  ["ld-mail", "iv-mail", "sx-mail"].forEach(id => { const el = $(id); if (!el) return; el.checked = v === "send"; const w = el.closest(".mailopt"); if (w) w.dataset.pref = v; if (w && v === "none") w.hidden = true; });
+  document.querySelectorAll("[data-invpref]").forEach(b => b.classList.toggle("on", b.dataset.invpref === v));
+}
+document.addEventListener("click", (ev) => {
+  const b = ev.target.closest("[data-invpref]"); if (!b) return;
+  try { localStorage.setItem("mokja-invmail", b.dataset.invpref); } catch {}
+  applyInvMail(); if (!$("s-leaders").hidden) syncLeadersBtn();
+  toast({ ask: "초대할 때마다 안내 메일을 쓸지 물어요.", send: "초대하면 늘 안내 메일 쓰기 창을 열어요.", none: "초대는 등록만 해요 (메일 안 씀)." }[b.dataset.invpref]);
+});

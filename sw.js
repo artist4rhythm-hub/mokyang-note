@@ -3,7 +3,7 @@
    - Firebase 통신은 절대 캐시하지 않음 (항상 최신 데이터)
    - 파일을 새로 올리면 CACHE 이름을 바꿔 새 버전을 받게 함 */
 
-const CACHE = "mokja-v35";
+const CACHE = "mokja-v36-1";
 const SHELL = [
   "./",
   "./index.html",
@@ -11,8 +11,12 @@ const SHELL = [
   "./manifest.json",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
-  "./icons/apple-touch-icon.png"
+  "./icons/apple-touch-icon.png",
+  "./fonts/Cafe24SsukssukRegular.woff2",
+  "./fonts/Cafe24SsukssukLight.woff2"
 ];
+/* 36단계 — 글꼴은 바뀌지 않으니 한 번 받으면 기기에 둔 것을 바로 씁니다 (1MB 넘는 파일을 매번 묻지 않게) */
+const FONT_CACHE = "mokja-fonts-1";
 
 self.addEventListener("install", (ev) => {
   self.skipWaiting();
@@ -24,7 +28,7 @@ self.addEventListener("install", (ev) => {
 self.addEventListener("activate", (ev) => {
   ev.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(keys => Promise.all(keys.filter(k => k !== CACHE && k !== FONT_CACHE).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
@@ -36,6 +40,14 @@ self.addEventListener("fetch", (ev) => {
   const url = new URL(req.url);
   // 우리 사이트 파일이 아니면 건드리지 않음 (Firebase, 구글 폰트 등)
   if (url.origin !== self.location.origin) return;
+
+  if (url.pathname.includes("/fonts/")) {
+    ev.respondWith(caches.open(FONT_CACHE).then(c => c.match(req).then(hit => hit || fetch(req).then(res => {
+      if (res.ok) c.put(req, res.clone()).catch(() => {});
+      return res;
+    }))));
+    return;
+  }
 
   // 네트워크 우선 — 새로 올린 파일이 바로 반영되게.
   // 브라우저의 HTTP 캐시가 옛 파일을 내주지 않도록 매번 서버에 '바뀌었나' 물어봅니다

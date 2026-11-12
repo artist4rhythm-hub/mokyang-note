@@ -3,16 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0F0F0F">
+<meta name="theme-color" content="#F6F1EA">
 <title>목자의 삶</title>
 <link rel="manifest" href="./manifest.json">
 <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="목자의 삶">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600&family=Noto+Serif+KR:wght@500;600&display=swap" rel="stylesheet">
+<link rel="preload" href="./fonts/Cafe24SsukssukRegular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="./fonts/Cafe24SsukssukLight.woff2" as="font" type="font/woff2" crossorigin>
 <style>
   :root{
     --bg:#0F0F0F; --surface:#191616; --surface2:#221D1E; --line:#2E2727;
@@ -721,6 +720,38 @@
 
 
 
+
+  /* 35.1단계 — 직분 배지 · 섬기는 분들 · 인턴 정하기 · 조직도 설정 · 초대 메일 기본값 */
+  .chip.role-jj{background:var(--rose-bg);color:var(--rose-tx);border:1px solid var(--rose-line)}
+  .chip.role-co{background:rgba(127,168,232,.14);color:#7FA8E8;border:1px solid rgba(127,168,232,.45)}
+  .chip.role-ld{background:var(--lead-bg,var(--rose-bg));color:var(--rose-tx)}
+  .chip.role-ps{background:var(--surface2);color:var(--sub-tx)}
+  .serve-band{background:linear-gradient(135deg,var(--lead-bg,var(--rose-bg)),var(--surface) 65%);border:1px solid var(--rose-line2,var(--line));border-radius:20px;padding:14px 16px;margin-bottom:14px}
+  .sb-h{display:flex;align-items:center;gap:8px;margin-bottom:10px;color:var(--rose-tx)}
+  .sb-h b{color:var(--text);font-size:15px}.sb-h span{font-size:12px;color:var(--dim)}
+  .sb-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px}
+  .sb-grid .mcard{margin:0}
+  .mb-tier{margin-top:14px;padding:12px 14px;border:1px dashed var(--ok-line);border-radius:14px;display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
+  .mb-tier .k{font-size:13px;font-weight:600;color:var(--ok-tx)}
+  .mb-tier .hint{flex-basis:100%;margin:0;font-size:11.5px}
+  .tr-cells{flex-wrap:wrap;margin:0 0 12px;display:flex}
+  .tr-list{display:flex;flex-direction:column;gap:6px;max-height:min(56vh,520px);overflow-y:auto}
+  .tr-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+  .tr-row .who{flex:1;min-width:0;font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tr-row .tier{display:inline-flex;gap:6px}
+  .tr-row .tier button{height:34px;padding:0 12px;border-radius:10px;border:1px solid var(--line);background:none;color:var(--dim);font:inherit;font-size:12.5px;cursor:pointer}
+  .tr-row .tier .cand{border-style:dashed}
+  .tr-row .tier .cand.on{border-color:var(--ok-line);color:var(--ok-tx);font-weight:600}
+  .tr-row .tier .int.on{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok-tx);font-weight:600}
+  .oc-mode{margin-top:8px}
+  .invpref{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:12px 0 4px;font-size:13px;font-weight:600}
+  .invpref small{flex-basis:100%;font-size:11.5px;font-weight:400;color:var(--dim)}
+  .invpref .seg{margin:0}
+  /* 리더 관리 — 넓은 화면은 위 두 칸 나란히 */
+  @media (min-width:1100px){
+    #s-manage .scroll.pad{max-width:1240px}
+    #my-cell-card{max-width:none !important}
+  }
   /* 35단계 — 인턴 · 후보 */
   .chip.cand{background:transparent;color:var(--ok-tx);border:1px dashed var(--ok-line)}
   .ordrow .tier{display:inline-flex;gap:4px;flex-shrink:0}
@@ -1216,15 +1247,220 @@
   #s-more .wide{display:block}
   #s-more .list{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px}
   #s-more .list .row{height:100%;margin:0}
+
+  /* ═══════════ 36단계 — 1안 '아이보리 갤러리 + 와인 조명' · 글꼴 카페24 쑥쑥 ═══════════
+     본문(굵기 400 이하) = 쑥쑥 Light · 제목 · 버튼 · 이름(500 이상) = 쑥쑥 Regular
+     Light에 없는 드문 글자는 Regular로 채워요 (SsukR). 글꼴: 카페24(주) 제공 — SIL OFL 1.1 */
+  @font-face{font-family:"Ssuk";src:url("./fonts/Cafe24SsukssukLight.woff2") format("woff2");font-weight:100 449;font-display:swap}
+  @font-face{font-family:"Ssuk";src:url("./fonts/Cafe24SsukssukRegular.woff2") format("woff2");font-weight:450 900;font-display:swap}
+  @font-face{font-family:"SsukR";src:url("./fonts/Cafe24SsukssukRegular.woff2") format("woff2");font-display:swap}
+  html,body{font-family:"Ssuk","SsukR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;font-synthesis:none;letter-spacing:.005em}
+  .serif{font-family:inherit;font-weight:500}
+  /* 굵은 글씨(b · strong · 제목)는 굵기 700 그대로 두고 Regular 글꼴로 그려요 — 편집기 [굵게] 표시가 맞게 */
+
+  /* 색 — 어두운 '전시실' (다크) */
+  :root{
+    --bg:#0F0D0C; --surface:#181513; --surface2:#211C19; --line:#2B2622;
+    --text:#F3ECE3; --dim:#A99F93; --brand:#E4485F; --action:#C42E47;
+    --rose-bg:#34171D; --rose-tx:#FF93A3; --warn-bg:#231C14; --warn-tx:#E5BE7C;
+    --lock-bg:#211C19; --lock-tx:#BCB1A5; --ok-bg:#16241B; --ok-tx:#86D3A2;
+    --sub-tx:#D2C7BA; --body-tx:#E9E1D7; --ph-tx:#857B70; --faint:#5F574F; --sel-bg:#1E1A17;
+    --ava-bg:#2A231F; --ava-tx:#E9CB94; --bar-bg:#131110; --rose-line:#43232A; --rose-line2:#62303A;
+    --line2:#231F1C; --track:#2E2824; --line3:#3B3430;
+    --lead-bg:#2B181B; --seg-bg:#151210; --seg-on:#2A2420; --toast-bg:#221C19; --toast-line:#45302F;
+    --gold:#D9B77E; --gold-soft:rgba(217,183,126,.13); --spot:#1B1714;
+    --card-shadow:none; --r-card:20px; --r-ctl:14px;
+    --side-a:#1D1916; --side-b:#171411; --side-glow:rgba(228,72,95,.12); --side-hover:rgba(255,255,255,.05);
+  }
+  /* 색 — 밝은 '아이보리 갤러리' (라이트, 기본) */
+  :root[data-theme="light"]{
+    --bg:#F6F1EA; --surface:#FFFDF9; --surface2:#F4EEE6; --line:#EAE2D7;
+    --text:#211C18; --dim:#645B52; --brand:#B8253F; --action:#B8253F;
+    --rose-bg:#F7E4E6; --rose-tx:#A41F37; --warn-bg:#FAF0DF; --warn-tx:#8E6420;
+    --lock-bg:#F3EDE5; --lock-tx:#5E564D; --ok-bg:#E5F1E7; --ok-tx:#2C6B3D;
+    --sub-tx:#4D463F; --body-tx:#2A2420; --ph-tx:#A3998D; --faint:#ACA194; --sel-bg:#FFFDF9;
+    --ava-bg:#F4E5E2; --ava-tx:#A41F37; --bar-bg:#FBF8F3; --rose-line:#EDC9CE; --rose-line2:#E3AAB3;
+    --ok-line:#BCD9C3; --ok-strong:#2E8A55; --warn-line:#EAD5B0; --warn-sub:#5A4526;
+    --line2:#F0EAE1; --track:#ECE5DB; --line3:#DDD3C6;
+    --mark-bg:#F9DDE1; --mark-tx:#7E1428; --toast-bg:#FFFDF9; --toast-line:#E8CFD3;
+    --lead-bg:#F8E8EA; --fam-lock:#FAF6F0; --tpill-bg:#E5F1E7;
+    --alert-bg:#FBEBEC; --alert-line:#EDBAC2; --alert-tx:#A41F37; --alert-div:#F2D3D8;
+    --seg-bg:#EFE8DE; --seg-on:#FFFDF9;
+    --gold:#A57E3A; --gold-soft:#F4EBDA; --spot:#1D1916;
+    --card-shadow:0 1px 2px rgba(60,40,20,.05),0 12px 28px -22px rgba(60,40,20,.32);
+    --side-a:#3D342E; --side-b:#342C27; --side-glow:rgba(228,72,95,.16); --side-hover:rgba(255,255,255,.06);
+  }
+  /* 홈 위 달 · 해 버튼 — 지금 밝기의 반대를 보여줘요 */
+  :root[data-theme="light"] #btn-theme .th-sun{display:none}
+  :root:not([data-theme="light"]) #btn-theme .th-moon{display:none}
+  :root{--c-cell:#D23A52}
+  select option,select optgroup{color:var(--text)}
+
+  /* 모양 — 둥글고 부드럽게 */
+  .card{border-radius:var(--r-card);box-shadow:var(--card-shadow)}
+  .row{border-radius:16px;box-shadow:var(--card-shadow)}
+  .tile{border-radius:14px}
+  .kpi{border-radius:18px;box-shadow:var(--card-shadow)}
+  .mcard{border-radius:16px}
+  .fold{border-radius:18px;box-shadow:var(--card-shadow)}
+  .btn{border-radius:var(--r-ctl);font-weight:500;box-shadow:0 10px 22px -14px rgba(184,37,63,.85)}
+  .btn-ghost{border-radius:var(--r-ctl);background:var(--surface)}
+  .btn-sm{border-radius:11px;background:var(--surface)}
+  input,select,textarea{border-radius:var(--r-ctl)}
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--brand);outline-offset:-1px;box-shadow:0 0 0 4px var(--rose-bg)}
+  .seg{border-radius:15px}
+  .seg button{border-radius:11px}
+  .chip{padding:4px 10px;font-weight:450}
+  dialog{border-radius:24px;box-shadow:0 30px 80px -30px rgba(30,15,10,.55)}
+  dialog::backdrop{background:rgba(28,18,14,.48);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+  dialog h3{font-size:19px}
+  .sec-title{letter-spacing:.02em;font-weight:500;display:flex;align-items:center;gap:8px}
+  .sec-title::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--brand);flex-shrink:0}
+  .icon-btn{border-radius:50%}
+  .topbar h1{font-weight:500}
+
+  /* 폰 아래 탭 — 떠 있는 둥근 막대 */
+  .tabbar{margin:auto 12px calc(10px + env(safe-area-inset-bottom));padding-bottom:0;border:1px solid var(--line);
+    border-radius:22px;background:var(--surface);box-shadow:0 14px 30px -18px rgba(40,20,10,.45)}
+  .tabbar button{height:60px;font-size:11px}
+  .tabbar button.on{color:var(--brand)}
+  .tabbar button.on svg{filter:drop-shadow(0 4px 8px rgba(184,37,63,.35))}
+
+  /* 넓은 화면 사이드바 */
+  @media (min-width:880px){
+    #sidebar{padding:26px 14px 18px;overflow-y:auto;scrollbar-width:none;
+      background:radial-gradient(120% 34% at 0% 0%,var(--side-glow),transparent 70%),linear-gradient(180deg,var(--side-a),var(--side-b))}
+    #sidebar::-webkit-scrollbar{display:none}
+    .side-g{margin:14px 12px 4px;font-size:11px;letter-spacing:.08em;color:var(--faint);font-weight:500}
+    #side-nav .side-g:first-child{margin-top:0}
+    .side-theme{display:flex;gap:4px;margin-top:10px;padding:4px;border-radius:14px;background:var(--seg-bg);border:1px solid var(--line)}
+    #sidebar .side-theme button{flex:1;height:34px;justify-content:center;gap:6px;font-size:12.5px;padding:0;border-radius:10px}
+    #sidebar .side-theme button.on{background:var(--surface);color:var(--text);box-shadow:var(--card-shadow)}
+    #sidebar .side-theme button.on svg{color:var(--brand)}
+    #sidebar .brand span{font-size:18px;font-weight:500}
+    #sidebar .brand img{border-radius:11px;box-shadow:0 8px 18px -10px rgba(184,37,63,.7)}
+    #sidebar button{border-radius:13px;font-size:14.5px;width:100%}
+    #sidebar button svg{width:21px;height:21px}
+    #sidebar #side-nav button{height:42px}
+    #sidebar button:hover{background:var(--side-hover);color:var(--text)}
+    #sidebar #side-nav button.on{background:var(--surface);color:var(--text);font-weight:500;box-shadow:var(--card-shadow);border:1px solid var(--line)}
+    #sidebar button.on svg{color:var(--brand)}
+    #sidebar .who{border:1px solid var(--line);border-radius:16px;background:var(--surface);margin-top:auto;padding:12px 14px;box-shadow:none}
+    .tabbar{display:none}
+  }
+
+  /* 홈 — 인사 · 오늘의 전시 · 전시실 (36.1 — 기도 카드는 은은하게, 전시실은 같은 틀로 가지런히) */
+  #home-title{font-size:26px !important;font-weight:500 !important;letter-spacing:-.01em}
+  #home-date{color:var(--brand) !important;font-weight:500}
+  #home-pray > .card,#home-pray > section{position:relative;overflow:hidden;border:1px solid var(--line);
+    background:linear-gradient(160deg,var(--lead-bg) 0%,var(--surface) 46%);box-shadow:var(--card-shadow)}
+  #home-pray > .card::before,#home-pray > section::before{content:"";position:absolute;left:0;top:22px;bottom:22px;width:3px;border-radius:0 3px 3px 0;background:var(--brand);opacity:.75}
+  #home-pray h2{font-size:21px !important}
+  #home-pray .btn{width:auto;height:44px !important;padding:0 22px;font-size:14px;box-shadow:none}
+  #home-pray .btn-ghost{width:44px !important;height:44px !important}
+  .room-h{display:flex;align-items:center;gap:10px;font-size:17px;font-weight:500;color:var(--text);margin:22px 2px 14px}
+  .room-h::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--brand)}
+  .room-h::after{content:"";flex:1;height:1px;background:var(--line)}
+  .rooms{gap:12px;grid-auto-rows:1fr}
+  .room{position:relative;min-height:136px;border-radius:18px;padding:16px 16px 14px;box-shadow:none;gap:0;justify-content:flex-start;
+    background:var(--surface);border:1px solid var(--line);transition:border-color .15s,background .15s,box-shadow .15s}
+  .room:hover{border-color:var(--rose-line2);box-shadow:var(--card-shadow)}
+  .room .rh{display:flex;align-items:center;justify-content:space-between;width:100%}
+  .room .ri{width:38px;height:38px;border-radius:12px;background:var(--rose-bg);color:var(--brand);display:grid;place-items:center}
+  .room .ri svg{width:19px;height:19px}
+  .room .ra{font-size:18px;color:var(--faint);transition:transform .15s,color .15s}
+  .room:hover .ra{color:var(--brand);transform:translateX(2px)}
+  .room .k{font-size:14.5px;color:var(--text);font-weight:500;margin-top:auto;padding-top:14px}
+  .room .v{display:flex;align-items:baseline;gap:6px;margin-top:4px;min-height:24px;flex-wrap:nowrap;width:100%}
+  .room .v b{font-size:22px;font-weight:500;color:var(--text);line-height:1}
+  .room .v span{font-size:12px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .room .v.nv b{display:none}
+  .room .v span.hot{color:var(--brand);font-weight:500}
+  .room .v span.hot::before{content:"● ";font-size:8px;vertical-align:2px}
+  .drawer{border:1px solid var(--line);border-radius:18px;background:var(--surface);box-shadow:none}
+  .drawer-in .btn-ghost{display:flex;align-items:center;justify-content:flex-start;gap:10px;padding:0 14px;height:50px;font-size:14px;border-radius:13px;background:var(--surface2);border-color:transparent}
+  .drawer-in .btn-ghost svg{color:var(--brand);flex-shrink:0;width:19px;height:19px}
+  #home-role,#home-where{background:var(--surface);border:1px solid var(--line)}
+  #home-ver{background:var(--gold-soft) !important;color:var(--gold) !important;font-weight:500}
+  .crow .dot{box-shadow:0 0 0 3px var(--rose-bg)}
+
+  /* 넓은 화면 공간 쓰기 */
+  @media (min-width:1280px){
+    .screen{max-width:1240px}
+    #s-soul,#s-edit,#s-log{max-width:1120px}
+    #list-meets,#list-att,#list-members{grid-template-columns:repeat(3,minmax(0,1fr))}
+  }
+  @media (min-width:1600px){
+    #s-home,#s-souls,#s-more,#s-stats,#s-reports{max-width:1560px}
+    .rooms{grid-template-columns:repeat(4,minmax(0,1fr))}
+  }
+  @media (max-width:600px){
+    #home-title{font-size:23px !important}
+    .room{min-height:116px;padding:14px}
+    .room .v b{top:14px;right:14px;font-size:19px}
+  }
+
+  /* ═══ 36.1 — 2안 '다크 사이드 갤러리'를 은은하게 ═══
+     왼쪽 메뉴 · 대표 방 2개만 부드러운 모카빛 전시실, 나머지는 아이보리 · 금빛 아이콘 + 와인 포인트 */
+  :root{--gold-ic:#D9B77E; --gold-ic-bg:rgba(217,183,126,.14); --feat-a:#2A2420; --feat-b:#211C19}
+  :root[data-theme="light"]{--gold-ic:#A57E3A; --gold-ic-bg:#F4EBDA; --feat-a:#41372F; --feat-b:#352D28}
+  @media (min-width:880px){
+    #sidebar{border-right:none;
+      --text:#F6EEE4; --dim:#CDBFB0; --faint:#9A8E80; --line:rgba(255,255,255,.09); --surface:rgba(255,255,255,.07);
+      --seg-bg:rgba(0,0,0,.16); --card-shadow:none; color:var(--dim)}
+    #sidebar .brand span{color:#F6EEE4}
+    #sidebar #side-nav button svg{color:#D9B77E;opacity:.9}
+    #sidebar #side-nav button.on{background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.10);box-shadow:none;color:#fff}
+    #sidebar #side-nav button.on svg{color:#FF8E9E;opacity:1}
+    #sidebar #side-nav button.on::before{content:"";position:absolute;left:-14px;top:10px;bottom:10px;width:3px;border-radius:0 3px 3px 0;background:#E4485F}
+    #sidebar #side-nav button{position:relative}
+    #sidebar .who{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.08);color:#CDBFB0}
+    #sidebar .side-theme button.on{background:rgba(255,255,255,.12);color:#fff}
+    #sidebar .side-theme button.on svg{color:#E9CB94}
+  }
+  /* 전시실 — 아이콘은 금빛, 대표 방 두 개(맨 앞)는 모카빛 액자 */
+  .room .ri{background:var(--gold-ic-bg);color:var(--gold-ic)}
+  .room:nth-child(-n+2){border:none;color:#F6EEE4;
+    background:radial-gradient(90% 120% at 100% 0%,rgba(228,72,95,.18),transparent 60%),linear-gradient(150deg,var(--feat-a),var(--feat-b))}
+  .room:nth-child(-n+2) .k,.room:nth-child(-n+2) .v b{color:#F6EEE4}
+  .room:nth-child(-n+2) .v span{color:#CDBFB0}
+  .room:nth-child(-n+2) .v span.hot{color:#FF9EAC}
+  .room:nth-child(-n+2) .ri{background:rgba(217,183,126,.16);color:#E9CB94}
+  .room:nth-child(-n+2) .ra{color:rgba(255,255,255,.35)}
+  .room:nth-child(-n+2):hover{box-shadow:0 16px 30px -22px rgba(40,20,10,.7)}
+  .room:nth-child(-n+2) .k{font-size:16px}
+  .room:nth-child(-n+2) .v b{font-size:26px}
+  /* 칸 나누기 — 대표 방은 반씩, 나머지는 고르게 (폰 2칸 · 패드 3칸 · 컴퓨터 2~4칸) */
+  @media (min-width:600px){
+    .rooms{grid-template-columns:repeat(6,minmax(0,1fr)) !important}
+    .room{grid-column:span 2}
+    .room:nth-child(-n+2){grid-column:span 3}
+  }
+  @media (min-width:880px) and (max-width:1279px){ .room{grid-column:span 3} }
+  /* 마지막 줄이 비지 않게 — 남은 방이 줄을 나눠 채워요 */
+  @media (max-width:599px){ .room:last-child:nth-child(odd){grid-column:1/-1} }
+  @media (min-width:600px) and (max-width:879px), (min-width:1280px) and (max-width:1599px){
+    .room:last-child:nth-child(3n){grid-column:span 6}
+    .room:last-child:nth-child(3n+1),.room:nth-last-child(2):nth-child(3n){grid-column:span 3}
+  }
+  @media (min-width:880px) and (max-width:1279px){ .room:last-child:nth-child(odd){grid-column:span 6} }
+  @media (min-width:1600px){
+    .rooms{grid-template-columns:repeat(12,minmax(0,1fr)) !important}
+    .room{grid-column:span 3}
+    .room:nth-child(-n+2){grid-column:span 6}
+    .room:last-child:nth-child(4n+3){grid-column:span 12}
+    .room:last-child:nth-child(4n),.room:nth-last-child(2):nth-child(4n+3){grid-column:span 6}
+    .room:last-child:nth-child(4n+1),.room:nth-last-child(2):nth-child(4n),.room:nth-last-child(3):nth-child(4n+3){grid-column:span 4}
+  }
 </style>
 <script>
   /* 27단계 — 화면 밝기: 다크(기본) · 라이트 · 기기 설정 따르기. 깜빡임 없게 그리기 전에 정해요. */
   (function () {
-    var t = "dark";
-    try { t = localStorage.getItem("mokja-theme") || "dark"; } catch (e) {}
+    var t = "light";
+    try { t = localStorage.getItem("mokja-theme") || "light"; } catch (e) {}
     if (t === "system") t = window.matchMedia && matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
     document.documentElement.dataset.theme = t;
-    var m = document.querySelector('meta[name="theme-color"]'); if (m) m.content = t === "light" ? "#F5F3F2" : "#0F0F0F";
+    var m = document.querySelector('meta[name="theme-color"]'); if (m) m.content = t === "light" ? "#F6F1EA" : "#0F0D0C";
   })();
 </script>
 </head>
@@ -1235,6 +1471,10 @@
   <div class="brand"><img src="./icons/icon-192.png" alt=""><span>목자의 삶</span></div>
   <div id="side-nav"></div>
   <div class="who" id="side-who"></div>
+  <div class="side-theme" role="group" aria-label="화면 밝기">
+    <button type="button" data-settheme="light"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/></svg>라이트</button>
+    <button type="button" data-settheme="dark"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>블랙</button>
+  </div>
 </nav>
 
 <div id="app">
@@ -1469,6 +1709,9 @@
       <p class="hint" style="margin:0 2px 12px;max-width:760px">셀마다 셀리더와 가입 상태예요. 이메일 칸에 그분의 <b>구글 이메일</b>을 넣고 아래 [초대 보내기]를 누르면,
         그분이 그 구글 계정으로 로그인할 때 바로 그 셀 셀리더로 들어와요. 셀원 목양 카드도 그때 생기고 노션 명단으로 채워져요.</p>
       <div class="tiles" id="ld-sum"></div>
+      <div class="invpref"><span>초대 안내 메일</span><div class="seg mini" role="group" aria-label="초대 안내 메일 기본값">
+        <button type="button" data-invpref="ask">매번 묻기</button><button type="button" data-invpref="send">항상 쓰기</button><button type="button" data-invpref="none">등록만</button></div>
+        <small>나중에 직접 연락하며 전해도 돼요 — '등록만'이면 메일 없이 초대만 걸려요</small></div>
       <div id="ld-list"></div>
       <p class="err" id="ld-err"></p>
       <p class="muted" id="ld-log" style="margin-top:8px"></p>
@@ -1489,6 +1732,10 @@
       </button>
       <button class="icon-btn" id="btn-bell" aria-label="소식 — 쪽지 · 댓글" style="position:relative">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16.5V11a6 6 0 1 1 12 0v5.5l1.5 2H4.5z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/></svg><span class="bdg" id="bdg-home" hidden></span>
+      </button>
+      <button class="icon-btn" id="btn-theme" aria-label="라이트 · 블랙 바꾸기" title="라이트 · 블랙 바꾸기">
+        <svg class="th-moon" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>
+        <svg class="th-sun" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/></svg>
       </button>
       <button class="icon-btn" id="btn-quick-add" aria-label="빠른 기록">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
@@ -2168,10 +2415,11 @@
 
       <h3 class="sec-title">화면</h3>
       <div class="seg" id="more-theme" style="margin:0">
-        <button type="button" data-theme="dark">다크</button>
         <button type="button" data-theme="light">라이트</button>
+        <button type="button" data-theme="dark">블랙</button>
         <button type="button" data-theme="system">기기 설정 따르기</button>
       </div>
+      <p class="hint" style="margin-top:8px">이 앱에는 카페24(주)이 제공한 Cafe24 Ssukssuk 글꼴이 적용되어 있어요.</p>
       <h3 class="sec-title">앱</h3>
       <div class="list" style="max-width:520px">
         <button class="row" id="btn-go-help" style="text-align:left;cursor:pointer;width:100%">
@@ -2340,6 +2588,7 @@
       <div id="mb-chips" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"></div>
     </div>
   </div>
+  <div id="mb-tier"></div>
   <div id="mb-contact" style="margin-top:14px"></div>
   <div id="mb-att"></div>
   <div id="mb-rows"></div>
@@ -2348,6 +2597,16 @@
   <div class="acts" id="mb-acts" style="margin-top:14px"></div>
   <p class="err" id="mb-err"></p>
   <div class="dlg-btns"><button class="btn-ghost" id="mb-close">닫기</button></div>
+</dialog>
+
+<!-- 35.1단계 — 인턴 · 후보 정하기 -->
+<dialog id="dlg-tier">
+  <h3>인턴 · 후보 정하기</h3>
+  <p class="hint" style="margin:-4px 0 12px"><b>인턴</b>은 공식 리더 후보 — 명부에도 보여요. <b>후보</b>는 비공식 — 셀리더 · 그 셀 코치 · 진장 · 소유자만 보고, 본인에게는 안 보여요.</p>
+  <div class="seg mini tr-cells" id="tr-cells"></div>
+  <div class="tr-list" id="tr-list"></div>
+  <p class="err" id="tr-err"></p>
+  <div class="dlg-btns"><button class="btn-ghost" id="tr-cancel">닫기</button><button class="btn" id="tr-save" disabled>저장</button></div>
 </dialog>
 
 <!-- 명부 등록 · 고치기 -->
