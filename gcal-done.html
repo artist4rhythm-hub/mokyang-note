@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>구글 캘린더 연결</title>
+<meta name="robots" content="noindex">
+<style>
+  :root{color-scheme:light dark}
+  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;background:#121010;color:#F4F1F0}
+  @media (prefers-color-scheme: light){ body{background:#F7F4F3;color:#1D1A1A} }
+  .b{text-align:center;padding:24px}
+  .b b{display:block;font-size:18px;margin-bottom:8px}
+  .b p{margin:0;font-size:14px;opacity:.75;line-height:1.6}
+</style></head>
+<body><div class="b"><b id="t">연결하는 중…</b><p id="s">이 창은 저절로 닫혀요.</p></div>
+<script>
+/* 구글 허락 화면에서 돌아오는 곳 — 받은 일회용 코드를 앱 창에 건네고 닫혀요.
+   코드는 이 기기 안(같은 주소의 앱 창)으로만 전달되고, 어디에도 저장하지 않아요. */
+(function () {
+  var q = new URLSearchParams(location.search);
+  var msg = { mokjaGcal: 1, code: q.get("code") || "", state: q.get("state") || "", error: q.get("error") || "" };
+  try { history.replaceState(null, "", location.pathname); } catch (e) {}
+  var sent = false;
+  try { var bc = new BroadcastChannel("mokja-gcal"); bc.postMessage(msg); sent = true; setTimeout(function () { bc.close(); }, 500); } catch (e) {}
+  try { if (window.opener && window.opener !== window) { window.opener.postMessage(msg, location.origin); sent = true; } } catch (e) {}
+  document.getElementById("t").textContent = msg.error ? "연결을 취소했어요" : "연결했어요";
+  document.getElementById("s").textContent = sent ? "앱 화면으로 돌아가 주세요. 이 창은 저절로 닫혀요." : "앱 화면으로 돌아가 다시 눌러 주세요.";
+  setTimeout(function () { try { window.close(); } catch (e) {} }, 700);
+})();
+</script>
+</body></html>

@@ -24,7 +24,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
 const APP_NAME = "목자의 삶";
-const APP_VERSION = "33.0 (2026-11-10)";
+const APP_VERSION = "34.0 (2026-11-11)";
 
 /* 사진 크기 — 얼굴을 알아볼 수 있는 선에서 가장 작게.
    얼굴 하나가 가로 80px은 되어야 알아보는데, 여럿이 한 줄로 선
@@ -781,7 +781,7 @@ async function homeBackground() {
       if (onHome()) { renderCare(); renderRooms(); }
       planAlarms();
       syncCalShare().catch(e => console.warn("캘린더 공유", e));
-      gcalDoc().then(() => { renderGcal(); if (gcalTok()) gcalSync().catch(() => {}); });
+      gcalDoc().then(() => { renderGcal(); if (gcalTok() || gcalLive()) gcalSync().catch(() => {}); });
     }
   } catch (e) { console.warn("홈 뒤 작업", e); }
 }
@@ -5218,6 +5218,10 @@ async function backfillThumbs() {
    올릴 때마다 version.json 도 같이 올립니다. 앱은 열 때 · 다시 볼 때 · 10분마다
    그 파일만 살짝 확인해서(아주 작은 파일), 지금 버전보다 새것이면 위에 알림을 띄웁니다. */
 const CHANGELOG = [
+  { v:"34.0", d:"2026-11-11", items:[
+    "구글 캘린더 실시간 — 서버(Blaze)를 켜면, 한 번 연결한 뒤로는 저장하는 순간 몇 초 안에 내 구글 캘린더로 (1시간마다 누를 일 없음)",
+    "로그인한 리더 누구나 각자 연결 — 일정은 각자 자기 구글 계정의 '목자의 삶' 캘린더에만",
+    "예전 방식으로 연결한 분은 [실시간으로 바꾸기] 한 번, 수퍼 관리자는 캘린더 아래 '실시간 서버 연결 설정'" ] },
   { v:"33.0", d:"2026-11-10", items:[
     "사용 현황(수퍼) 새 단장 — 쓰는 사람 · 오늘/이번 주 · 하루 평균 사용 시간 · 홈 화면 앱 비율 · 최신 버전 비율 · 오류",
     "날마다 그래프(사람 수 · 사용 시간 · 연 횟수), 요일 × 시간 히트맵, 기기 · 운영체제 · 브라우저 · 버전, 앱 여는 속도",
@@ -8980,9 +8984,61 @@ function gcalSetTok(t) {
 }
 async function gcalDoc(force) {
   if (!force && state.gcal.doc !== null) return state.gcal.doc;
-  try { const d = await getDoc(doc(db, "gcal", uid())); state.gcal.doc = d.exists() ? d.data() : false; }
-  catch { state.gcal.doc = false; }
+  const [d, c] = await Promise.all([
+    getDoc(doc(db, "gcal", uid())).catch(() => null),
+    state.gcal.cfg && !force ? Promise.resolve(null) : getDoc(doc(db, "config", "gcal")).catch(() => null)]);
+  state.gcal.doc = d && d.exists() ? d.data() : false;
+  if (c) state.gcal.cfg = c.exists() ? c.data() : (state.gcal.cfg || {});
   return state.gcal.doc;
+}
+/* ── 34단계 — 실시간 (서버) ──────────────────────────────
+   수퍼가 '서버 연결 설정'(클라이언트 ID · 서버 주소)을 넣어 두면, 리더는 한 번만 연결하고
+   그 뒤로는 저장하는 순간 서버가 그 리더 본인의 구글 캘린더에 넣어요 (1시간 제한 없음).
+   서버 설정 전에는 예전 방식(앱이 직접 · 1시간)이 그대로 돌아가요. */
+const GCAL_DONE = "https://artist4rhythm-hub.github.io/mokyang-note/gcal-done.html";
+const gcalSrv = () => { const c = state.gcal.cfg; return !!(c && c.url && c.clientId); };
+const gcalLive = () => gcalSrv() && !!(state.gcal.doc && state.gcal.doc.on && state.gcal.doc.mode === "server");
+function gcalDoneUrl() { return location.origin === "https://artist4rhythm-hub.github.io" ? GCAL_DONE : new URL("gcal-done.html", location.href).href; }
+/* 반드시 누른 순간에 (팝업) — 구글 허락 화면 → gcal-done.html → 일회용 코드 */
+function gcalAskCode() {
+  const c = state.gcal.cfg, st = Array.from(crypto.getRandomValues(new Uint8Array(12)), b => b.toString(16).padStart(2, "0")).join("");
+  const q = new URLSearchParams({ client_id: c.clientId, redirect_uri: gcalDoneUrl(), response_type: "code", scope: GCAL_SCOPE,
+    access_type: "offline", prompt: "consent", include_granted_scopes: "false", state: st, login_hint: (state.me && state.me.email) || "" });
+  const w = window.open((c.authUrl || "https://accounts.google.com/o/oauth2/v2/auth") + "?" + q, "mokja-gcal", "popup,width=480,height=680");
+  if (!w) return Promise.reject(new Error("팝업이 막혔어요. 브라우저에서 이 사이트의 팝업을 허용해 주세요."));
+  return new Promise((res, rej) => {
+    let bc = null, done = false;
+    const fin = (fn, v) => { if (done) return; done = true; clearTimeout(tm); window.removeEventListener("message", onMsg); try { bc && bc.close(); } catch {} fn(v); };
+    const got = (m) => { if (!m || !m.mokjaGcal || m.state !== st) return;
+      if (m.error || !m.code) fin(rej, new Error(m.error === "access_denied" ? "연결을 취소했어요." : "구글 허락을 받지 못했어요."));
+      else fin(res, m.code); };
+    const onMsg = (ev) => { if (ev.origin === location.origin) got(ev.data); };
+    window.addEventListener("message", onMsg);
+    try { bc = new BroadcastChannel("mokja-gcal"); bc.onmessage = (ev) => got(ev.data); } catch {}
+    const tm = setTimeout(() => fin(rej, new Error("구글 창에서 시간이 너무 지났어요. 다시 눌러 주세요.")), 5 * 60 * 1000);
+    state.gcal.cancelAsk = () => fin(rej, new Error("연결을 취소했어요."));
+  });
+}
+const GCAL_SRV_ERR = {
+  NOT_CONNECTED: "서버에 연결 기록이 없어요. [실시간으로 다시 연결]을 눌러 주세요.",
+  RECONNECT: "구글에서 허락이 풀렸어요 (구글 계정에서 액세스를 지웠거나 비밀번호를 바꾼 경우). [실시간으로 다시 연결]을 눌러 주세요.",
+  NO_SCOPE: "구글 창에서 '캘린더' 칸에 체크해 주세요.", NO_REFRESH: "구글이 오래 가는 허락을 주지 않았어요. 다시 연결해 주세요.",
+  CODE_FAIL: "구글 허락 코드를 확인하지 못했어요. 서버 설정(클라이언트 ID · 보안 비밀 · 리디렉션 주소)을 확인해 주세요.",
+  API_OFF: "구글 클라우드에서 'Google Calendar API'가 꺼져 있어요. 설정 안내 ①번을 해 주세요.",
+  SERVER_NOT_SET: "서버에 클라이언트 ID · 보안 비밀이 아직 안 들어갔어요 (설정 안내 ⑦번 — 변수 및 보안 비밀).",
+  NOT_ACTIVE: "활성 계정만 연결할 수 있어요.", BAD_LOGIN: "로그인을 다시 확인해 주세요 (새로고침).", NO_LOGIN: "로그인을 다시 확인해 주세요 (새로고침).",
+};
+async function gcalCall(action, body) {
+  const u = auth.currentUser; if (!u) throw new Error("로그인을 다시 확인해 주세요.");
+  const t = await u.getIdToken();
+  let r;
+  try {
+    r = await fetch(state.gcal.cfg.url, { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + t },
+      body: JSON.stringify(Object.assign({ action }, body || {})) });
+  } catch { const e = new Error("캘린더 서버에 닿지 못했어요. 인터넷이나 서버 주소를 확인해 주세요."); e.code = "NET"; throw e; }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) { const e = new Error(GCAL_SRV_ERR[j.error] || `캘린더 서버 오류 ${r.status}${j.error ? " · " + j.error : ""}`); e.code = j.error || r.status; throw e; }
+  return j;
 }
 /* 반드시 누른 순간에 불러야 해요 (팝업) */
 function gcalConnect() {
@@ -9083,6 +9139,7 @@ async function gcalPool(items, n, fn) {
 async function gcalSync(again) {
   const g = state.gcal; if (g.busy) return;
   const D = await gcalDoc(); if (!D || !D.on) return;
+  if (gcalLive()) return gcalSyncLive(again);
   if (!gcalTok()) { g.need = true; renderGcal(); return; }
   g.busy = true; g.err = ""; renderGcal(); bump("gcalSync");
   try {
@@ -9127,10 +9184,48 @@ async function gcalSync(again) {
     console.warn("구글 캘린더", e.code, e.detail || e.message);
   } finally { g.busy = false; renderGcal(); }
 }
+/* 실시간 — 바뀐 것만 서버로 (허락 시간 제한 없음) */
+async function gcalSyncLive(again, manual) {
+  const g = state.gcal, D = state.gcal.doc;
+  const check = !!manual || !g.checked;   /* 누르거나 처음 열 때는 구글에 캘린더가 있는지도 확인 */
+  g.busy = true; g.err = ""; g.need = false; renderGcal(); bump("gcalSync");
+  try {
+    await Promise.all([loadMeetings(), loadSouls()]); await loadAllRecords(); await loadAllTrainings();
+    const map = D.map || {}, want = gcalWant(), next = {}, out = { ...map };
+    const todo = want.filter(w => { next[w.id] = w.h; return map[w.id] !== w.h; });
+    const stale = Object.keys(map).filter(id => !next[id]);
+    let add = 0, upd = 0, del = 0, fails = [], calId = D.calId, redo = false;
+    const ops = [...todo.map(w => ({ u: w })), ...stale.map(id => ({ d: id }))];
+    for (let i = 0; (i < ops.length || (i === 0 && check)) && !redo; i += 120) {
+      const part = ops.slice(i, i + 120);
+      const r = await gcalCall("push", { check: i === 0 && check, upserts: part.filter(o => o.u).map(o => ({ known: !!map[o.u.id], body: o.u.body })), deletes: part.filter(o => o.d).map(o => o.d) });
+      if (r.recreated) { calId = r.calId; redo = true; break; }
+      calId = r.calId || calId;
+      const H = Object.fromEntries(part.filter(o => o.u).map(o => [o.u.id, o.u.h]));
+      (r.done || []).forEach(id => { if (map[id]) upd++; else add++; out[id] = H[id]; });
+      (r.removed || []).forEach(id => { del++; delete out[id]; });
+      fails = fails.concat(r.failed || []);
+    }
+    if (redo && !again) {   /* 구글에서 '목자의 삶' 캘린더가 지워졌어요 — 새 캘린더에 처음부터 */
+      D.calId = calId; D.map = {}; g.busy = false;
+      await setDoc(doc(db, "gcal", uid()), { calId, on: true, map: {}, syncedAt: "", email: state.me.email || "", mode: "server" });
+      return gcalSyncLive(true);
+    }
+    g.checked = true;
+    D.calId = calId; D.map = out; D.syncedAt = new Date().toISOString();
+    await setDoc(doc(db, "gcal", uid()), { calId, on: true, map: out, syncedAt: D.syncedAt, email: (state.me && state.me.email) || "", mode: "server" });
+    g.last = add || upd || del ? `새로 ${add} · 바뀜 ${upd} · 지움 ${del}` : "바뀐 것 없음";
+    if (fails.length) g.err = fails.some(f => f.why === "403") ? GCAL_SRV_ERR.API_OFF : `${fails.length}개는 못 넣었어요 — 다음에 저절로 다시 해요`;
+  } catch (e) {
+    g.err = msgOf(e);
+    if (e.code === "RECONNECT" || e.code === "NOT_CONNECTED") g.need = true;
+    console.warn("구글 캘린더(서버)", e.code, e.message);
+  } finally { g.busy = false; renderGcal(); }
+}
 let gcalT = 0;
 function gcalSoon() {
   clearTimeout(gcalT);
-  gcalT = setTimeout(() => { if (state.me && state.gcal.doc && state.gcal.doc.on) gcalSync().catch(() => {}); }, 2500);
+  gcalT = setTimeout(() => { if (state.me && state.gcal.doc && state.gcal.doc.on) gcalSync().catch(() => {}); }, gcalLive() ? 1200 : 2500);
 }
 function gcalPendingCount() {
   const D = state.gcal.doc; if (!D || !D.on || !state.allRecords) return 0;
@@ -9144,30 +9239,50 @@ function renderGcal() {
   if (!lead || calOther()) { box.hidden = true; $("home-gcal").innerHTML = ""; return; }
   box.hidden = false;
   const icon = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 9.5h17M8 3v4m8-4v4"/><path d="m9 14.5 2 2 4-4"/></svg>`;
+  const srv = gcalSrv(), live = gcalLive();
+  const asking = g.asking ? `<p class="t" style="margin-top:8px"><b>구글 창에서 계정을 고르고 '캘린더'를 허용해 주세요…</b> <button class="btn-sm" id="gcal-cancel">취소</button></p>` : "";
   if (!D || !D.on) {
     box.className = "gcal";
-    box.innerHTML = `<div class="gh">${icon}<b>내 구글 캘린더에 자동으로 넣기</b></div>
+    box.innerHTML = `<div class="gh">${icon}<b>내 구글 캘린더에 자동으로 넣기</b>${srv ? `<span class="chip ok" style="margin-left:auto">실시간</span>` : ""}</div>
       <p class="t">한 번 연결하면 셀모임 · 만남 · 예정 · 훈련 · 기념일이 내 구글 캘린더의 <b>'목자의 삶'</b> 캘린더에 들어가요.
-        앱에서 고치거나 지우면 구글 캘린더도 따라 바뀌고, 알림도 구글 캘린더가 울려줘요.
-        만남 기록 · 기도 내용은 넣지 않아요 (제목 · 시간 · 장소만).</p>
-      <div class="acts"><button class="btn" id="gcal-on" style="max-width:260px">구글 캘린더 연결하기</button></div>
+        ${srv ? "저장하는 순간 몇 초 안에 넘어가고, 앱을 닫아 두어도 다시 누를 일이 없어요." : "앱에서 고치거나 지우면 구글 캘린더도 따라 바뀌어요."}
+        알림도 구글 캘린더가 울려줘요. 만남 기록 · 기도 내용은 넣지 않아요 (제목 · 시간 · 장소만).</p>
+      <div class="acts"><button class="btn" id="gcal-on" style="max-width:260px" ${g.asking ? "disabled" : ""}>구글 캘린더 연결하기</button></div>${asking}
       <p class="err" id="gcal-err">${esc(g.err || "")}</p>`;
   } else {
     const pend = gcalPendingCount();
     const when = D.syncedAt ? new Date(D.syncedAt) : null;
     const whenTxt = when ? `${when.getMonth() + 1}월 ${when.getDate()}일 ${pad2(when.getHours())}:${pad2(when.getMinutes())}` : "아직";
-    box.className = "gcal" + (g.need && pend ? " need" : "");
-    box.innerHTML = `<div class="gh">${icon}<b>구글 캘린더 연결됨</b> <span class="chip ok" style="margin-left:auto">'목자의 삶' 캘린더</span></div>
-      <p class="t">${g.busy ? "구글 캘린더에 맞추는 중…" : `마지막으로 맞춘 때 ${whenTxt} · 일정 ${Object.keys(D.map || {}).length}개${g.last ? " · " + esc(g.last) : ""}`}
-        ${!g.busy && pend ? `<br><b style="color:var(--warn-tx)">아직 안 보낸 변경 ${pend}개</b>${g.need ? " — 구글 허락이 1시간마다 끝나서, 눌러서 다시 맞춰 주세요." : ""}` : ""}</p>
-      <div class="acts"><button class="btn-sm" id="gcal-sync" ${g.busy ? "disabled" : ""}>${g.need || !gcalTok() ? "다시 연결하고 맞추기" : "지금 맞추기"}</button>
-        <button class="btn-sm danger" id="gcal-off" ${g.busy ? "disabled" : ""}>연결 끊기</button></div>
+    const upgrade = srv && !live;   /* 예전 방식으로 연결된 분 — 한 번만 다시 연결하면 실시간 */
+    box.className = "gcal" + ((g.need || upgrade) && (pend || upgrade) ? " need" : "");
+    const chip = live ? `<span class="chip ok" style="margin-left:auto">실시간 · '목자의 삶' 캘린더</span>` : `<span class="chip ok" style="margin-left:auto">'목자의 삶' 캘린더</span>`;
+    const status = g.busy ? "구글 캘린더에 맞추는 중…" : `마지막으로 맞춘 때 ${whenTxt} · 일정 ${Object.keys(D.map || {}).length}개${g.last ? " · " + esc(g.last) : ""}`;
+    const note = live ? (pend && !g.busy ? `<br><b style="color:var(--warn-tx)">아직 안 보낸 변경 ${pend}개</b> — 곧 저절로 보내요.` : `<br><span class="muted">저장하면 몇 초 안에 구글 캘린더에 들어가요.</span>`)
+      : upgrade ? `<br><b style="color:var(--warn-tx)">이제 실시간으로 바꿀 수 있어요</b> — 한 번만 다시 연결하면 1시간마다 누를 일이 없어져요.${pend ? ` (안 보낸 변경 ${pend}개도 함께 보내요)` : ""}`
+      : (pend && !g.busy ? `<br><b style="color:var(--warn-tx)">아직 안 보낸 변경 ${pend}개</b>${g.need ? " — 구글 허락이 1시간마다 끝나서, 눌러서 다시 맞춰 주세요." : ""}` : "");
+    const main = live ? (g.need ? `<button class="btn-sm" id="gcal-relive" ${g.busy || g.asking ? "disabled" : ""}>실시간으로 다시 연결</button>` : `<button class="btn-sm" id="gcal-sync" ${g.busy ? "disabled" : ""}>지금 맞추기</button>`)
+      : upgrade ? `<button class="btn-sm" id="gcal-relive" ${g.busy || g.asking ? "disabled" : ""}>실시간으로 바꾸기</button>`
+      : `<button class="btn-sm" id="gcal-sync" ${g.busy ? "disabled" : ""}>${g.need || !gcalTok() ? "다시 연결하고 맞추기" : "지금 맞추기"}</button>`;
+    box.innerHTML = `<div class="gh">${icon}<b>구글 캘린더 연결됨</b> ${chip}</div>
+      <p class="t">${status}${note}</p>
+      <div class="acts">${main}<button class="btn-sm danger" id="gcal-off" ${g.busy || g.asking ? "disabled" : ""}>연결 끊기</button></div>${asking}
       <p class="err" id="gcal-err">${esc(g.err || "")}</p>`;
   }
+  if (me && me.role === "super") box.insertAdjacentHTML("beforeend", gcalCfgHTML());
   /* 홈 — 보낼 변경이 있는데 허락이 끝났으면 한 줄로 */
   const pendH = D && D.on && g.need ? gcalPendingCount() : 0;
   $("home-gcal").innerHTML = pendH ? `<div class="gstrip"><span>구글 캘린더에 아직 안 보낸 일정 변경이 ${pendH}개 있어요</span>
     <button class="btn-sm" data-gcalgo="1">맞추기</button></div>` : "";
+}
+/* 수퍼 — 서버 연결 설정 (공개돼도 괜찮은 값 두 개: 클라이언트 ID · 서버 주소) */
+function gcalCfgHTML() {
+  const c = state.gcal.cfg || {};
+  return `<details class="gcfg"${gcalSrv() && !state.gcal.cfgOpen ? "" : " open"}><summary>실시간 서버 연결 설정 <span class="muted">수퍼 관리자</span>${gcalSrv() ? ` <span class="chip ok">켜짐</span>` : ""}</summary>
+    <p class="t">설정 안내 ⑤번(클라이언트 ID)과 ⑦번(서버 주소)에서 복사한 두 값을 붙여 넣어요. 둘 다 공개돼도 괜찮은 값이에요 (보안 비밀은 서버에만).</p>
+    <label class="fl">OAuth 클라이언트 ID<input id="gcfg-cid" value="${esc(c.clientId || "")}" placeholder="783816661858-xxxx.apps.googleusercontent.com" autocomplete="off" spellcheck="false"></label>
+    <label class="fl">서버 주소 (Cloud Run URL)<input id="gcfg-url" value="${esc(c.url || "")}" placeholder="https://gcal-783816661858.asia-northeast3.run.app" autocomplete="off" spellcheck="false"></label>
+    <div class="acts"><button class="btn-sm" id="gcfg-save">저장</button>${gcalSrv() ? `<button class="btn-sm" id="gcfg-test">서버 확인</button>` : ""}<span class="muted" id="gcfg-msg"></span></div>
+  </details>`;
 }
 async function gcalTap(fn) {
   state.gcal.err = "";
@@ -9175,22 +9290,68 @@ async function gcalTap(fn) {
   try { await p; await fn(); }
   catch (e) { state.gcal.err = msgOf(e); renderGcal(); }
 }
-document.addEventListener("click", (ev) => {
-  const t = ev.target.closest("#gcal-on, #gcal-sync, #gcal-off, [data-gcalgo]"); if (!t) return;
+/* 실시간 연결 — 구글 허락 화면 → 서버가 오래 가는 열쇠 보관 → 처음부터 맞추기 */
+async function gcalLiveConnect() {
+  const g = state.gcal; g.err = ""; g.need = false;
+  let code;
+  try { const p = gcalAskCode(); g.asking = true; renderGcal(); code = await p; }   // 창은 누른 그 순간에 열려요
+  catch (e) { g.asking = false; g.err = msgOf(e); renderGcal(); return; }
+  g.asking = false; g.busy = true; renderGcal();
+  try {
+    const old = g.doc || {};
+    const r = await gcalCall("connect", { code, redirectUri: gcalDoneUrl(), calId: old.calId || "" });
+    const keep = !r.fresh && r.calId === old.calId;
+    g.doc = { on: true, calId: r.calId, map: keep ? (old.map || {}) : {}, syncedAt: "", mode: "server" };
+    await setDoc(doc(db, "gcal", uid()), { on: true, calId: r.calId, map: g.doc.map, syncedAt: "", email: state.me.email || "", mode: "server" });
+    bump("gcalConnect"); g.busy = false;
+    await gcalSyncLive();
+    if (!g.err) toast("실시간으로 연결했어요. 이제 저장하면 몇 초 안에 구글 캘린더 '목자의 삶'에 들어가요.");
+  } catch (e) { g.busy = false; g.err = msgOf(e); renderGcal(); }
+}
+document.addEventListener("click", async (ev) => {
+  const t = ev.target.closest("#gcal-on, #gcal-sync, #gcal-off, #gcal-relive, #gcal-cancel, #gcfg-save, #gcfg-test, [data-gcalgo]"); if (!t) return;
+  if (t.id === "gcal-cancel") { if (state.gcal.cancelAsk) state.gcal.cancelAsk(); return; }
+  if (t.id === "gcal-on" && gcalSrv()) return gcalLiveConnect();
+  if (t.id === "gcal-relive") return gcalLiveConnect();
   if (t.id === "gcal-on") gcalTap(async () => {
     state.gcal.doc = { on: true, calId: (state.gcal.doc && state.gcal.doc.calId) || "", map: (state.gcal.doc && state.gcal.doc.map) || {} };
     await setDoc(doc(db, "gcal", uid()), { on: true, calId: state.gcal.doc.calId, map: state.gcal.doc.map, syncedAt: "", email: state.me.email || "" });
     await gcalSync(); toast("구글 캘린더에 넣었어요. 구글 캘린더 앱에서 '목자의 삶'을 확인해 보세요.");
   });
+  if ((t.id === "gcal-sync" || t.dataset.gcalgo) && gcalLive()) { state.gcal.err = ""; if (state.gcal.busy) return; await gcalDoc(); return gcalSyncLive(false, true); }
   if (t.id === "gcal-sync" || t.dataset.gcalgo) gcalTap(() => gcalSync());
   if (t.id === "gcal-off") {
     if (!confirm("구글 캘린더 연결을 끊을까요?\n'목자의 삶' 캘린더와 그 안의 일정도 구글 캘린더에서 지워요.")) return;
     const D = state.gcal.doc || {};
+    const off = async () => {
+      await setDoc(doc(db, "gcal", uid()), { on: false, calId: "", map: {}, syncedAt: "", email: state.me.email || "" });
+      state.gcal.doc = { on: false, calId: "", map: {} }; state.gcal.last = ""; state.gcal.need = false; renderGcal(); toast("연결을 끊었어요.");
+    };
+    if (D.mode === "server" && gcalSrv()) {
+      state.gcal.err = ""; state.gcal.busy = true; renderGcal();
+      try { await gcalCall("disconnect"); state.gcal.busy = false; await off(); }
+      catch (e) { state.gcal.busy = false; state.gcal.err = msgOf(e); renderGcal(); }
+      return;
+    }
     gcalTap(async () => {
       if (D.calId) { try { await gapi("DELETE", `/calendars/${encodeURIComponent(D.calId)}`); } catch (e) { if (e.code !== 404 && e.code !== 410) throw e; } }
-      await setDoc(doc(db, "gcal", uid()), { on: false, calId: "", map: {}, syncedAt: "", email: state.me.email || "" });
-      state.gcal.doc = { on: false, calId: "", map: {} }; state.gcal.last = ""; renderGcal(); toast("연결을 끊었어요.");
+      await off();
     });
+  }
+  if (t.id === "gcfg-save") {
+    const cid = $("gcfg-cid").value.trim(), url = $("gcfg-url").value.trim().replace(/\/+$/, "");
+    const m = $("gcfg-msg");
+    if (cid && !/^\d+-[a-z0-9]+\.apps\.googleusercontent\.com$/.test(cid)) { m.textContent = "클라이언트 ID는 숫자-…apps.googleusercontent.com 모양이에요."; return; }
+    if (url && !/^https:\/\/[a-z0-9-]+(\.[a-z0-9-]+)*\.(run\.app|cloudfunctions\.net)(\/[a-zA-Z0-9_-]+)?$/.test(url)) { m.textContent = "서버 주소는 https://…run.app 모양이에요."; return; }
+    try {
+      await setDoc(doc(db, "config", "gcal"), { clientId: cid, url });
+      state.gcal.cfg = { clientId: cid, url }; state.gcal.cfgOpen = true; toast(cid && url ? "저장했어요. 리더들 캘린더에 '실시간 연결'이 보여요." : "저장했어요."); renderGcal();
+    } catch (e) { m.textContent = msgOf(e); }
+  }
+  if (t.id === "gcfg-test") {
+    const m = $("gcfg-msg"); m.textContent = "확인하는 중…";
+    try { const r = await gcalCall("ping"); m.textContent = r.connected ? "서버 정상 · 내 계정은 실시간 연결됨" : "서버 정상 · 내 계정은 아직 실시간 연결 전"; }
+    catch (e) { m.textContent = msgOf(e); }
   }
 });
 
@@ -9534,7 +9695,7 @@ const HELP = [
     steps: [["cal", "날짜 누르기", `그날 일정 · ${kb("plus", "이 날 기록")}`],
       ["souls", "다른 셀 보기", `맨 위 ${kb("", "1B01 김준")} — 같은 진 셀리더 캘린더`],
       ["google", "구글 캘린더", `${kb("", "구글 캘린더 연결하기")} 한 번이면 내 폰 캘린더에`],
-      ["refresh", "맞추기", `1시간 뒤 바뀐 건 ${kb("", "맞추기")} 한 번`]],
+      ["refresh", "실시간", `연결해 두면 저장하는 순간 몇 초 안에 내 구글 캘린더로`]],
     tips: [["lock", "다른 셀 만남은 날짜 · 시간 · 종류만 보여요"]], go: ["cal", "캘린더 열기"] },
   { id: "dir", ic: "dir", c: "#C9A227", t: "교회 명부", s: "셀별 가지 · 목록 · 통계", who: "all",
     steps: [["dir", "셀별로", `셀마다 맨 위 셀리더, 아래로 셀원이 가지처럼`],

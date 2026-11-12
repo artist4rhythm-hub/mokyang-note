@@ -720,6 +720,15 @@
   }
 
 
+  /* 34단계 — 구글 캘린더 실시간 · 수퍼 서버 설정 */
+  .gcfg{margin-top:14px;border-top:1px dashed var(--line);padding-top:12px}
+  .gcfg summary{cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;list-style:none}
+  .gcfg summary::-webkit-details-marker{display:none}
+  .gcfg summary::before{content:"›";display:inline-block;transition:transform .15s;color:var(--dim)}
+  .gcfg[open] summary::before{transform:rotate(90deg)}
+  .gcfg .fl{display:block;margin-top:10px;font-size:12px;color:var(--sub-tx)}
+  .gcfg .fl input{margin-top:4px;font-size:13px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .gcfg .acts{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px}
   /* 33단계 — 사용 현황 (수퍼) */
   @media (min-width:1200px){ #s-usage{max-width:1440px} }
   .us-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
