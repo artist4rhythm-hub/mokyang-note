@@ -24,7 +24,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
 const APP_NAME = "목자의 삶";
-const APP_VERSION = "36.1 (2026-11-12)";
+const APP_VERSION = "37.0 (2026-11-12)";
 /* 35단계 — 버전 표시: v35.0 · 2026.11.12 업데이트 */
 const verNo = () => APP_VERSION.split(" ")[0];
 const verDate = () => (APP_VERSION.match(/\((.*)\)/) || [])[1] || "";
@@ -786,7 +786,7 @@ async function openHome() {
   const where1 = (me.role==="super" && !me.isLeader) ? "전체" : (cell?cell.name:(jin?jin.name:""));
   $("home-where").textContent = where1; $("home-where").hidden = !where1;
   $("side-who").innerHTML = `${esc(me.name||"")}<br>${esc(ROLE[me.role]||"")}${where1?" · "+esc(where1):""}`
-    + `<br><button type="button" id="side-ver" style="background:none;border:none;padding:0;margin-top:4px;color:var(--faint);font:inherit;font-size:11px;cursor:pointer">${esc(verTag(true))}</button>`;
+    + `<br><button type="button" id="side-ver" style="background:none;border:none;padding:0;margin-top:4px;color:var(--faint);font:inherit;font-size:calc(11px*var(--fs,1));cursor:pointer">${esc(verTag(true))}</button>`;
   $("home-ver").textContent = verTag(false);
   $("btn-quick-add").hidden = !canLead();
 
@@ -846,7 +846,7 @@ const planLine = (r) => r.kind === "train" && r.sponsorName
 function renderSoon() { renderCare(); }
 
 const tile = (k,v) => `<div class="tile"><p class="k">${k}</p><p class="v">${v}</p></div>`;
-const card = (h,b) => `<div class="card"><h3 class="serif" style="font-size:17px;font-weight:600">${h}</h3>
+const card = (h,b) => `<div class="card"><h3 class="serif" style="font-size:calc(17px*var(--fs,1));font-weight:600">${h}</h3>
   <p class="muted" style="margin-top:8px">${b}</p></div>`;
 
 /* ── 오늘의 전시 · 기도할 영혼 ──
@@ -864,9 +864,9 @@ function renderPray() {
   if (!list.length) {
     $("home-pray").innerHTML = `
       <section class="card" style="border-radius:20px;padding:20px">
-        <span style="font-size:12px;letter-spacing:.06em;color:var(--brand)">오늘의 전시 · 기도할 영혼</span>
-        <h2 class="serif" style="font-size:19px;font-weight:600;margin-top:12px">오늘 ${all.length}명 모두 기도했어요</h2>
-        <p class="muted" style="margin-top:6px;font-size:13px">내일 아침에 다시 한 명씩 떠요.</p>
+        <span style="font-size:calc(12px*var(--fs,1));letter-spacing:.06em;color:var(--brand)">오늘의 전시 · 기도할 영혼</span>
+        <h2 class="serif" style="font-size:calc(19px*var(--fs,1));font-weight:600;margin-top:12px">오늘 ${all.length}명 모두 기도했어요</h2>
+        <p class="muted" style="margin-top:6px;font-size:calc(13px*var(--fs,1))">내일 아침에 다시 한 명씩 떠요.</p>
       </section>`;
     return;
   }
@@ -875,20 +875,20 @@ function renderPray() {
   $("home-pray").innerHTML = `
     <section class="card" style="border-radius:20px;padding:20px">
       <div style="display:flex;align-items:center;justify-content:space-between">
-        <span style="font-size:12px;letter-spacing:.06em;color:var(--brand)">오늘의 전시 · 기도할 영혼</span>
-        <span style="font-size:11px;color:var(--dim)">남은 ${list.length}명 / ${all.length}명</span>
+        <span style="font-size:calc(12px*var(--fs,1));letter-spacing:.06em;color:var(--brand)">오늘의 전시 · 기도할 영혼</span>
+        <span style="font-size:calc(11px*var(--fs,1));color:var(--dim)">남은 ${list.length}명 / ${all.length}명</span>
       </div>
       <div style="display:flex;align-items:center;gap:12px;margin-top:14px;cursor:pointer" data-gosoul="${s.id}">
         ${avatar(s)}
         <div style="min-width:0">
-          <h2 class="serif" style="font-size:20px;font-weight:600">${esc(s.name)}</h2>
+          <h2 class="serif" style="font-size:calc(20px*var(--fs,1));font-weight:600">${esc(s.name)}</h2>
           <div style="display:flex;gap:6px;margin-top:6px">
             <span class="chip rose">${esc(STATUS[s.status]||"—")}</span>
             ${top.since?`<span class="chip">${(daysSince(top.since)||0)+1}일째 기도</span>`:""}
           </div>
         </div>
       </div>
-      <p style="margin-top:14px;font-size:15px;line-height:1.75;color:var(--body-tx)">${esc(top.text||"기도제목을 적어주세요.")}</p>
+      <p style="margin-top:14px;font-size:calc(15px*var(--fs,1));line-height:1.75;color:var(--body-tx)">${esc(top.text||"기도제목을 적어주세요.")}</p>
       <div style="display:flex;gap:8px;margin-top:16px">
         <button class="btn" style="height:48px" data-pray="${s.id}">기도했어요</button>
         ${list.length>1?`<button class="btn-ghost" style="width:48px;height:48px;flex-shrink:0;padding:0" data-next="1" aria-label="다음 영혼">›</button>`:""}
@@ -993,10 +993,10 @@ function renderCare() {
   box.innerHTML = `
     <section class="card" style="margin-top:14px">
       <div style="display:flex;align-items:center;justify-content:space-between">
-        <h3 style="font-size:15px;font-weight:600">오늘 챙길 사람</h3>
-        <span class="muted" style="font-size:12px">${recs ? "" : "기록 불러오는 중…"}</span>
+        <h3 style="font-size:calc(15px*var(--fs,1));font-weight:600">오늘 챙길 사람</h3>
+        <span class="muted" style="font-size:calc(12px*var(--fs,1))">${recs ? "" : "기록 불러오는 중…"}</span>
       </div>
-      ${total ? "" : `<p class="muted" style="margin-top:10px;font-size:13px">오늘은 따로 챙길 사람이 없어요.</p>`}
+      ${total ? "" : `<p class="muted" style="margin-top:10px;font-size:calc(13px*var(--fs,1))">오늘은 따로 챙길 사람이 없어요.</p>`}
       ${careGroup("ck", "확인할 셀 보고", ckRows)}
       ${careGroup("abs", "결석 — 연락할 때", absRows)}
       ${careGroup("soon", "오늘 · 곧", soonRows, 5)}
@@ -1019,8 +1019,8 @@ function renderReports() {
   const cn = (id) => (state.cells.find(c=>c.id===id)||{}).name || "셀";
   $("home-pray").innerHTML = `
     <section class="card" style="border-radius:20px;padding:20px">
-      <span style="font-size:12px;letter-spacing:.06em;color:var(--brand)">오늘의 전시 · 셀 보고</span>
-      <h2 class="serif" style="font-size:19px;font-weight:600;margin-top:12px">${
+      <span style="font-size:calc(12px*var(--fs,1));letter-spacing:.06em;color:var(--brand)">오늘의 전시 · 셀 보고</span>
+      <h2 class="serif" style="font-size:calc(19px*var(--fs,1));font-weight:600;margin-top:12px">${
         pastor ? (wait.length ? `최근 30일 셀 보고 ${wait.length}건` : "공유된 셀 보고가 아직 없어요")
         : wait.length ? `확인을 기다리는 보고 ${wait.length}건` : "기다리는 보고가 없어요"}</h2>
       <div style="margin-top:8px">
@@ -1043,9 +1043,9 @@ function renderCoachCare() {
   });
   $("home-soon").innerHTML = `
     <section class="card" style="margin-top:14px">
-      <h3 style="font-size:15px;font-weight:600">${state.me.role==="jinjang"?"우리 진에서":state.me.role==="pastor"?"공유된 카드 중":"맡은 셀에서"} 챙길 사람</h3>
+      <h3 style="font-size:calc(15px*var(--fs,1));font-weight:600">${state.me.role==="jinjang"?"우리 진에서":state.me.role==="pastor"?"공유된 카드 중":"맡은 셀에서"} 챙길 사람</h3>
       ${rows.length ? careGroup("cabs", `${CARE_AT}주 이상 연달아 결석`, rows, 6)
-        : `<p class="muted" style="margin-top:10px;font-size:13px">연달아 빠진 사람이 없어요.</p>`}
+        : `<p class="muted" style="margin-top:10px;font-size:calc(13px*var(--fs,1))">연달아 빠진 사람이 없어요.</p>`}
     </section>`;
 }
 
@@ -1266,8 +1266,8 @@ function renderSouls() {
           st >= 2 ? `<span class="tpill streak">결석 ${st}주</span>` : ""] });
     }
     const bt = birthText(s), bd = annivIn(s.birth), od = isLeaderCard(s) ? null : oneDays(s);
-    return scard({ attr: `data-open="${s.id}"`, ava: avatar(s, 52), name: esc(s.name) + (tierOfSoul(s) === "intern" ? ` <span class="chip intern" style="font-size:10.5px;padding:2px 8px;vertical-align:2px">인턴</span>`
-        : tierOfSoul(s) === "cand" ? ` <span class="chip cand" style="font-size:10.5px;padding:2px 8px;vertical-align:2px" title="비공식 — 셀리더 · 코치 · 진장만 봐요">후보</span>` : ""),
+    return scard({ attr: `data-open="${s.id}"`, ava: avatar(s, 52), name: esc(s.name) + (tierOfSoul(s) === "intern" ? ` <span class="chip intern" style="font-size:calc(10.5px*var(--fs,1));padding:2px 8px;vertical-align:2px">인턴</span>`
+        : tierOfSoul(s) === "cand" ? ` <span class="chip cand" style="font-size:calc(10.5px*var(--fs,1));padding:2px 8px;vertical-align:2px" title="비공식 — 셀리더 · 코치 · 진장만 봐요">후보</span>` : ""),
       sub: (bt ? esc(bt) : "생일 미입력") + (bd !== null && bd <= 14 ? ` · 🎂 ${bd === 0 ? "오늘" : "D-" + bd}` : ""),
       chip: isLeaderCard(s) ? KINDLABEL[s.kind] : esc(STATUS[s.status] || "—"),
       chipCls: isLeaderCard(s) ? "" : s.status === "care" ? "warn" : "rose",
@@ -1419,9 +1419,9 @@ async function openSoul(soulId) {
   const tel = (s.phone||"").replace(/\D/g,"");
   $("soul-contact").innerHTML = tel ? `
     <div style="display:flex;gap:8px;max-width:420px">
-      <a class="btn-ghost" href="tel:${tel}" style="height:44px;display:flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;color:var(--text);font-size:13px">
+      <a class="btn-ghost" href="tel:${tel}" style="height:44px;display:flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;color:var(--text);font-size:calc(13px*var(--fs,1))">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4.5h3l1.4 3.5-2 1.4a10.5 10.5 0 0 0 5.2 5.2l1.4-2 3.5 1.4v3a1.6 1.6 0 0 1-1.8 1.6C11.3 18.2 5.8 12.7 5.4 6.3A1.6 1.6 0 0 1 7 4.5Z"/></svg>전화</a>
-      <a class="btn-ghost" href="sms:${tel}" style="height:44px;display:flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;color:var(--text);font-size:13px">
+      <a class="btn-ghost" href="sms:${tel}" style="height:44px;display:flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;color:var(--text);font-size:calc(13px*var(--fs,1))">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 5.5h15v11h-9l-4 3.5v-3.5h-2z"/></svg>문자</a>
     </div>` : "";
   $("soul-contact").insertAdjacentHTML("beforeend", shareBar(s));
@@ -1480,7 +1480,7 @@ function recCard(r, kw, showSoul) {
     : `${RTYPE[r.type]||r.type} · ${fmtDate(r.date)}`;
   return `<article class="rec">
     <div class="head">
-      <span style="font-size:12px;color:var(--dim)">${showSoul?`<b style="color:var(--text)">${esc(r.soulName)}</b> · `:""}${head}</span>
+      <span style="font-size:calc(12px*var(--fs,1));color:var(--dim)">${showSoul?`<b style="color:var(--text)">${esc(r.soulName)}</b> · `:""}${head}</span>
       ${scopeChip(r.scope)}
     </div>
     ${r.type!=="meet" && r.body ? `<p class="body${r.type==="heart"?" serif":""}">${hl(r.body,kw)}</p>` : ""}
@@ -1530,7 +1530,7 @@ function attendBlock(soulId, cellId) {
     return `<i class="${v}" title="${esc(fmtDate(m.date))} · ${esc(label)}${esc(why)}"></i>`;
   }).join("");
   return `<div class="card" style="margin-bottom:12px">
-    <h3 style="font-size:13px;font-weight:600;margin-bottom:12px">셀모임 출석</h3>
+    <h3 style="font-size:calc(13px*var(--fs,1));font-weight:600;margin-bottom:12px">셀모임 출석</h3>
     <div class="ring">
       <svg width="84" height="84" viewBox="0 0 84 84" role="img"
         aria-label="출석률 ${rate===null?"기록 없음":rate+"퍼센트"}">
@@ -1543,9 +1543,9 @@ function attendBlock(soulId, cellId) {
         <text class="rk" x="42" y="58" text-anchor="middle">출석률</text>
       </svg>
       <div style="min-width:0">
-        <p style="font-size:14px;line-height:1.7">${marked.length}번 중
+        <p style="font-size:calc(14px*var(--fs,1));line-height:1.7">${marked.length}번 중
           <b>${marked.filter(m=>m.attendance[soulId]!=="absent").length}번</b> 나왔어요</p>
-        <p class="muted" style="font-size:12px;margin-top:4px">
+        <p class="muted" style="font-size:calc(12px*var(--fs,1));margin-top:4px">
           최근 ${last12.length}주 흐름 — 왼쪽이 오래된 쪽이에요</p>
         <div class="weeks">${cells}</div>
       </div>
@@ -1578,8 +1578,8 @@ function renderSoulBody() {
       ${alertBlock(s)}
       ${isLeaderCard(s) && !s.linkedUid ? "" : attendBlock(attKey(s), attCell(s))}
       ${state.shared.length ? `<div class="card" style="margin-bottom:12px;background:var(--rose-bg);border-color:var(--rose-line)">
-        <h3 style="font-size:13px;font-weight:600;color:var(--rose-tx)">본인이 열어준 기록</h3>
-        <p class="muted" style="font-size:12px;margin-top:4px">
+        <h3 style="font-size:calc(13px*var(--fs,1));font-weight:600;color:var(--rose-tx)">본인이 열어준 기록</h3>
+        <p class="muted" style="font-size:calc(12px*var(--fs,1));margin-top:4px">
           ${esc(s.name)} 님이 '내 기록'에서 진장에게 보이기로 켠 것들이에요.</p>
         <div class="list" style="margin-top:10px">${state.shared.map(n=>`
           <div class="row"><div class="grow">
@@ -1618,7 +1618,7 @@ function renderSoulBody() {
   if (state.soulTab === "todo") {
     const todos = (s.todos||[]);
     box.innerHTML = `
-      ${mine?`<button class="btn-ghost" id="btn-todo-new" style="height:44px;font-size:13px;margin-bottom:12px;max-width:320px">후속조치 추가</button>`:""}
+      ${mine?`<button class="btn-ghost" id="btn-todo-new" style="height:44px;font-size:calc(13px*var(--fs,1));margin-bottom:12px;max-width:320px">후속조치 추가</button>`:""}
       <div class="list">${todos.length?todos.map(t=>`
         <div class="row ${t.done?"off":""}">
           ${mine?`<button class="icon-btn" style="width:34px;height:34px;color:${t.done?"#F24557":"var(--faint)"}" data-tgl="${t.id}" aria-label="완료 전환">
@@ -1658,8 +1658,8 @@ function renderSoulBody() {
     box.innerHTML = `
       <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between">
-          <h3 style="font-size:13px;font-weight:600">훈련 현황</h3>
-          <span class="muted" style="font-size:12px">${
+          <h3 style="font-size:calc(13px*var(--fs,1));font-weight:600">훈련 현황</h3>
+          <span class="muted" style="font-size:calc(12px*var(--fs,1))">${
             state.courses.length ? `${state.courses.length}개 중 ${doneN}개 수료` : "과정 미등록"}</span>
         </div>
         <div class="courses">${bapBox}${grid}</div>
@@ -1667,7 +1667,7 @@ function renderSoulBody() {
           ${canAddCourse?`<button class="btn-sm" id="btn-course-here" style="margin-top:10px">여기서 과정 등록하기</button>`
             :`<p class="muted" style="margin-top:8px">진장에게 과정 등록을 요청해 주세요.</p>`}`}
       </div>
-      ${mine&&state.courses.length?`<button class="btn-ghost" id="btn-train-new" style="height:44px;font-size:13px;margin-top:12px;max-width:320px">훈련 기록 추가</button>`:""}
+      ${mine&&state.courses.length?`<button class="btn-ghost" id="btn-train-new" style="height:44px;font-size:calc(13px*var(--fs,1));margin-top:12px;max-width:320px">훈련 기록 추가</button>`:""}
       <div class="list" style="margin-top:12px">${state.trainings.length?state.trainings.map(t=>{
         const c = state.courses.find(x=>x.id===t.courseId);
         const total = (c&&c.sessions)||t.totalSessions||1, okN = doneSessions(t), log = t.sessionLog||[];
@@ -1704,7 +1704,7 @@ function renderSoulBody() {
     const leadRows = Object.values(leads);
     if (leadRows.length) box.insertAdjacentHTML("beforeend", `
       <div class="card" style="margin-top:12px">
-        <h3 style="font-size:13px;font-weight:600">후원자로 이끌고 있어요</h3>
+        <h3 style="font-size:calc(13px*var(--fs,1));font-weight:600">후원자로 이끌고 있어요</h3>
         <div class="list" style="margin-top:10px">${leadRows.map(x=>`
           <div class="row"><div class="grow">
             <p class="nm">${esc((x.r.sponseeNames||[]).join(", "))} · ${esc(x.r.courseName||"")}</p>
@@ -1731,7 +1731,7 @@ function renderSoulBody() {
       <div class="row"><div class="grow"><p class="sub" style="margin:0">${k}</p>
         <p class="nm" style="margin-top:4px;white-space:pre-wrap">${esc(v)}</p></div></div>`).join("")}</div>`
       :`<p class="muted">아직 적은 정보가 없어요.</p>`)
-      + (mine?`<button class="btn-ghost" id="btn-edit-here" style="height:44px;font-size:13px;margin-top:12px;max-width:320px">프로필 수정</button>`:"");
+      + (mine?`<button class="btn-ghost" id="btn-edit-here" style="height:44px;font-size:calc(13px*var(--fs,1));margin-top:12px;max-width:320px">프로필 수정</button>`:"");
     const e=$("btn-edit-here"); if(e) e.onclick=()=>openEdit(s.id);
     /* 셀리더 카드라면, 그 셀리더가 스스로 적어 진장에게 열어둔 프로필도 같이 */
     const ls = state.linkedSelf;
@@ -1739,8 +1739,8 @@ function renderSoulBody() {
       <div class="card" style="margin-bottom:12px">
         <div style="display:flex;align-items:center;gap:10px">
           ${avatar({ name:s.name, thumb:ls.thumb }, 40)}
-          <div><h3 style="font-size:13px;font-weight:600">본인이 적은 프로필</h3>
-            <p class="muted" style="font-size:12px">${esc(s.name)} 님이 '내 카드'에 적고 진장에게 열어둔 것</p></div>
+          <div><h3 style="font-size:calc(13px*var(--fs,1));font-weight:600">본인이 적은 프로필</h3>
+            <p class="muted" style="font-size:calc(12px*var(--fs,1))">${esc(s.name)} 님이 '내 카드'에 적고 진장에게 열어둔 것</p></div>
         </div>
         ${selfRows(ls)}
       </div>`);
@@ -1749,7 +1749,7 @@ function renderSoulBody() {
   if (state.soulTab === "family") {
     const fam = s.family||[];
     box.innerHTML = `
-      ${mine?`<button class="btn-ghost" id="btn-fam-new" style="height:44px;font-size:13px;margin-bottom:12px;max-width:320px">가족 추가</button>`:""}
+      ${mine?`<button class="btn-ghost" id="btn-fam-new" style="height:44px;font-size:calc(13px*var(--fs,1));margin-bottom:12px;max-width:320px">가족 추가</button>`:""}
       <div class="list">${fam.length?fam.map((f,i)=>`
         <div class="row"><span class="ava">${esc(initial(f.name))}</span>
           <div class="grow"><p class="nm">${esc(f.relation)} · ${esc(f.name)}</p>
@@ -2567,7 +2567,7 @@ function renderSessions() {
       <button type="button" class="${s.ok?"ok":""}" data-sok="${s.no}"
         aria-label="${s.no}회차 ${s.ok?"만남 완료":"예정"}">${s.ok?"✓":"○"}</button></div>`).join("");
   const all = n===sesTotal && sesTotal>0;
-  $("ses-done-hint").innerHTML = `<p class="muted" style="font-size:12px">${n} / ${sesTotal}회 만남${planned?` · 예정 ${planned}회`:""}</p>
+  $("ses-done-hint").innerHTML = `<p class="muted" style="font-size:calc(12px*var(--fs,1))">${n} / ${sesTotal}회 만남${planned?` · 예정 ${planned}회`:""}</p>
     ${all?`<button class="btn-sm" id="ses-complete" style="margin-top:10px">수료로 표시하기</button>`:""}`;
   const b=$("ses-complete");
   if(b) b.onclick=async()=>{
@@ -2898,7 +2898,7 @@ function renderCal() {
     html += `<div class="day${ds===todayStr()?" today":""}${ds===state.calPick?" sel":""}" data-day="${ds}">
       <span class="${dw===0?"sun":""}">${d}</span>
       <span class="marks">${colors.map(c=>`<i style="background:${c}"></i>`).join("")}</span>
-      ${isWide()&&list.length?`<span style="font-size:10px;color:var(--dim);line-height:1.4;text-align:left;width:100%;overflow:hidden">${list.slice(0,2).map(e=>esc(e.title)).join("<br>")}</span>`:""}
+      ${isWide()&&list.length?`<span style="font-size:calc(10px*var(--fs,1));color:var(--dim);line-height:1.4;text-align:left;width:100%;overflow:hidden">${list.slice(0,2).map(e=>esc(e.title)).join("<br>")}</span>`:""}
     </div>`;
   }
   $("cal-grid").innerHTML = html;
@@ -2928,7 +2928,7 @@ function renderCalDay() {
       ${e.id?`<button class="btn-sm" data-gomeet="${e.id}">열기</button>`:""}
     </div>`).join("")
     : canLead()
-      ? `<button class="btn-ghost" id="cal-empty-add" style="height:46px;font-size:13px;max-width:360px">${
+      ? `<button class="btn-ghost" id="cal-empty-add" style="height:46px;font-size:calc(13px*var(--fs,1));max-width:360px">${
           ds > todayStr() ? "이 날 예정 잡기" : "이 날 있었던 일 적기"}</button>`
       : `<p class="muted">이 날은 일정이 없어요.</p>`;
   const ea = $("cal-empty-add"); if (ea) ea.onclick = () => $("btn-cal-add").click();
@@ -3110,9 +3110,9 @@ function openEdit(soulId) {
   const canAddCell = state.me.role==="super"||state.me.role==="jinjang";
   $("no-cell-help").innerHTML = use.length?"":`
     <div class="card" style="margin-bottom:14px;background:var(--warn-bg);border-color:var(--warn-line);max-width:560px">
-      <p style="font-size:13px;line-height:1.7;color:var(--warn-sub)">셀이 아직 없어요. 셀이 없어도 저장은 되지만, 출석 체크를 하려면 셀이 필요해요.</p>
+      <p style="font-size:calc(13px*var(--fs,1));line-height:1.7;color:var(--warn-sub)">셀이 아직 없어요. 셀이 없어도 저장은 되지만, 출석 체크를 하려면 셀이 필요해요.</p>
       ${canAddCell?`<button class="btn-sm" id="btn-cell-here" style="margin-top:10px">여기서 셀 만들기</button>`
-        :`<p class="muted" style="margin-top:8px;font-size:12px">진장에게 셀 생성을 요청해 주세요.</p>`}</div>`;
+        :`<p class="muted" style="margin-top:8px;font-size:calc(12px*var(--fs,1))">진장에게 셀 생성을 요청해 주세요.</p>`}</div>`;
   const cb=$("btn-cell-here"); if(cb) cb.onclick=()=>addCell(()=>openEdit(state.editingId));
 
   const v=(id,val)=>$(id).value=val||"";
@@ -3410,8 +3410,8 @@ function renderMeetChart() {
   box.innerHTML = `
     <div class="card" style="margin-top:14px">
       <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px">
-        <h3 style="font-size:13px;font-weight:600">주차별 출석률</h3>
-        <span class="muted" style="font-size:12px;display:inline-flex;align-items:center;gap:5px">
+        <h3 style="font-size:calc(13px*var(--fs,1));font-weight:600">주차별 출석률</h3>
+        <span class="muted" style="font-size:calc(12px*var(--fs,1));display:inline-flex;align-items:center;gap:5px">
           최근 ${recent.length}회
           <i style="width:14px;border-top:1px dashed var(--faint);display:inline-block"></i>평균 ${avg}%
         </span>
@@ -3427,23 +3427,23 @@ function renderMeetChart() {
     ${people.length ? `
     <div class="card" style="margin-top:10px">
       <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px">
-        <h3 style="font-size:13px;font-weight:600">사람별 출석률</h3>
+        <h3 style="font-size:calc(13px*var(--fs,1));font-weight:600">사람별 출석률</h3>
         <span style="display:flex;gap:6px;align-items:center">
           <span class="seg" style="margin:0" id="meet-sort">
-            <button type="button" data-ms="seq" class="${sortLow?"":"on"}" style="padding:6px 10px;font-size:12px">정한 순서</button>
-            <button type="button" data-ms="low" class="${sortLow?"on":""}" style="padding:6px 10px;font-size:12px">낮은 순</button>
+            <button type="button" data-ms="seq" class="${sortLow?"":"on"}" style="padding:6px 10px;font-size:calc(12px*var(--fs,1))">정한 순서</button>
+            <button type="button" data-ms="low" class="${sortLow?"on":""}" style="padding:6px 10px;font-size:calc(12px*var(--fs,1))">낮은 순</button>
           </span>
           ${canLead()?`<button type="button" class="btn-sm" id="btn-meet-order">순서 정하기</button>`:""}
         </span>
       </div>
       <div class="hbars">${people.map(({s,rate,me})=>`
         <div class="hb${rate<60?" low":""}" ${me?`data-gomine="1"`:`data-gosoul5="${s.id}"`} style="cursor:pointer">
-          <span class="who">${esc(s.name)}${me?` <span class="chip rose" style="font-size:10px;padding:1px 6px">나</span>`
-            : isLeaderCard(s)?` <span class="chip" style="font-size:10px;padding:1px 6px">셀리더</span>`:""}</span>
+          <span class="who">${esc(s.name)}${me?` <span class="chip rose" style="font-size:calc(10px*var(--fs,1));padding:1px 6px">나</span>`
+            : isLeaderCard(s)?` <span class="chip" style="font-size:calc(10px*var(--fs,1));padding:1px 6px">셀리더</span>`:""}</span>
           <span class="track"><i style="width:${Math.max(rate,2)}%"></i></span>
           <span class="pct">${rate}%</span>
         </div>`).join("")}</div>
-      <p class="muted" style="font-size:11px;margin-top:12px">
+      <p class="muted" style="font-size:calc(11px*var(--fs,1));margin-top:12px">
         이름을 누르면 그 사람 카드가 열려요. 60%가 안 되면 숫자를 노란색으로 표시했어요.</p>
     </div>` : ""}`;
 }
@@ -3527,12 +3527,12 @@ function renderAttendance(mine) {
   const lname = (lm && lm.name) || "셀리더";
   const lv = mt.attendance[lk] || "";
   const n=Object.values(mt.attendance).filter(v=>v&&v!=="absent").length;
-  const head = `<p class="muted" style="font-size:12px;grid-column:1/-1">셀리더 포함 ${roster.length+1}명 중 ${n}명 출석</p>`;
+  const head = `<p class="muted" style="font-size:calc(12px*var(--fs,1));grid-column:1/-1">셀리더 포함 ${roster.length+1}명 중 ${n}명 출석</p>`;
   const leadRow = `<div class="member lead">
       <div class="top">
-        ${lk===uid() ? meAvatar(34) : `<span class="ava" style="width:34px;height:34px;font-size:13px">${esc(initial(lname))}</span>`}
+        ${lk===uid() ? meAvatar(34) : `<span class="ava" style="width:34px;height:34px;font-size:calc(13px*var(--fs,1))">${esc(initial(lname))}</span>`}
         <div class="grow" style="flex-grow:1;min-width:0">
-          <p class="nm">${esc(lname)} <span class="chip rose" style="font-size:10px;padding:1px 7px">셀리더${lk===uid()?" · 나":""}</span></p>
+          <p class="nm">${esc(lname)} <span class="chip rose" style="font-size:calc(10px*var(--fs,1));padding:1px 7px">셀리더${lk===uid()?" · 나":""}</span></p>
           ${lk===uid()?`<p class="sub" style="margin-top:2px">내 근황은 '내 카드'에 적어요</p>`:""}
         </div>
         <div class="att">${["present","online","absent"].map(k=>
@@ -3556,7 +3556,7 @@ function renderAttendance(mine) {
       ${v==="absent"?`<div class="rsn">${Object.entries(REASON).map(([k,l])=>
           `<button data-rk="${s.id}" data-k="${k}" class="${(mt.reasonKinds[s.id]||"")===k?"on":""}" ${mine?"":"disabled"}>${l}</button>`).join("")}</div>
         <input data-reason="${s.id}" value="${esc(mt.reasons[s.id]||"")}"
-        placeholder="한 줄 메모 (선택)" style="height:40px;margin-top:8px;font-size:14px" ${mine?"":"disabled"}>`:""}
+        placeholder="한 줄 메모 (선택)" style="height:40px;margin-top:8px;font-size:calc(14px*var(--fs,1))" ${mine?"":"disabled"}>`:""}
       ${open?`<div class="more">
         <p class="tag">근황 · 나눔</p>
         <textarea data-note="${s.id}" data-k="update" placeholder="오늘 나눈 이야기, 요즘 어떤지" ${mine?"":"disabled"}>${esc(nt.update||"")}</textarea>
@@ -4181,7 +4181,7 @@ const SCREEN_SKIP = new Set(["login", "verify", "setup", "accept", "pending", "c
 const ACT_NAME = { recordCreate:"기록 남김", planCreate:"만남 예약", meetingSave:"셀모임 저장",
   soulCreate:"영혼 추가", trainSave:"훈련 기록", exportCsv:"내려받기", myNote:"내 기록", handover:"카드 인계",
   promote:"셀리더 세우기", comment:"댓글", dm:"쪽지", careContact:"챙김 연락", meetingReport:"셀 보고",
-  gcalConnect:"구글 캘린더 연결", gcalSync:"구글 캘린더 맞추기", photoUpload:"셀모임 사진 올림", themeChange:"화면 밝기 바꿈",
+  gcalConnect:"구글 캘린더 연결", gcalSync:"구글 캘린더 맞추기", photoUpload:"셀모임 사진 올림", themeChange:"화면 밝기 바꿈", fontSize:"글자 크기 바꿈",
   memoFormat:"메모 꾸미기 사용", installApp:"홈 화면 앱 설치", welcomeOff:"처음 안내 닫음" };
 const actName = (k) => ACT_NAME[k] || (k.startsWith("help_") ? `도우미 · ${(HELP.find(t => t.id === k.slice(5)) || {}).t || k.slice(5)}` : k);
 const US_PERIOD = [[7, "7일"], [30, "30일"], [90, "90일"]];
@@ -4347,7 +4347,7 @@ function renderUsage() {
         </div>
       </div>
       <div class="card us-card us-wide"><div class="us-h"><h3>사람별</h3>
-          <select id="us-sort" aria-label="사람별 정렬" style="width:auto;height:34px;font-size:13px;padding:0 30px 0 10px">${[["quiet", "오래 안 들어온 순"], ["most", "많이 쓰는 순"], ["name", "가나다순"]].map(([k, l]) => `<option value="${k}" ${U.sort === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>
+          <select id="us-sort" aria-label="사람별 정렬" style="width:auto;height:34px;font-size:calc(13px*var(--fs,1));padding:0 30px 0 10px">${[["quiet", "오래 안 들어온 순"], ["most", "많이 쓰는 순"], ["name", "가나다순"]].map(([k, l]) => `<option value="${k}" ${U.sort === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>
         <div class="us-tw"><table class="us-tbl"><thead><tr><th>이름</th><th>마지막</th><th class="n">쓴 날</th><th class="n">사용 시간</th><th class="n">한 일</th><th>주로 쓰는 화면</th><th>기기 · 버전</th></tr></thead>
           <tbody>${ppl || `<tr><td colspan="7" class="muted">아직 쌓인 게 없어요.</td></tr>`}</tbody></table></div>
       </div>
@@ -4411,15 +4411,15 @@ function renderMine() {
     $("mine-sum").innerHTML = `
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
         ${meAvatar(48)}
-        <div><p style="font-size:17px;font-weight:600">${esc(state.me.name||"나")}</p>
-          <p class="muted" style="font-size:12px">셀리더${cell?` · ${esc(cell.name)}`:""}</p></div>
+        <div><p style="font-size:calc(17px*var(--fs,1));font-weight:600">${esc(state.me.name||"나")}</p>
+          <p class="muted" style="font-size:calc(12px*var(--fs,1))">셀리더${cell?` · ${esc(cell.name)}`:""}</p></div>
       </div>
       <div class="tiles">
         ${tile("셀모임 출석 · 3개월", a3.marked ? `${a3.came}/${a3.marked}` : "—")}
         ${tile("함께한 모임 · 3개월", a3.met+"번")}
         ${tile("1:1 · 3개월", a3.one+"번")}
       </div>
-      <p class="muted" style="font-size:12px;margin-top:8px">지금까지 셀모임 출석 ${all.marked?`${all.came}/${all.marked}`:"기록 전"}
+      <p class="muted" style="font-size:calc(12px*var(--fs,1));margin-top:8px">지금까지 셀모임 출석 ${all.marked?`${all.came}/${all.marked}`:"기록 전"}
         · 함께한 모임 ${all.met}번 — 셀모임 출석 체크의 '나' 줄과 내가 함께한 만남 기록에서 셉니다.</p>`;
   } else $("mine-sum").innerHTML = "";
   renderMineProfile();
@@ -4434,7 +4434,7 @@ function renderMine() {
   $("mine-list").innerHTML = list.map(n=>`
     <article class="rec">
       <div class="head">
-        <span style="font-size:12px;color:var(--dim)">${MYKIND[n.kind]||""} · ${fmtDate(n.date)}</span>
+        <span style="font-size:calc(12px*var(--fs,1));color:var(--dim)">${MYKIND[n.kind]||""} · ${fmtDate(n.date)}</span>
         <span class="chip ${n.scope==="upline"?"rose":"lock"}">${MYSCOPE[n.scope]||""}</span>
       </div>
       <p class="body${n.kind==="heart"?" serif":""}">${esc(n.body)}</p>
@@ -4878,7 +4878,7 @@ function renderPhotos() {
     <div class="tiles" style="margin-top:14px">
       ${tile("얼굴", S.faces.length+"장")}${tile("셀모임", S.nCell+"장")}${tile("만남 · 모임", S.nMeet+"장")}
     </div>
-    <p class="muted" style="font-size:12px;margin-top:10px">사진 저장 공간 (추정) 약 ${usedMB<10?usedMB.toFixed(1):Math.round(usedMB)}MB
+    <p class="muted" style="font-size:calc(12px*var(--fs,1));margin-top:10px">사진 저장 공간 (추정) 약 ${usedMB<10?usedMB.toFixed(1):Math.round(usedMB)}MB
       · 무료 한도 1,024MB의 ${pct<1?pct.toFixed(1):Math.round(pct)}% — 모임 사진은 대략 4,000장까지 들어가요.
       내가 볼 수 있는 사진 기준이에요.</p>`;
 
@@ -5014,8 +5014,8 @@ function renderStats() {
   const col = (c) => SCAT.find(x=>x[0]===c)[2];
   $("st-kinds").innerHTML = `
     <div class="card" style="margin-top:14px">
-      <h3 style="font-size:13px;font-weight:600">종류별 모임 횟수</h3>
-      <p class="muted" style="font-size:12px;margin-top:4px">여러 명이 함께한 모임은 한 번으로 셉니다.</p>
+      <h3 style="font-size:calc(13px*var(--fs,1));font-weight:600">종류별 모임 횟수</h3>
+      <p class="muted" style="font-size:calc(12px*var(--fs,1));margin-top:4px">여러 명이 함께한 모임은 한 번으로 셉니다.</p>
       <div style="margin-top:10px">${krows.length ? krows.map(k=>`
         <div class="kbar" title="${esc(k.label)} ${k.n}회"><span>${esc(k.label)}</span>
           <div><div class="t" style="width:${Math.max(1, k.n/kmax*100)}%;background:${col(k.cat)}"></div></div>
@@ -5037,11 +5037,11 @@ function renderStats() {
   const used = SCAT.filter(([k]) => k !== "cell" || S.withCell);
   $("st-people").innerHTML = `
     <div class="card" style="margin-top:14px">
-      <h3 style="font-size:13px;font-weight:600">누구를 얼마나 만났나</h3>
-      <p class="muted" style="font-size:12px;margin-top:4px">${S.away
+      <h3 style="font-size:calc(13px*var(--fs,1));font-weight:600">누구를 얼마나 만났나</h3>
+      <p class="muted" style="font-size:calc(12px*var(--fs,1));margin-top:4px">${S.away
         ? "나 없이 모인 것까지 셉니다 — 그 사람의 활동량이에요."
         : "내가 직접 함께한 것만 셉니다 — 내가 만난 횟수예요."} 평균 ${avg.toFixed(1)}회.</p>
-      ${low.length ? `<p style="font-size:13px;margin-top:10px;color:var(--warn-tx)">이 기간에 적게 만난 사람 — ${
+      ${low.length ? `<p style="font-size:calc(13px*var(--fs,1));margin-top:10px;color:var(--warn-tx)">이 기간에 적게 만난 사람 — ${
         low.slice().reverse().slice(0,5).map(x=>`${esc(x.s.name)} ${x.total}회`).join(", ")}</p>` : ""}
       <div class="legend" style="margin-top:12px">${used.map(([k,l,c])=>
         `<span><i style="background:${c};border:none"></i>${l}</span>`).join("")}</div>
@@ -5052,7 +5052,7 @@ function renderStats() {
         return `<div class="srow" title="${esc(x.s.name)} — ${used.map(([k,l])=>`${l} ${x.c[k]}`).join(" · ")}">
           <span class="who">${avatar(x.s,24)}<span>${esc(x.s.name)}</span></span>
           <div>${x.total ? `<div class="hbar" style="width:${x.total/max*100}%">${segs}</div>`
-            : `<span class="chip warn" style="font-size:11px">한 번도 없음</span>`}</div>
+            : `<span class="chip warn" style="font-size:calc(11px*var(--fs,1))">한 번도 없음</span>`}</div>
           <span class="n">${x.total}</span>
           <span class="det">${used.filter(([k])=>x.c[k]).map(([k,l])=>`${l} ${x.c[k]}`).join(" · ") || "—"}${
             n!==null?` · 마지막 만남 ${n===0?"오늘":n+"일 전"}`:""}</span>
@@ -5092,7 +5092,7 @@ function selfRows(sc) {
     ["가족", sc.family], ["인생 말씀", sc.verse]
   ].filter(([,v])=>v);
   return rows.length
-    ? `<div style="display:grid;grid-template-columns:84px 1fr;gap:8px 12px;font-size:13px;margin-top:12px">${
+    ? `<div style="display:grid;grid-template-columns:84px 1fr;gap:8px 12px;font-size:calc(13px*var(--fs,1));margin-top:12px">${
         rows.map(([k,v])=>`<span class="muted">${k}</span><span style="white-space:pre-wrap">${esc(v)}</span>`).join("")}</div>`
     : `<p class="muted" style="margin-top:10px">아직 적은 게 없어요.</p>`;
 }
@@ -5103,7 +5103,7 @@ function renderMineProfile() {
   $("mine-profile").innerHTML = `
     <div class="card" style="margin-top:14px">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-        <h3 style="font-size:13px;font-weight:600">내 프로필</h3>
+        <h3 style="font-size:calc(13px*var(--fs,1));font-weight:600">내 프로필</h3>
         ${state.selfCard ? `<span class="chip ${sc.share==="private"?"lock":"rose"}">${sc.share==="private"?"나만 보기":"진장에게 보임"}</span>` : ""}
       </div>
       ${state.selfCard ? selfRows(sc) : `<p class="muted" style="margin-top:10px">사진 · 생일 · 연락처를 넣어두면 출석 명단과 영혼들 맨 위 '나' 줄에 쓰여요.
@@ -5278,6 +5278,10 @@ async function backfillThumbs() {
    올릴 때마다 version.json 도 같이 올립니다. 앱은 열 때 · 다시 볼 때 · 10분마다
    그 파일만 살짝 확인해서(아주 작은 파일), 지금 버전보다 새것이면 위에 알림을 띄웁니다. */
 const CHANGELOG = [
+  { v:"37.0", d:"2026-11-12", items:[
+    "글자를 전체적으로 한 단계 크게 (쑥쑥 글꼴에 맞춰 기본 110%)",
+    "글자 크기 고르기 — 더보기 → 화면: 작게 · 보통 · 크게 · 아주 크게 (이 기기에 기억, 칸 배치는 그대로)",
+    "폰 홈 '처음이세요?' 띠 — 글은 한 줄로, 버튼은 아래 줄로" ] },
   { v:"36.1", d:"2026-11-12", items:[
     "오늘 기도할 영혼 카드를 은은하게 (왼쪽 와인색 선 하나 · 버튼 작게)",
     "2안 다크 사이드 갤러리를 은은하게 — 왼쪽 메뉴 · 대표 방 두 개를 모카빛으로, 금빛 아이콘",
@@ -5488,10 +5492,10 @@ $("btn-ver").onclick = () => {
   $("ver-list").innerHTML = CHANGELOG.map(c => `
     <div class="cmt">
       <p class="h"><span><b style="color:var(--text)">v${c.v}</b> · ${String(c.d).replace(/-/g, ".")}</span>${
-        verOf(APP_VERSION)===c.v?`<span class="chip rose" style="font-size:10px">지금 이 버전</span>`:""}</p>
-      <ul style="margin:6px 0 0 18px;font-size:13px;line-height:1.7">${c.items.map(i=>`<li>${esc(i)}</li>`).join("")}</ul>
+        verOf(APP_VERSION)===c.v?`<span class="chip rose" style="font-size:calc(10px*var(--fs,1))">지금 이 버전</span>`:""}</p>
+      <ul style="margin:6px 0 0 18px;font-size:calc(13px*var(--fs,1));line-height:1.7">${c.items.map(i=>`<li>${esc(i)}</li>`).join("")}</ul>
     </div>`).join("")
-    + `<p class="muted" style="font-size:12px;margin-top:10px">그 전 (1~9단계): 영혼 카드 · 셀모임 출석 · 만남 기록 · 훈련 현황 · 캘린더 · 넓은 화면 · 사진 · 사용 현황</p>`;
+    + `<p class="muted" style="font-size:calc(12px*var(--fs,1));margin-top:10px">그 전 (1~9단계): 영혼 카드 · 셀모임 출석 · 만남 기록 · 훈련 현황 · 캘린더 · 넓은 화면 · 사진 · 사용 현황</p>`;
   $("dlg-ver").showModal();
 };
 $("ver-close").onclick = () => $("dlg-ver").close();
@@ -5545,7 +5549,7 @@ function renderComments() {
   $("cmt-list").innerHTML = state.cmtRows.map(c => `
     <div class="cmt">
       <p class="h"><span><b style="color:var(--text)">${esc(c.byName||"")}</b> · ${fmtAgo(c.atMs)}</span>
-        ${c.by===uid()?`<button class="btn-sm danger" data-delcmt="${c.id}" style="height:26px;font-size:11px">지우기</button>`:""}</p>
+        ${c.by===uid()?`<button class="btn-sm danger" data-delcmt="${c.id}" style="height:26px;font-size:calc(11px*var(--fs,1))">지우기</button>`:""}</p>
       <p class="b">${esc(c.body)}</p>
     </div>`).join("") || `<p class="muted">아직 댓글이 없어요. 첫 댓글을 남겨보세요.</p>`;
   $("cmt-list").scrollTop = 1e6;
@@ -6142,7 +6146,7 @@ function renderDir() {
       const single = state.dirCell !== "all";   // 셀 하나만 볼 땐 셀리더도 같은 크기 카드로 한 판에
       return `<section class="cgrp">
         <div class="cgh"><span class="cbadge">${esc(c.name)}</span>
-          <span class="cgm">${esc(jinName(c))}</span>${myCellIds.has(c.id) ? `<button type="button" class="btn-sm" data-ordcell="${c.id}" style="height:30px;font-size:12px;padding:0 10px;white-space:nowrap;flex:none">순서 · 인턴</button>` : ""}<span class="cgc" data-cellatt="${c.id}">셀원 ${ms.length}명</span></div>
+          <span class="cgm">${esc(jinName(c))}</span>${myCellIds.has(c.id) ? `<button type="button" class="btn-sm" data-ordcell="${c.id}" style="height:30px;font-size:calc(12px*var(--fs,1));padding:0 10px;white-space:nowrap;flex:none">순서 · 인턴</button>` : ""}<span class="cgc" data-cellatt="${c.id}">셀원 ${ms.length}명</span></div>
         ${single ? `<div class="mgrid one">${leadH}${ms.map(m => card(m, { rank: true })).join("")}</div>`
           : `${leadH}${ms.length ? `<div class="twigs">${ms.map(m => card(m, { twig: true, rank: true })).join("")}</div>`
           : `<p class="muted twig-empty">아직 등록된 셀원이 없어요.</p>`}`}
@@ -6211,8 +6215,8 @@ function openMember(id) {
     handPendingFor(m) ? `<span class="chip warn">카드 넘어가는 중</span>` : ""].join("");
   const tel = String(m.phone||"").replace(/\D/g, "");
   $("mb-contact").innerHTML = tel && !mine ? `<div style="display:flex;gap:8px">
-    <a class="btn-ghost" href="tel:${tel}" style="height:42px;display:flex;align-items:center;justify-content:center;text-decoration:none;color:var(--text);font-size:13px">전화 ${esc(m.phone)}</a>
-    <a class="btn-ghost" href="sms:${tel}" style="height:42px;width:92px;flex-shrink:0;display:flex;align-items:center;justify-content:center;text-decoration:none;color:var(--text);font-size:13px">문자</a></div>` : "";
+    <a class="btn-ghost" href="tel:${tel}" style="height:42px;display:flex;align-items:center;justify-content:center;text-decoration:none;color:var(--text);font-size:calc(13px*var(--fs,1))">전화 ${esc(m.phone)}</a>
+    <a class="btn-ghost" href="sms:${tel}" style="height:42px;width:92px;flex-shrink:0;display:flex;align-items:center;justify-content:center;text-decoration:none;color:var(--text);font-size:calc(13px*var(--fs,1))">문자</a></div>` : "";
   const rows = [
     ["연락처", mine ? m.phone : ""], ["생일", mdText(m.birthMD, m.lunar)], ["성별", m.gender], ["직분", m.position],
     ["교회 등록일", fmtDate(m.registeredAt, true)], ["침례", fmtDate(m.baptizedAt, true)],
@@ -6580,7 +6584,7 @@ function renderHomeHand() {
   (state.handovers||[]).filter(h => h.status === "pending" && h.fromUid === me).forEach(h => {
     const n = handTargets(h).length;
     parts.push(`<div class="card" style="margin-bottom:12px;background:var(--rose-bg);border-color:var(--rose-line)">
-      <p style="font-size:13px;font-weight:600;color:var(--rose-tx)">${esc(handTitle(h))}</p>
+      <p style="font-size:calc(13px*var(--fs,1));font-weight:600;color:var(--rose-tx)">${esc(handTitle(h))}</p>
       <p class="muted" style="margin-top:6px">${esc(h.byName || "")} 님이 요청했어요 — 내가 맡은 목양 카드 ${n}장을
         <b style="color:var(--text)">${esc(userName(h.toUid))}</b> 님에게 넘겨주세요.</p>
       <button class="btn-sm" data-hrun="${h.id}" style="margin-top:10px">${n ? "넘기기" : "확인 — 넘길 카드 없음"}</button>
@@ -6588,11 +6592,11 @@ function renderHomeHand() {
   });
   const inc = (state.handovers||[]).filter(h => h.status === "pending" && h.toUid === me && h.fromUid !== me);
   if (inc.length) parts.push(`<div class="card" style="margin-bottom:12px">
-      <p style="font-size:13px;font-weight:600">목양 카드가 넘어올 거예요</p>
+      <p style="font-size:calc(13px*var(--fs,1));font-weight:600">목양 카드가 넘어올 거예요</p>
       <p class="muted" style="margin-top:6px">${inc.map(h => `${esc(handTitle(h))} — ${esc(userName(h.fromUid))} 님이 앱을 열어 넘기면 내 영혼들에 생겨요.`).join("<br>")}</p>
     </div>`);
   if (state.selfDup && state.selfDup.active !== false) parts.push(`<div class="card" style="margin-bottom:12px">
-      <p style="font-size:13px;font-weight:600">영혼 카드에 '${esc(state.selfDup.name)}' — 나와 같은 이름이 있어요</p>
+      <p style="font-size:calc(13px*var(--fs,1));font-weight:600">영혼 카드에 '${esc(state.selfDup.name)}' — 나와 같은 이름이 있어요</p>
       <p class="muted" style="margin-top:6px">나를 위해 만들어 둔 카드라면 그 카드에서 '보관하기'를 눌러주세요.
         이제 나는 영혼들 맨 위 '나'와 교회 명부에 따로 있어요. 다른 분이면 그대로 두셔도 돼요(명부에는 안 올라가요).</p>
       <button class="btn-sm" data-gosoul="${state.selfDup.id}" style="margin-top:10px">카드 열기</button>
@@ -6617,7 +6621,7 @@ function openHrun(id) {
   const jj = (state.members||[]).find(u => u.role === "jinjang" && u.active !== false && u.jinId === h.jinId && u.id !== uid());
   state.hrJJ = jj ? jj.id : null;
   $("hr-lead-wrap").innerHTML = self.length ? `<div class="card" style="background:var(--lock-bg);border-color:var(--track)">
-      <p style="font-size:13px;line-height:1.7">${esc(self.map(s => s.name).join(", "))} 님 카드는 본인에게 넘기지 않아요.
+      <p style="font-size:calc(13px*var(--fs,1));line-height:1.7">${esc(self.map(s => s.name).join(", "))} 님 카드는 본인에게 넘기지 않아요.
         '셀리더 카드'로 바뀌고, 본인은 어떤 경로로도 못 봐요.</p>
       ${jj ? `<label class="check" style="margin-top:10px"><input type="checkbox" id="hr-tojj" checked> 진장(${esc(jj.name)})에게 넘기기</label>`
            : `<p class="muted" style="margin-top:6px">진장이 없어서 내가 계속 맡아요.</p>`}</div>` : "";
@@ -6690,8 +6694,8 @@ function renderCellMgr() {
   const pend = (state.handovers||[]).filter(h => h.status === "pending");
   const me = state.me;
   $("cm-pending").innerHTML = pend.length ? `<div class="card" style="margin-top:6px">
-      <h3 style="font-size:13px;font-weight:600">넘어가는 중인 목양 카드 ${pend.length}건</h3>
-      <p class="muted" style="font-size:12px;margin-top:4px">지금 카드를 맡은 셀리더가 앱을 열어 넘기면 끝나요.</p>
+      <h3 style="font-size:calc(13px*var(--fs,1));font-weight:600">넘어가는 중인 목양 카드 ${pend.length}건</h3>
+      <p class="muted" style="font-size:calc(12px*var(--fs,1));margin-top:4px">지금 카드를 맡은 셀리더가 앱을 열어 넘기면 끝나요.</p>
       <div class="list" style="margin-top:10px">${pend.map(h => `<div class="row" style="flex-direction:column;align-items:stretch">
         <p class="nm">${esc(handTitle(h))}</p>
         <p class="sub">${esc(userName(h.fromUid))} → ${esc(userName(h.toUid))} · ${(h.memberIds||[]).length ? h.memberIds.length + "명" : "셀 전체"} · ${fmtAgo(h.atMs)} 요청</p>
@@ -6712,7 +6716,7 @@ function renderCellMgr() {
         <button class="btn-sm" data-cmview="${c.id}">명부</button></div>
       ${ents.length ? ents.map(e => e.m ? memCardHTML(e.m, { leadEnt: e, mgr: true, cellId: c.id }) : leadGhostHTML(e)).join("")
         : `<div class="mcard lead empty"><span class="ava" style="width:52px;height:52px">?</span>
-            <div class="mc-body"><p class="mc-role">담당 셀리더</p><p class="mc-nm" style="color:var(--warn-tx);font-size:13px;font-weight:500">없음 — '담당 바꾸기'나 셀리더 명단에서 넣어 주세요</p></div></div>`}
+            <div class="mc-body"><p class="mc-role">담당 셀리더</p><p class="mc-nm" style="color:var(--warn-tx);font-size:calc(13px*var(--fs,1));font-weight:500">없음 — '담당 바꾸기'나 셀리더 명단에서 넣어 주세요</p></div></div>`}
       <div class="acts">
         <button class="btn-sm" data-cmlead="${c.id}">담당 바꾸기</button>
         <button class="btn-sm" data-cmsplit="${c.id}">분가</button>
@@ -6993,13 +6997,13 @@ function renderOrg() {
     const jj = seatList("jinjang", j.id), co = seatList("coach", j.id);
     return `<div class="card" style="margin-top:14px">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-        <h3 class="grow" style="font-size:16px;font-weight:600">${esc(j.name)}</h3>
+        <h3 class="grow" style="font-size:calc(16px*var(--fs,1));font-weight:600">${esc(j.name)}</h3>
         <button class="btn-sm" data-ojrename="${j.id}">이름</button>
       </div>
       <div class="seat"><span class="lb">진장</span><div class="ppl">${jj.map(p => chip(p, "jinjang", j.id)).join("")}${jj.length ? "" : add("jinjang", j.id)}</div></div>
       <div class="seat"><span class="lb">코치</span><div class="ppl">${co.map(p => chip(p, "coach", j.id)).join("")}${add("coach", j.id)}</div></div>
       <div style="display:flex;align-items:center;gap:6px;margin:14px 0 2px;flex-wrap:wrap">
-        <p class="grow" style="font-size:13px;font-weight:600">셀 ${cells.length}개</p>
+        <p class="grow" style="font-size:calc(13px*var(--fs,1));font-weight:600">셀 ${cells.length}개</p>
         <button class="btn-sm" data-obulk="${j.id}">여러 셀 한꺼번에</button>
         <button class="btn-sm" data-ocell="${j.id}">＋ 셀</button>
       </div>
@@ -7009,7 +7013,7 @@ function renderOrg() {
         return `<div class="ocell"><span class="cn" data-ocview="${c.id}" title="명부에서 보기">${esc(c.name)}</span>
           <div class="ppl" style="display:flex;flex-wrap:wrap;gap:6px;flex:1;min-width:0">${ls.map(p => chip(p, "leader", j.id, c.id)).join("")}${ls.length ? "" : add("leader", j.id, c.id)}</div>
           <span class="cnt">${n}명</span></div>`;
-      }).join("") || `<p class="muted" style="font-size:12px;padding:8px 0">아직 셀이 없어요. '＋ 셀'이나 '여러 셀 한꺼번에'로 만들어요.</p>`}
+      }).join("") || `<p class="muted" style="font-size:calc(12px*var(--fs,1));padding:8px 0">아직 셀이 없어요. '＋ 셀'이나 '여러 셀 한꺼번에'로 만들어요.</p>`}
     </div>`;
   }).join("") || `<p class="muted" style="margin-top:14px">아직 진이 없어요. 오른쪽 위 '＋ 진'으로 만들어요.</p>`;
 }
@@ -7379,8 +7383,8 @@ function healthCard(c, h, mine) {
       <circle cx="42" cy="42" r="${R}" fill="none" style="stroke:var(--track)" stroke-width="9"/>
       ${rate == null ? "" : `<circle cx="42" cy="42" r="${R}" fill="none" style="stroke:${col}" stroke-width="9" stroke-linecap="round"
         stroke-dasharray="${C * rate / 100} ${C}" transform="rotate(-90 42 42)"/>`}
-      <text x="42" y="45" text-anchor="middle" style="fill:var(--text);font-size:18px;font-weight:600">${rate == null ? "—" : rate + "%"}</text>
-      <text x="42" y="59" text-anchor="middle" style="fill:var(--dim);font-size:8.5px">출석률</text></svg>`;
+      <text x="42" y="45" text-anchor="middle" style="fill:var(--text);font-size:calc(18px*var(--fs,1));font-weight:600">${rate == null ? "—" : rate + "%"}</text>
+      <text x="42" y="59" text-anchor="middle" style="fill:var(--dim);font-size:calc(8.5px*var(--fs,1))">출석률</text></svg>`;
   const cnt = (m) => { const v = Object.values(m.attendance || {}); return { ok: v.filter(x => x && x !== "absent").length, all: v.filter(Boolean).length }; };
   const max = Math.max(1, ...ms.map(m => cnt(m).all));
   const md = (d) => { const p = String(d).split("-"); return `${Number(p[1])}/${Number(p[2])}`; };
@@ -7388,7 +7392,7 @@ function healthCard(c, h, mine) {
       return `<div class="vb${k.all && k.ok / k.all < .5 ? " low" : ""}" title="${esc(fmtDate(m.date, true))} 출석 ${k.ok}/${k.all}">
         <i class="all" style="height:${k.all / max * 100}%"></i><i class="ok" style="height:${k.ok / max * 100}%"></i></div>`; }).join("")}</div>
       <div class="vlabels">${ms.map(m => `<span>${md(m.date)} · ${cnt(m).ok}명</span>`).join("")}</div>`
-    : `<p class="muted" style="font-size:12px;padding:46px 0;text-align:center">최근 8주 셀모임 기록이 없어요</p>`;
+    : `<p class="muted" style="font-size:calc(12px*var(--fs,1));padding:46px 0;text-align:center">최근 8주 셀모임 기록이 없어요</p>`;
   const ppl = h.people.map(s => {
     const k = attKey(s), cells = ms.map(m => (m.attendance || {})[k] || "");
     const okn = cells.filter(v => v && v !== "absent").length, rec = cells.filter(Boolean).length;
@@ -7419,8 +7423,8 @@ function healthCard(c, h, mine) {
       <p class="hlegend"><span><i style="background:var(--ok-strong)"></i>출석</span><span><i style="background:#7FA8E8"></i>온라인</span><span><i style="background:var(--brand)"></i>결석</span><span><i style="box-shadow:inset 0 0 0 1.5px var(--line3)"></i>기록 없음</span></p>` : ""}
     <p class="hc-sec">인턴 (예비 셀리더) ${h.interns.length}명 <span>${canTick ? "눌러서 세우거나 빼요 · 순서는 '순서 · 인턴'에서" : ""}</span></p>
     ${canTick ? `<div class="hints">${h.people.filter(isLeaderOf).map(s => `
-        <label class="${s.intern ? "on" : ""}"><input type="checkbox" data-intern="${s.id}" ${s.intern ? "checked" : ""}>${esc(s.name)}${s.intern && s.internSince ? `<span class="muted" style="font-size:11px">${fmtDate(s.internSince)}~</span>` : ""}</label>`).join("")}</div>`
-      : `<p style="font-size:14px">${h.interns.map(s => esc(s.name)).join(", ") || "아직 없어요"}</p>`}
+        <label class="${s.intern ? "on" : ""}"><input type="checkbox" data-intern="${s.id}" ${s.intern ? "checked" : ""}>${esc(s.name)}${s.intern && s.internSince ? `<span class="muted" style="font-size:calc(11px*var(--fs,1))">${fmtDate(s.internSince)}~</span>` : ""}</label>`).join("")}</div>`
+      : `<p style="font-size:calc(14px*var(--fs,1))">${h.interns.map(s => esc(s.name)).join(", ") || "아직 없어요"}</p>`}
   </div>`;
 }
 $("hl-body").addEventListener("change", async (ev) => {
@@ -7464,7 +7468,7 @@ function alertBlock(s) {
     ${open ? list.map(a => `<div class="it">
       <p>${esc(a.body)}</p>
       <div style="display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap">
-        ${scopeChip(a.scope)}<span class="muted" style="font-size:12px">${esc(a.byName || "")} · ${fmtDate(a.date)}</span>
+        ${scopeChip(a.scope)}<span class="muted" style="font-size:calc(12px*var(--fs,1))">${esc(a.byName || "")} · ${fmtDate(a.date)}</span>
         ${a.by === uid() ? `<button class="btn-sm" data-aledit="${a.id}" style="margin-left:auto;height:32px">고치기</button>` : ""}
       </div></div>`).join("") + (mine ? `<button class="btn-sm" data-alnew="1" style="margin-top:10px">하나 더</button>` : "") : ""}
   </div>`;
@@ -7522,21 +7526,21 @@ function renderReportBox() {
   if (!m) { box.hidden = true; return; }
   const mine = m.leaderUid === uid(), ck = m.check;
   const seer = !mine && ["coach", "jinjang"].includes(state.me.role);
-  const ckLine = ck ? `<p style="font-size:14px;margin-top:8px"><b>${esc(ck.name || "")}</b> 님이 ${fmtDate(ck.at)}에 확인했어요${
+  const ckLine = ck ? `<p style="font-size:calc(14px*var(--fs,1));margin-top:8px"><b>${esc(ck.name || "")}</b> 님이 ${fmtDate(ck.at)}에 확인했어요${
     ck.note ? `<br><span style="color:var(--body-tx)">“${esc(ck.note)}”</span>` : ""}</p>` : "";
-  let html = `<p style="font-size:13px;font-weight:600">셀 보고</p>`;
+  let html = `<p style="font-size:calc(13px*var(--fs,1));font-weight:600">셀 보고</p>`;
   if (mine) {
     html += m.reportedAt
-      ? `<p class="muted" style="font-size:13px;margin-top:6px">${fmtDate(m.reportedAt)}에 보고했어요.${ck ? "" : " 코치 · 진장 확인을 기다리는 중이에요."}</p>${ckLine}`
-      : `<p class="muted" style="font-size:13px;margin-top:6px">출석과 나눔을 다 적었으면 코치 · 진장에게 알려요.</p>
+      ? `<p class="muted" style="font-size:calc(13px*var(--fs,1));margin-top:6px">${fmtDate(m.reportedAt)}에 보고했어요.${ck ? "" : " 코치 · 진장 확인을 기다리는 중이에요."}</p>${ckLine}`
+      : `<p class="muted" style="font-size:calc(13px*var(--fs,1));margin-top:6px">출석과 나눔을 다 적었으면 코치 · 진장에게 알려요.</p>
          <button class="btn-sm" id="btn-m-report" style="margin-top:10px">코치에게 보고하기</button>`;
   } else if (seer) {
-    html += `<p class="muted" style="font-size:13px;margin-top:6px">${m.reportedAt ? `${fmtDate(m.reportedAt)}에 보고됨` : "아직 보고 전이에요 (기록은 볼 수 있어요)"}</p>${ckLine}`
+    html += `<p class="muted" style="font-size:calc(13px*var(--fs,1));margin-top:6px">${m.reportedAt ? `${fmtDate(m.reportedAt)}에 보고됨` : "아직 보고 전이에요 (기록은 볼 수 있어요)"}</p>${ckLine}`
       + (ck && ck.by !== uid() ? "" : `
         <input id="m-ck-note" maxlength="200" placeholder="셀리더에게 한 줄 (선택) — 예) 수고했어요, 민지 같이 기도할게요"
           value="${esc(ck && ck.by === uid() ? ck.note || "" : "")}" style="height:44px;margin-top:10px">
         <button class="btn-sm" id="btn-m-check" style="margin-top:8px">${ck ? "다시 남기기" : "확인했어요"}</button>`);
-  } else html += m.reportedAt ? `<p class="muted" style="font-size:13px;margin-top:6px">${fmtDate(m.reportedAt)}에 보고됨</p>${ckLine}` : "";
+  } else html += m.reportedAt ? `<p class="muted" style="font-size:calc(13px*var(--fs,1));margin-top:6px">${fmtDate(m.reportedAt)}에 보고됨</p>${ckLine}` : "";
   box.innerHTML = html; box.hidden = false;
   const rb = $("btn-m-report");
   if (rb) rb.onclick = async () => {
@@ -7810,7 +7814,7 @@ function renderOrgTop() {
   const own = isOwnerMe();
   $("org-top").innerHTML = `
     <div class="seat"><span class="lb">소유자</span><div class="ppl">${supers.filter(u => u.id === state.ownerUid).map(u =>
-      `<span class="pchip acc">${esc(u.name)} <i>소유자</i></span>`).join("") || `<span class="muted" style="font-size:12px">—</span>`}
+      `<span class="pchip acc">${esc(u.name)} <i>소유자</i></span>`).join("") || `<span class="muted" style="font-size:calc(12px*var(--fs,1))">—</span>`}
       ${own && supers.length > 1 ? `<button type="button" class="pchip add" data-otransfer="1">소유권 넘기기</button>` : ""}</div></div>
     <div class="seat"><span class="lb">수퍼 관리자</span><div class="ppl">${supers.filter(u => u.id !== state.ownerUid).map(u =>
       `<button type="button" class="pchip acc" data-osuper="${u.id}">${esc(u.name)}</button>`).join("")}
@@ -8077,7 +8081,7 @@ function renderRepList() {
     <div class="list">${byMonth[ym].map(r => {
       const c = repCount(r), mine = r.leaderUid === uid() || (r.leaderMemberId && memberOfUid(uid()) && r.leaderMemberId === memberOfUid(uid()).id);
       return `<div class="row" data-rep="${r.id}" data-repdate="${r.date}" style="cursor:pointer">
-        <div class="grow"><p class="nm">${fmtDate(r.date)} · ${esc(r.cellName || cellNameOf(r.cellId) || "셀")}${mine ? ` <span class="chip rose" style="font-size:10px;padding:1px 7px">내 셀</span>` : ""}</p>
+        <div class="grow"><p class="nm">${fmtDate(r.date)} · ${esc(r.cellName || cellNameOf(r.cellId) || "셀")}${mine ? ` <span class="chip rose" style="font-size:calc(10px*var(--fs,1));padding:1px 7px">내 셀</span>` : ""}</p>
           <p class="sub">${esc(r.leaderName || "")}${r.topic ? " · " + esc(r.topic) : ""}${(r.peopleIds || []).length ? ` · 나눔 ${(r.peopleIds || []).length}명` : ""}</p></div>
         ${r.imported ? `<span class="chip">노션</span>` : ""}
         <span class="chip">${c.all ? `출석 ${c.ok}/${c.all}` : "—"}</span></div>`;
@@ -8109,12 +8113,12 @@ async function openReport(id) {
   const c = repCount(r);
   $("rep1-body").innerHTML = `
     <div class="card">
-      <p class="muted" style="font-size:12px">${esc(r.leaderName || "")} 셀리더${r.imported ? " · 노션에서 가져온 보고" : ""}</p>
+      <p class="muted" style="font-size:calc(12px*var(--fs,1))">${esc(r.leaderName || "")} 셀리더${r.imported ? " · 노션에서 가져온 보고" : ""}</p>
       ${line("주제", r.topic)}${line("장소", r.place)}${line("새 방문", r.visitors)}
       ${r.noteHtml ? `<div class="rnote" style="margin-top:10px">${rteClean(r.noteHtml)}</div>` : r.note ? `<p style="margin-top:10px;white-space:pre-wrap">${esc(r.note)}</p>` : ""}
     </div>
     <div class="card" style="margin-top:10px">
-      <h3 style="font-size:14px;font-weight:600">출석 ${c.ok} / ${c.all}</h3>
+      <h3 style="font-size:calc(14px*var(--fs,1));font-weight:600">출석 ${c.ok} / ${c.all}</h3>
       ${["present", "online", "absent"].map(k => grp[k].length ? `<p style="margin-top:8px"><span class="chip${k === "absent" ? " warn" : ""}">${ATT[k]} ${grp[k].length}</span> ${grp[k].map(esc).join(" · ")}</p>` : "").join("")}
     </div>
     <div id="rep1-people" style="margin-top:10px">${(r.peopleIds || []).length ? `<p class="muted">나눔 불러오는 중…</p>` : ""}</div>`;
@@ -8125,9 +8129,9 @@ async function openReport(id) {
     .then(d => d.exists() ? { id: k, ...d.data() } : null).catch(() => null)));
   if (!state.rep || state.rep.id !== r.id) return;
   const ps = got.filter(Boolean);
-  $("rep1-people").innerHTML = ps.length ? `<div class="card"><h3 style="font-size:14px;font-weight:600">사람별 나눔</h3>
+  $("rep1-people").innerHTML = ps.length ? `<div class="card"><h3 style="font-size:calc(14px*var(--fs,1));font-weight:600">사람별 나눔</h3>
     ${ps.map(p => `<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line)">
-      <p class="nm" style="font-weight:600">${esc(p.name || "")}${p.reasonKind || p.reason ? ` <span class="chip warn" style="font-size:10px;padding:1px 7px">결석 ${esc([REASON[p.reasonKind], p.reason].filter(Boolean).join(" · "))}</span>` : ""}</p>
+      <p class="nm" style="font-weight:600">${esc(p.name || "")}${p.reasonKind || p.reason ? ` <span class="chip warn" style="font-size:calc(10px*var(--fs,1));padding:1px 7px">결석 ${esc([REASON[p.reasonKind], p.reason].filter(Boolean).join(" · "))}</span>` : ""}</p>
       ${p.update ? `<p style="margin-top:4px;white-space:pre-wrap">${esc(p.update)}</p>` : ""}
       ${p.pray ? `<p style="margin-top:6px;white-space:pre-wrap"><span class="muted">기도 </span>${esc(p.pray)}</p>` : ""}
     </div>`).join("")}</div>` : "";
@@ -8177,18 +8181,18 @@ function renderImport() {
       <select id="imp-jin">${state.jins.map(j => `<option value="${j.id}"${j.id === jinId ? " selected" : ""}>${esc(j.name)}</option>`).join("")}</select></div>
     <div class="tiles" style="margin-top:12px">
       ${tile("보고서", J.reports.length + "건")}${tile("셀", cellsIn.length + "개")}${tile("사람", people.size + "명")}</div>
-    <div class="card" style="margin-top:12px;font-size:14px;line-height:1.8">
+    <div class="card" style="margin-top:12px;font-size:calc(14px*var(--fs,1));line-height:1.8">
       <p>기간: ${dates.length ? `${dates[0]} ~ ${dates[dates.length - 1]}` : "—"}</p>
       <p>새로 만들 셀: ${newCells.length ? newCells.map(esc).join(", ") : "없음 (모두 있는 셀)"}</p>
       ${(J.people || []).length ? `<p>명단: ${J.people.length}명 — 연락처 · 생일 · 가족 · 차량 · 기도제목 ${J.people.reduce((n, p) => n + (p.prayers || []).length, 0)}개</p>` : ""}
       ${(J.renames || []).length ? `<p>이름 바꾸기: ${(J.renames || []).map(x => `${esc(x.from)} → ${esc(x.to)}`).join(", ")}</p>` : ""}
-      <p class="muted" style="font-size:12px;margin-top:6px">같은 파일을 다시 넣어도 보고서가 두 번 생기지 않고 그 자리에 고쳐져요.</p>
+      <p class="muted" style="font-size:calc(12px*var(--fs,1));margin-top:6px">같은 파일을 다시 넣어도 보고서가 두 번 생기지 않고 그 자리에 고쳐져요.</p>
     </div>
     <div class="card" style="margin-top:10px">
-      <h3 style="font-size:14px;font-weight:600">셀마다</h3>
+      <h3 style="font-size:calc(14px*var(--fs,1));font-weight:600">셀마다</h3>
       ${cellsIn.map(n => { const rs = J.reports.filter(r => r.cell === n);
         const ls = [...new Set(rs.map(r => r.leader).filter(Boolean))];
-        return `<p style="margin-top:8px;font-size:14px"><b>${esc(n)}</b> · 보고 ${rs.length}건 · 셀리더 ${ls.map(esc).join(", ") || "—"}</p>`; }).join("")}
+        return `<p style="margin-top:8px;font-size:calc(14px*var(--fs,1))"><b>${esc(n)}</b> · 보고 ${rs.length}건 · 셀리더 ${ls.map(esc).join(", ") || "—"}</p>`; }).join("")}
     </div>`;
   $("imp-jin").onchange = renderImport;
   $("btn-imp-run").hidden = false;
@@ -8471,7 +8475,7 @@ function renderLeaders() {
           const i = state.ldRows.push({ ...p, jinId: j.id, cellId: c.id }) - 1;
           const head = k ? "" : `<div class="ld-ch"><span class="cbadge">${esc(c.name)}</span><span class="muted">셀원 ${n}명</span></div>`;
           const lm = p.t === "acc" ? memberOfUid(p.uid) : p.t === "noe" ? p.m : null;
-          const ava = lm ? avatar(lm, 36) : `<span class="ava" style="width:36px;height:36px;font-size:14px">${esc(initial(p.name || "?"))}</span>`;
+          const ava = lm ? avatar(lm, 36) : `<span class="ava" style="width:36px;height:36px;font-size:calc(14px*var(--fs,1))">${esc(initial(p.name || "?"))}</span>`;
           const box = (inner, cls) => `${k ? "" : `<div class="ld-card ${cls || ""}">`}${head}${inner}`;
           if (p.t === "acc") return box(`<div class="ld-p">${ava}<div class="grow"><p class="nm">${esc(p.name)} <span class="chip ok">가입함</span>${p.sub ? ` <span class="chip">${esc(p.sub)}</span>` : ""}</p>
               <p class="sub">${esc((userOf(p.uid) || {}).email || "")}</p></div></div>`, "acc");
@@ -8480,7 +8484,7 @@ function renderLeaders() {
           return box(`<div class="ld-in">
               <input data-ldname="${i}" value="${esc(p.name || "")}" placeholder="셀리더 이름" aria-label="${esc(c.name)} 셀리더 이름">
               <input data-ldmail="${i}" type="email" inputmode="email" autocomplete="off" placeholder="구글 이메일" aria-label="${esc(c.name)} 셀리더 구글 이메일">
-              <p class="muted" style="font-size:12px">${p.t === "noe" ? "가입 전 — 구글 이메일을 넣으면 초대돼요" : "셀리더 자리가 비어 있어요"}</p>
+              <p class="muted" style="font-size:calc(12px*var(--fs,1))">${p.t === "noe" ? "가입 전 — 구글 이메일을 넣으면 초대돼요" : "셀리더 자리가 비어 있어요"}</p>
             </div>`, "open");
         }).join("") + "</div>";
       }).join("")}
@@ -8652,7 +8656,7 @@ function memCardHTML(m, o) {
 /* 명부 카드가 아직 없는 초대 (이름 · 이메일만) */
 function leadGhostHTML(e) {
   return `<div class="mcard lead">
-    <span class="ava" style="width:52px;height:52px;font-size:20px">${esc(initial(e.p.name || ""))}</span>
+    <span class="ava" style="width:52px;height:52px;font-size:calc(20px*var(--fs,1))">${esc(initial(e.p.name || ""))}</span>
     <div class="mc-body"><div class="mc-top"><div class="mc-id">
       <p class="mc-role">셀리더 <span class="chip warn">초대 중</span></p><p class="mc-nm">${esc(e.p.name || "")}</p></div></div>
       <div class="mc-info"><div class="mi ph"><span class="mk">초대 이메일</span><span class="mv">${esc(e.p.email || "")}</span></div></div></div>
@@ -8739,11 +8743,11 @@ async function showMbAtt(m) {
   box.innerHTML = "";
   if (state.me.role === "pastor") return;
   const cellId = m.cellId || (state.dirLM && state.dirLM.get(m.id)) || "";
-  box.innerHTML = `<p class="mb-sec">셀모임 출석 <span>최근 3개월</span></p><p class="muted" style="font-size:12px">불러오는 중…</p>`;
+  box.innerHTML = `<p class="mb-sec">셀모임 출석 <span>최근 3개월</span></p><p class="muted" style="font-size:calc(12px*var(--fs,1))">불러오는 중…</p>`;
   await loadAttReps();
   if (!state.mb || state.mb.id !== m.id) return;
   const st = attStats(m.id, cellId);
-  if (!st.strip.length && !st.n) { box.innerHTML = `<p class="mb-sec">셀모임 출석</p><p class="muted" style="font-size:12px">아직 셀모임 출석 기록이 없어요.</p>`; return; }
+  if (!st.strip.length && !st.n) { box.innerHTML = `<p class="mb-sec">셀모임 출석</p><p class="muted" style="font-size:calc(12px*var(--fs,1))">아직 셀모임 출석 기록이 없어요.</p>`; return; }
   const lab = { present: "출석", online: "온라인", absent: "결석", "": "기록 없음" };
   const md = (d) => { const p = String(d).split("-"); return `${Number(p[1])}/${Number(p[2])}`; };
   box.innerHTML = `<p class="mb-sec">셀모임 출석 <span>최근 3개월</span></p>
@@ -8925,6 +8929,18 @@ function applyTheme(pref) {
   document.querySelectorAll("#more-theme [data-theme]").forEach(b => b.classList.toggle("on", b.dataset.theme === pref));
   syncThemeBtns();
 }
+/* 37단계 — 글자 크기 (이 기기에 기억) */
+function fsPref() { try { return localStorage.getItem("mokja-fs") || "m"; } catch { return "m"; } }
+function applyFs(v) {
+  if (v === "m") delete document.documentElement.dataset.fs; else document.documentElement.dataset.fs = v;
+  document.querySelectorAll("#more-fs [data-fs]").forEach(b => b.classList.toggle("on", b.dataset.fs === v));
+}
+document.addEventListener("click", (ev) => {
+  const b = ev.target.closest("#more-fs [data-fs]"); if (!b) return;
+  try { localStorage.setItem("mokja-fs", b.dataset.fs); } catch {}
+  applyFs(b.dataset.fs); bump("fontSize");
+});
+applyFs(fsPref());
 /* 36.1 — 라이트 · 블랙 바로 바꾸기 (사이드바 아래 · 홈 위 달/해 버튼) */
 function setThemePref(t) {
   try { localStorage.setItem("mokja-theme", t); } catch {}
@@ -9017,7 +9033,7 @@ function repCalHTML(ym, rows) {
   }
   const n = Object.keys(byDay).length;
   return `<div class="rcal-nav"><button type="button" data-repym="-1" aria-label="이전 달">‹</button>
-      <b>${y}년 ${m}월 <span class="muted" style="font-weight:400;font-size:12px">셀모임 ${n}번</span></b>
+      <b>${y}년 ${m}월 <span class="muted" style="font-weight:400;font-size:calc(12px*var(--fs,1))">셀모임 ${n}번</span></b>
       <button type="button" data-repym="1" aria-label="다음 달">›</button></div>
     <div class="rcal">${["일","월","화","수","목","금","토"].map(w => `<span class="wd">${w}</span>`).join("")}${cells.join("")}</div>`;
 }
@@ -9063,15 +9079,15 @@ function renderOtherStats() {
     </div>`;
   $("st-kinds").innerHTML = `
     <div class="card" style="margin-top:14px">
-      <h3 style="font-size:13px;font-weight:600">종류별 모임 횟수</h3>
-      <p class="muted" style="font-size:12px;margin-top:4px">${D.off ? "이 셀리더는 만남 일정 공유를 꺼 두어서 셀모임만 보여요." : "만남은 셀리더가 공유한 날짜 · 종류로만 셉니다."}</p>
+      <h3 style="font-size:calc(13px*var(--fs,1));font-weight:600">종류별 모임 횟수</h3>
+      <p class="muted" style="font-size:calc(12px*var(--fs,1));margin-top:4px">${D.off ? "이 셀리더는 만남 일정 공유를 꺼 두어서 셀모임만 보여요." : "만남은 셀리더가 공유한 날짜 · 종류로만 셉니다."}</p>
       <div style="margin-top:10px">${krows.map(k => `
         <div class="kbar" title="${esc(k.label)} ${k.n}회"><span>${esc(k.label)}</span>
           <div><div class="t" style="width:${Math.max(1, k.n / kmax * 100)}%;background:${k.cell ? "var(--c-cell)" : "var(--c-one)"}"></div></div>
           <span style="text-align:right;font-variant-numeric:tabular-nums">${k.n}</span></div>`).join("")}</div>
     </div>
     ${mk.length ? `<div class="card" style="margin-top:12px">
-      <h3 style="font-size:13px;font-weight:600">달마다 — <span style="color:var(--c-cell)">셀모임</span> · <span style="color:var(--c-one)">만남</span></h3>
+      <h3 style="font-size:calc(13px*var(--fs,1));font-weight:600">달마다 — <span style="color:var(--c-cell)">셀모임</span> · <span style="color:var(--c-one)">만남</span></h3>
       <div class="vbars" style="height:110px;margin-top:10px">${mk.map(k => { const o = months[k];
         return `<div class="vb" title="${k} 셀모임 ${o.c} · 만남 ${o.m}"><i class="ok" style="height:${o.m / mmax * 100}%;background:var(--c-one);border-radius:0"></i><i class="ok" style="height:${o.c / mmax * 100}%;background:var(--c-cell)"></i></div>`; }).join("")}</div>
       <div class="vlabels">${mk.map(k => `<span>${Number(k.slice(5))}월</span>`).join("")}</div></div>` : ""}`;
@@ -9554,7 +9570,7 @@ function dirStatsHTML(scope, cells, cellOfM, LM) {
   const mo = Number(todayStr().slice(5, 7)), mo2 = mo % 12 + 1;
   const bd = (mm) => scope.filter(m => m.birthMD && Number(String(m.birthMD).slice(0, 2)) === mm)
     .sort((a, b) => String(a.birthMD).localeCompare(String(b.birthMD)));
-  const bdHTML = (mm) => { const l = bd(mm); return l.length ? `<div class="bdays">${l.map(m => `<span>${esc(m.name)} · ${Number(String(m.birthMD).slice(3, 5))}일</span>`).join("")}</div>` : `<p class="muted" style="font-size:12px">없어요</p>`; };
+  const bdHTML = (mm) => { const l = bd(mm); return l.length ? `<div class="bdays">${l.map(m => `<span>${esc(m.name)} · ${Number(String(m.birthMD).slice(3, 5))}일</span>`).join("")}</div>` : `<p class="muted" style="font-size:calc(12px*var(--fs,1))">없어요</p>`; };
   /* 셀별 */
   const perCell = state.dirCell === "all" ? cells.map(c => {
     const ms = scope.filter(m => cellOfM(m) === c.id); if (!ms.length) return null;
@@ -9620,7 +9636,7 @@ async function openOrgChart() {
 }
 function ocPerson(p, role, extraCls) {
   const m = p.t === "acc" ? memberOfUid(p.uid) : p.t === "noe" ? p.m : (p.inv && p.inv.memberId ? memberById(p.inv.memberId) : null);
-  const ava = m ? avatar(m, 40) : `<span class="ava" style="width:40px;height:40px;font-size:16px">${esc(initial(p.name || ""))}</span>`;
+  const ava = m ? avatar(m, 40) : `<span class="ava" style="width:40px;height:40px;font-size:calc(16px*var(--fs,1))">${esc(initial(p.name || ""))}</span>`;
   const st = p.t === "inv" ? `<span class="chip warn">초대 중</span>` : p.t === "noe" ? `<span class="chip lock">가입 전</span>` : "";
   const mine = p.t === "acc" && p.uid === uid() ? `<span class="chip rose">나</span>` : "";
   return `<button type="button" class="oc-node ${extraCls || ""}${p.t !== "acc" ? " pend" : ""}"${m ? ` data-ocmem="${m.id}"` : ""}>
@@ -9641,7 +9657,7 @@ function ocCell(c) {
   const st = !e ? "" : e.p.t === "inv" ? `<span class="chip warn">초대 중</span>` : e.p.t === "noe" ? `<span class="chip lock">가입 전</span>` : "";
   return `<button type="button" class="oc-cell" data-occell="${c.id}">
     <span class="h"><span class="cbadge">${esc(c.name)}</span><span class="cnt">셀원 ${ms.length}명</span></span>
-    <span class="ld">${lm ? avatar(lm, 30) : `<span class="ava" style="width:30px;height:30px;font-size:13px">${esc(initial(nm || "?"))}</span>`}
+    <span class="ld">${lm ? avatar(lm, 30) : `<span class="ava" style="width:30px;height:30px;font-size:calc(13px*var(--fs,1))">${esc(initial(nm || "?"))}</span>`}
       <span class="nm">${nm ? esc(nm) : "셀리더 미정"}</span>${st}</span>
     <span class="ft">${interns ? `<span class="tpill">인턴 ${interns}</span>` : ""}${rate !== null ? `<span>출석 ${rate}%</span>` : `<span>최근 보고 없음</span>`}</span>
   </button>`;
@@ -9763,7 +9779,7 @@ function renderDirRatio(base, shown) {
         ${known ? `<span style="color:var(--text);font-weight:600">${Math.round(yes / known * 100)}%${a.parts.some(p => p[0] === "u") && cnt.u ? ` (아는 ${known}명 중)` : ""}</span>` : ""}</div></div>`;
   }).join("");
   box.innerHTML = N ? `<div class="rto"><div class="rto-h"><b>한눈에 보기</b><span>${N}명 · 막대를 누르면 그 사람들만 보여요</span>
-      ${anyF ? `<button type="button" class="btn-sm" data-rfclear="1" style="height:28px;font-size:12px">거르기 풀기 (${shown}명 보는 중)</button>` : ""}</div>
+      ${anyF ? `<button type="button" class="btn-sm" data-rfclear="1" style="height:28px;font-size:calc(12px*var(--fs,1))">거르기 풀기 (${shown}명 보는 중)</button>` : ""}</div>
     <div class="rto-grid">${rows}</div></div>` : "";
 }
 $("dir-ratio").addEventListener("click", (ev) => {
@@ -10352,7 +10368,7 @@ function renderInterns() {
       <div class="card it-list">
         <div class="us-h">
           <div class="seg mini">${[["intern", `공식 인턴 ${I.length}`], ...(seesCand ? [["cand", `인턴 후보 ${C.length}`]] : [])].map(([k, l]) => `<button type="button" data-itt="${k}" class="${V.tab === k ? "on" : ""}">${l}</button>`).join("")}</div>
-          <select id="it-sort" aria-label="정렬" style="width:auto;height:34px;font-size:13px;padding:0 30px 0 10px;margin-left:auto">${[["cell", "셀 순"], ["long", "오래된 순"], ["att", "출석 높은 순"], ["name", "가나다순"]].map(([k, l]) => `<option value="${k}" ${V.sort === k ? "selected" : ""}>${l}</option>`).join("")}</select>
+          <select id="it-sort" aria-label="정렬" style="width:auto;height:34px;font-size:calc(13px*var(--fs,1));padding:0 30px 0 10px;margin-left:auto">${[["cell", "셀 순"], ["long", "오래된 순"], ["att", "출석 높은 순"], ["name", "가나다순"]].map(([k, l]) => `<option value="${k}" ${V.sort === k ? "selected" : ""}>${l}</option>`).join("")}</select>
         </div>
         ${V.tab === "cand" ? `<p class="it-note">${HIC.lock.replace("<svg", '<svg width="15" height="15"')}비공식 — 셀리더 · 그 셀 코치 · 진장만 봐요. 본인과 같은 진의 다른 분에게는 보이지 않고, 명부에도 나오지 않아요.</p>` : ""}
         <div class="it-cards">${list.map(card).join("") || `<p class="muted" style="padding:10px 2px">${V.tab === "cand" ? "아직 인턴 후보가 없어요." : "아직 공식 인턴이 없어요."}</p>`}</div>
@@ -10483,9 +10499,9 @@ function serveList() {
 }
 function serveGhost(x) {
   const st = x.p.t === "inv" ? `<span class="chip warn">초대 중</span>` : `<span class="chip lock">가입 전</span>`;
-  return `<div class="mcard lead"><span class="ava" style="width:48px;height:48px;font-size:18px">${esc(initial(x.name || "?"))}</span>
+  return `<div class="mcard lead"><span class="ava" style="width:48px;height:48px;font-size:calc(18px*var(--fs,1))">${esc(initial(x.name || "?"))}</span>
     <div class="mc-body"><p class="mc-role">${esc(x.roles.join(" · "))} ${st}</p><p class="mc-nm">${esc(x.name || "")}</p>
-    <p class="muted" style="font-size:12px;margin-top:4px">명부 카드가 아직 없어요</p></div></div>`;
+    <p class="muted" style="font-size:calc(12px*var(--fs,1));margin-top:4px">명부 카드가 아직 없어요</p></div></div>`;
 }
 /* 명부 카드 창 — 인턴 구분 (맡은 분만) */
 function renderMbTier(m, isLead) {
