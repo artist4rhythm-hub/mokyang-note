@@ -24,7 +24,11 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
 const APP_NAME = "목자의 삶";
-const APP_VERSION = "34.0 (2026-11-11)";
+const APP_VERSION = "35.0 (2026-11-12)";
+/* 35단계 — 버전 표시: v35.0 · 2026.11.12 업데이트 */
+const verNo = () => APP_VERSION.split(" ")[0];
+const verDate = () => (APP_VERSION.match(/\((.*)\)/) || [])[1] || "";
+const verTag = (long) => `v${verNo()} · ${long ? verDate().replace(/-/g, ".") + " 업데이트" : verDate().slice(5).replace("-", ".") + " 업데이트"}`;
 
 /* 사진 크기 — 얼굴을 알아볼 수 있는 선에서 가장 작게.
    얼굴 하나가 가로 80px은 되어야 알아보는데, 여럿이 한 줄로 선
@@ -58,7 +62,7 @@ if ("serviceWorker" in navigator) {
 
 /* ── 공통 ── */
 const $ = (id) => document.getElementById(id);
-const SCREENS = ["s-help","s-orgchart","s-loading","s-login","s-verify","s-setup","s-accept","s-pending",
+const SCREENS = ["s-interns","s-help","s-orgchart","s-loading","s-login","s-verify","s-setup","s-accept","s-pending",
                  "s-home","s-souls","s-cal","s-meet","s-meeting","s-log","s-soul",
                  "s-edit","s-train","s-search","s-mine","s-usage","s-more","s-manage",
                  "s-photos","s-stats","s-inbox","s-dir","s-cellmgr","s-org","s-consent","s-share",
@@ -358,7 +362,8 @@ ICON.inbox = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke
 ICON.dir = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3.5" width="14" height="17" rx="2"/><circle cx="12" cy="10" r="2.6"/><path d="M8.5 16.5a3.5 3.5 0 0 1 7 0"/></svg>`;
 ICON.health = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 12h4l2-4.5 4 9 2-4.5h5"/></svg>`;
 const SIDE = [["home","홈"],["inbox","소식"],["souls","영혼들"],["dir","교회 명부"],["cal","캘린더"],["meet","셀모임"],
-  ["health","셀 건강"],["train","훈련 현황"],["stats","활동 통계"],["photos","사진 모아보기"],["help","도우미"],["more","더보기"]];
+  ["health","셀 건강"],["train","훈련 현황"],["stats","활동 통계"],["photos","사진 모아보기"],["interns","인턴 · 후보"],["help","도우미"],["more","더보기"]];
+ICON.interns = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7.5" r="3.2"/><path d="M5.5 20v-1.2A4.8 4.8 0 0 1 10.3 14h3.4a4.8 4.8 0 0 1 4.8 4.8V20"/><path d="m16.8 3.8.8 1.6 1.7.2-1.3 1.2.3 1.7-1.5-.8-1.5.8.3-1.7-1.3-1.2 1.7-.2z" fill="currentColor" stroke-width="1"/></svg>`;
 ICON.help = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.1-2.4 3.7M12 16.9v.1"/></svg>`;
 function renderNav() {
   document.querySelectorAll("[data-nav]").forEach(nav => {
@@ -383,6 +388,7 @@ document.addEventListener("click", (ev) => {
   else if (t === "meet") openMeet();
   else if (t === "more") openMore();
   else if (t === "help") openHelp("");
+  else if (t === "interns") openInterns();
   else if (t === "train") openTrainBoard();
   else if (t === "stats") openStats();
   else if (t === "photos") openPhotos();
@@ -526,6 +532,7 @@ $("btn-accept").onclick = async () => {
 const ORG_TTL = 10 * 60 * 1000;
 async function loadOrg(force) {
   if (!force && state.orgAt && Date.now() - state.orgAt < ORG_TTL) return;
+  if (force === "open") force = true;
   const me = state.me, isSuper = me.role === "super";
   /* 담당 교역자는 맡은 진 여러 개를 진마다 따로 읽어 합칩니다 */
   const multi = (col) => Promise.all((me.jinIds||[]).map(j => getDocs(query(collection(db, col), where("jinId","==",j)))))
@@ -550,6 +557,14 @@ async function loadOrg(force) {
       .sort((a,b)=>(a.order||0)-(b.order||0));
     state.orgAt = Date.now();
   } catch (e) { toast(msgOf(e)); }
+}
+/* 35단계 — 화면을 열 때: 받아 둔 것으로 바로 그리고, 바뀐 게 있는지는 뒤에서 확인해 다시 그려요.
+   (10초 안에 다시 열면 확인도 건너뜀) — 기다림은 없애고, 다른 폰에서 가입한 것도 곧 보여요 */
+async function orgOpen(redraw) {
+  if (!state.orgAt) { await loadOrg(true); return; }
+  if (Date.now() - state.orgAt < 10 * 1000) return;
+  const was = state.orgAt;
+  loadOrg(true).then(() => { if (state.orgAt !== was) { try { redraw(); } catch (e) { console.warn("다시 그리기", e); } } });
 }
 async function loadSouls(force) {
   if (!force && state.soulsAt && Date.now() - state.soulsAt < ORG_TTL) return;
@@ -741,8 +756,8 @@ async function openHome() {
   const where1 = (me.role==="super" && !me.isLeader) ? "전체" : (cell?cell.name:(jin?jin.name:""));
   $("home-where").textContent = where1; $("home-where").hidden = !where1;
   $("side-who").innerHTML = `${esc(me.name||"")}<br>${esc(ROLE[me.role]||"")}${where1?" · "+esc(where1):""}`
-    + `<br><button type="button" id="side-ver" style="background:none;border:none;padding:0;margin-top:4px;color:var(--faint);font:inherit;font-size:11px;cursor:pointer">버전 ${esc(APP_VERSION)}</button>`;
-  $("home-ver").textContent = `버전 ${APP_VERSION.split(" ")[0]}`;
+    + `<br><button type="button" id="side-ver" style="background:none;border:none;padding:0;margin-top:4px;color:var(--faint);font:inherit;font-size:11px;cursor:pointer">${esc(verTag(true))}</button>`;
+  $("home-ver").textContent = verTag(false);
   $("btn-quick-add").hidden = !canLead();
 
   if (canLead()) { renderPray(); renderCare(); }
@@ -1043,6 +1058,7 @@ function renderRooms() {
       + room("stats","활동 통계", monthMeets, "이번 달 만남")
       + room("photos","사진", "보기", "셀모임 · 만남 사진")
       + room("orgchart","조직도", "보기", "진장 · 코치 · 셀")
+      + room("interns","인턴 · 후보", internCount(), "공식 인턴")
       + (me.role === "super" ? room("leaders","셀리더 명단", leaderSeatStats().n, leaderSeatStats().txt, leaderSeatStats().noe > 0) : "");
   } else if (["coach","jinjang","pastor"].includes(me.role)) {
     const pastor = me.role === "pastor";
@@ -1055,7 +1071,8 @@ function renderRooms() {
       + room("dir","교회 명부", dirCountTxt(), `셀 ${state.cells.length}개`)
       + room("train","훈련 현황", state.courses.length, "과정")
       + room("cal","캘린더", weekEv(), "이번 주 셀모임")
-      + room("orgchart","조직도", "보기", "진장 · 코치 · 셀");
+      + room("orgchart","조직도", "보기", "진장 · 코치 · 셀")
+      + room("interns","인턴 · 후보", internCount(), "공식 인턴");
   } else {
     const pendingN = state.invites.filter(i=>i.status==="pending").length;
     html = room("dir","교회 명부", dirCountTxt(), "명")
@@ -1085,7 +1102,7 @@ $("s-home").addEventListener("click", async (ev) => {
   if (rm) {
     const k = rm.dataset.room;
     ({ souls:openSouls, meet:openMeet, cal:openCal, health:openHealth, dir:openDir, train:openTrainBoard,
-       stats:openStats, photos:openPhotos, org:openOrg, orgchart:openOrgChart, cellmgr:openCellMgr, usage:openUsage,
+       stats:openStats, photos:openPhotos, org:openOrg, orgchart:openOrgChart, interns:openInterns, cellmgr:openCellMgr, usage:openUsage,
        reports:()=>openReports(""), leaders:openLeaders }[k] || (()=>{}))();
     return;
   }
@@ -1219,7 +1236,8 @@ function renderSouls() {
           st >= 2 ? `<span class="tpill streak">결석 ${st}주</span>` : ""] });
     }
     const bt = birthText(s), bd = annivIn(s.birth), od = isLeaderCard(s) ? null : oneDays(s);
-    return scard({ attr: `data-open="${s.id}"`, ava: avatar(s, 52), name: esc(s.name) + (s.intern ? ` <span class="chip intern" style="font-size:10.5px;padding:2px 8px;vertical-align:2px">인턴</span>` : ""),
+    return scard({ attr: `data-open="${s.id}"`, ava: avatar(s, 52), name: esc(s.name) + (s.intern ? ` <span class="chip intern" style="font-size:10.5px;padding:2px 8px;vertical-align:2px">인턴</span>`
+        : s.cand ? ` <span class="chip cand" style="font-size:10.5px;padding:2px 8px;vertical-align:2px" title="비공식 — 셀리더 · 코치 · 진장만 봐요">후보</span>` : ""),
       sub: (bt ? esc(bt) : "생일 미입력") + (bd !== null && bd <= 14 ? ` · 🎂 ${bd === 0 ? "오늘" : "D-" + bd}` : ""),
       chip: isLeaderCard(s) ? KINDLABEL[s.kind] : esc(STATUS[s.status] || "—"),
       chipCls: isLeaderCard(s) ? "" : s.status === "care" ? "warn" : "rose",
@@ -1266,12 +1284,12 @@ $("btn-soul-new").onclick = () => openEdit(null);
 
 /* ── 셀원 순서 정하기 ── */
 const dlgOrder = $("dlg-order");
-let orderList = [], orderAfter = null, orderIntern = {};
+let orderList = [], orderAfter = null, orderIntern = {};   /* 35단계: "" · "cand" · "intern" */
 function openOrderDlg(cellId, after) {
   const mine = state.souls.filter(s=>isLeaderOf(s) && (!cellId || s.cellId === cellId));
   if (!mine.length) { toast("순서를 정할 영혼이 없어요."); return; }
   orderList = mine.slice(); orderAfter = after || null;
-  orderIntern = Object.fromEntries(mine.map(s => [s.id, !!s.intern]));
+  orderIntern = Object.fromEntries(mine.map(s => [s.id, s.intern ? "intern" : s.cand ? "cand" : ""]));
   $("order-err").textContent = ""; renderOrder(); dlgOrder.showModal();
 }
 function renderOrder() {
@@ -1279,7 +1297,9 @@ function renderOrder() {
     <div class="ordrow">
       <span class="no">${i+1}</span>
       <span class="who">${esc(s.name)}</span>
-      <button type="button" class="int${orderIntern[s.id]?" on":""}" data-int="${s.id}" aria-pressed="${!!orderIntern[s.id]}">인턴</button>
+      <span class="tier" role="group" aria-label="${esc(s.name)} 인턴 구분">
+        <button type="button" class="cand${orderIntern[s.id]==="cand"?" on":""}" data-tier="cand" data-int="${s.id}" aria-pressed="${orderIntern[s.id]==="cand"}" title="비공식 — 셀리더 · 코치 · 진장만 봐요">후보</button>
+        <button type="button" class="int${orderIntern[s.id]==="intern"?" on":""}" data-tier="intern" data-int="${s.id}" aria-pressed="${orderIntern[s.id]==="intern"}" title="공식 리더 후보 — 명부에도 표시">인턴</button></span>
       <button type="button" class="top" data-top="${i}" aria-label="맨 위로"${i===0?" disabled":""}>맨 위</button>
       <button type="button" data-up="${i}" aria-label="위로"${i===0?" disabled":""}>↑</button>
       <button type="button" data-down="${i}" aria-label="아래로"${i===orderList.length-1?" disabled":""}>↓</button>
@@ -1287,7 +1307,7 @@ function renderOrder() {
 }
 $("order-list").addEventListener("click",(ev)=>{
   const it = ev.target.closest("[data-int]");
-  if (it) { orderIntern[it.dataset.int] = !orderIntern[it.dataset.int]; renderOrder(); return; }
+  if (it) { const t = it.dataset.tier || "intern"; orderIntern[it.dataset.int] = orderIntern[it.dataset.int] === t ? "" : t; renderOrder(); return; }
   const tp = ev.target.closest("[data-top]");
   if (tp) { const i = Number(tp.dataset.top); orderList.unshift(...orderList.splice(i, 1)); renderOrder(); return; }
   const u = ev.target.closest("[data-up]"), d = ev.target.closest("[data-down]");
@@ -1307,15 +1327,16 @@ $("ord-save").onclick = async () => {
     orderList.forEach((s,i)=>{
       const p = {};
       if (s.seq !== i+1) p.seq = i+1;
-      const iv = !!orderIntern[s.id];
+      const tv = orderIntern[s.id] || "", iv = tv === "intern", cv = tv === "cand";
       if (!!s.intern !== iv) { p.intern = iv; p.internSince = iv ? (s.internSince || today) : ""; }
+      if (!!s.cand !== cv) { p.cand = cv; p.candSince = cv ? (s.candSince || today) : ""; }
       if (Object.keys(p).length) writes.push(updateDoc(doc(db,"souls",s.id), p).then(() => Object.assign(s, p)));
     });
     await Promise.all(writes);
     state.soulsAt = 0;
     orderList.forEach((s,i)=>{
       s.seq = i+1;
-      const inList = state.souls.find(x=>x.id===s.id); if (inList) { inList.seq = i+1; inList.intern = s.intern; inList.internSince = s.internSince; }
+      const inList = state.souls.find(x=>x.id===s.id); if (inList) { inList.seq = i+1; inList.intern = s.intern; inList.internSince = s.internSince; inList.cand = s.cand; inList.candSince = s.candSince; }
     });
     await syncRankToDir(orderList).catch(e => console.warn("명부 순서", e));   // 29단계 — 명부에도 같은 순서 · 인턴
     state.souls.sort(bySeq);
@@ -1355,7 +1376,8 @@ async function openSoul(soulId) {
   $("soul-chips").innerHTML =
     (isLeaderCard(s) ? `<span class="chip">${KINDLABEL[s.kind]}</span>` : "")
     + `<span class="chip rose">${esc(STATUS[s.status]||"—")}</span>`
-    + (s.intern?`<span class="chip ok">인턴</span>`:"")
+    + (s.intern?`<span class="chip intern">인턴${s.internSince?` · ${fmtDate(s.internSince)}~`:""}</span>`
+       : s.cand?`<span class="chip cand" title="비공식 — 셀리더 · 코치 · 진장만 봐요. 본인에게는 안 보여요">인턴 후보 (비공식)</span>`:"")
     + (careDue(s)?`<span class="chip warn">결석 ${careDue(s).n}주 · 연락할 때</span>`:"")
     + (cell?`<span class="chip">${esc(cell.name)}${isLeaderCard(s)?" 담당":""}</span>`:"");
   const tel = (s.phone||"").replace(/\D/g,"");
@@ -3641,7 +3663,7 @@ async function openMore() {
   $("more-ava").textContent=initial(me.name);
   $("more-name").textContent=me.name||"";
   $("more-email").textContent=`${me.email||""} · ${ROLE[me.role]||me.role}`;
-  $("app-ver").textContent=APP_VERSION;
+  $("app-ver").textContent=verTag(true);
   $("btn-go-usage").hidden = me.role!=="super";
   $("btn-go-cellmgr").hidden = !isManager();
   $("btn-manage-org") && ($("btn-manage-org").hidden = me.role !== "super");
@@ -3736,8 +3758,9 @@ $("btn-export-all").onclick=async()=>{
 
 /* ════════ 리더 관리 ════════ */
 async function openManage() {
-  show("s-loading");
-  await loadOrg(true); await syncBadges();
+  if (!state.orgAt) show("s-loading");
+  await orgOpen(() => { if (!$("s-manage").hidden && !document.querySelector("dialog[open]")) openManage(); });
+  await syncBadges();
   $("btn-manage-org").hidden = state.me.role !== "super";
   const isSuper=state.me.role==="super";
   const cellName=(id)=>(state.cells.find(c=>c.id===id)||{}).name||"";
@@ -3984,6 +4007,7 @@ $("iv-send").onclick=async()=>{
     const r=await sendInvite({ name, email, pick, jinId, cellId, memberId:$("iv-member").value||"" });
     if(r.err){ $("invite-err").textContent=r.err; return; }
     dlg.close(); toast(r.msg); openManage();
+    if ($("iv-mail") && $("iv-mail").checked) mailTray([{ name, email, role: ROLE[role] || "리더", cell: cellId ? cellNameOf(cellId) : "" }]);
   }catch(e){ $("invite-err").textContent=msgOf(e); }
   finally{ $("iv-send").disabled=false; }
 };
@@ -4110,7 +4134,7 @@ document.addEventListener("visibilitychange", () => {
 window.addEventListener("pagehide", flushUsage);
 
 /* ── 수퍼 관리자용 화면 (33단계 — 개발 개선을 위한 사용 현황) ── */
-const SCREEN_NAME = { home:"홈", souls:"영혼들", cal:"캘린더", meet:"셀모임", more:"더보기",
+const SCREEN_NAME = { interns:"인턴 · 후보", home:"홈", souls:"영혼들", cal:"캘린더", meet:"셀모임", more:"더보기",
   soul:"영혼 카드", log:"만남 기록", meeting:"셀모임 입력", train:"훈련 현황",
   search:"기록 검색", manage:"리더 관리", usage:"사용 현황", edit:"영혼 수정",
   dir:"교회 명부", cellmgr:"셀 관리", org:"조직 구성", inbox:"소식", photos:"사진 모아보기", stats:"활동 통계", mine:"내 카드",
@@ -5218,6 +5242,12 @@ async function backfillThumbs() {
    올릴 때마다 version.json 도 같이 올립니다. 앱은 열 때 · 다시 볼 때 · 10분마다
    그 파일만 살짝 확인해서(아주 작은 파일), 지금 버전보다 새것이면 위에 알림을 띄웁니다. */
 const CHANGELOG = [
+  { v:"35.0", d:"2026-11-12", items:[
+    "인턴(공식 리더 후보)과 인턴 후보(비공식 — 셀리더 · 코치 · 진장만 봐요, 본인에게는 안 보여요)를 나눠서 표시",
+    "인턴 · 후보 화면 — 셀별 그림, 명단(기간 · 출석 · 수료), 통계",
+    "조직도 — 진장 옆에 '진장 보좌 · 코치', 진장과 셀 사이에 코치별 담당 셀",
+    "셀리더 명단 넓은 화면 정리, 초대할 때 안내 메일을 쓸지 고르기",
+    "버전 표시를 v35.0 · 날짜로, 조직도 · 셀리더 명단 · 조직 구성 · 셀 관리를 열 때 다시 받지 않아 빨라짐" ] },
   { v:"34.0", d:"2026-11-11", items:[
     "구글 캘린더 실시간 — 서버(Blaze)를 켜면, 한 번 연결한 뒤로는 저장하는 순간 몇 초 안에 내 구글 캘린더로 (1시간마다 누를 일 없음)",
     "로그인한 리더 누구나 각자 연결 — 일정은 각자 자기 구글 계정의 '목자의 삶' 캘린더에만",
@@ -5390,7 +5420,7 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden && st
 setInterval(() => { if (!document.hidden && state.me) checkVersion(); }, 10 * 60 * 1000);
 function renderVerCard() {
   if (!$("ver-now")) return;
-  $("ver-now").textContent = `버전 ${verOf(APP_VERSION)} · ${(APP_VERSION.match(/\((.*)\)/)||[])[1]||""}`;
+  $("ver-now").textContent = verTag(true);
   const L = state.latest;
   $("ver-state").textContent = !L ? "바뀐 것 보기"
     : cmpVer(L.version, APP_VERSION) > 0 ? `새 버전 ${verOf(L.version)}이 있어요 — 눌러서 새로고침`
@@ -5400,10 +5430,10 @@ function renderVerCard() {
 $("btn-ver").onclick = () => {
   const L = state.latest;
   if (L && cmpVer(L.version, APP_VERSION) > 0) { $("upd-go").click(); return; }
-  $("ver-sub").textContent = `지금 쓰는 버전: ${APP_VERSION}`;
+  $("ver-sub").textContent = `지금 쓰는 버전: ${verTag(true)}`;
   $("ver-list").innerHTML = CHANGELOG.map(c => `
     <div class="cmt">
-      <p class="h"><span><b style="color:var(--text)">${c.v}</b> · ${c.d}</span>${
+      <p class="h"><span><b style="color:var(--text)">v${c.v}</b> · ${String(c.d).replace(/-/g, ".")}</span>${
         verOf(APP_VERSION)===c.v?`<span class="chip rose" style="font-size:10px">지금 이 버전</span>`:""}</p>
       <ul style="margin:6px 0 0 18px;font-size:13px;line-height:1.7">${c.items.map(i=>`<li>${esc(i)}</li>`).join("")}</ul>
     </div>`).join("")
@@ -5415,7 +5445,7 @@ $("ver-close").onclick = () => $("dlg-ver").close();
 function noteUpdated() {
   let seen = null;
   try { seen = localStorage.getItem("mokja-seen-ver"); } catch {}
-  if (seen && cmpVer(APP_VERSION, seen) > 0) toast(`${verOf(APP_VERSION)} 버전으로 업데이트됐어요. 홈 맨 아래에서 바뀐 것을 볼 수 있어요.`);
+  if (seen && cmpVer(APP_VERSION, seen) > 0) toast(`v${verNo()}(${verDate().slice(5).replace("-", ".")})로 업데이트됐어요. 버전을 누르면 바뀐 것을 볼 수 있어요.`);
   try { localStorage.setItem("mokja-seen-ver", APP_VERSION); } catch {}
 }
 
@@ -6585,8 +6615,9 @@ $("hr-go").onclick = async () => {
 /* ════════ 셀 관리 (진장 · 코치 · 수퍼) ════════ */
 async function openCellMgr() {
   if (!isManager()) { toast("셀 관리는 진장 · 코치 · 수퍼 관리자가 해요."); return; }
-  show("s-loading");
-  await loadOrg(true); await syncBadges(); await loadHandovers();
+  if (!state.orgAt) show("s-loading");
+  await orgOpen(() => { if (!$("s-cellmgr").hidden && !document.querySelector("dialog[open]")) renderCellMgr(); });
+  await syncBadges(); await loadHandovers();
   if (canLead() || ["coach","jinjang"].includes(state.me.role)) await loadSouls();
   renderCellMgr(); show("s-cellmgr");
 }
@@ -6876,8 +6907,8 @@ function leaderLabel(cellId) {
 }
 async function openOrg() {
   if (!state.me || state.me.role !== "super") { toast("조직 구성은 수퍼 관리자가 해요."); return; }
-  show("s-loading");
-  await loadOrg(true);
+  if (!state.orgAt) show("s-loading");
+  await orgOpen(() => { if (!$("s-org").hidden && !document.querySelector("dialog[open]")) renderOrg(); });
   if (!state.orgName) { try { const o = await getDoc(doc(db,"org","main")); if (o.exists()) state.orgName = o.data().name; } catch {} }
   await loadOwner();
   renderOrg(); show("s-org");
@@ -7086,6 +7117,7 @@ $("sx-save").onclick = async () => {
         if (e && e.t === "inv" && e.email !== email) { try { await deleteDoc(doc(db,"invites",e.email)); } catch {} }
         const r = await sendInvite({ name, email, pick, jinId: S.jinId, cellId: seat.cellId, cellIds, memberId: m.id });
         if (r.err) { $("sx-err").textContent = r.err; return; }
+        if ($("sx-mail") && $("sx-mail").checked) state.mailNext = [{ name, email, role: SEATNAME[S.kind] || "리더", cell: seat.cellId ? cellNameOf(seat.cellId) : "" }];
         await updateDoc(doc(db,"members",m.id), { pendingSeat: null }); m.pendingSeat = null;
       } else {
         await updateDoc(doc(db,"members",m.id), { pendingSeat: seat, name, updatedAt: serverTimestamp() });
@@ -7094,6 +7126,7 @@ $("sx-save").onclick = async () => {
       await log(email ? "자리 초대" : "자리에 이름만", name, SEATNAME[S.kind]);
     }
     dlgSt.close(); await loadOrg(true); renderOrg();
+    if (state.mailNext) { mailTray(state.mailNext); state.mailNext = null; }
     toast(v.startsWith("u:") ? "앉혔어요." : $("sx-email").value.trim() ? "자리에 넣고 초대했어요." : "이름만 자리에 넣어 뒀어요.");
   } catch (err) { $("sx-err").textContent = msgOf(err); }
   finally { $("sx-save").disabled = false; }
@@ -8352,8 +8385,8 @@ function leaderSeatStats() {
 }
 async function openLeaders() {
   if (!state.me || state.me.role !== "super") { toast("셀리더 명단은 수퍼 관리자가 해요."); return; }
-  show("s-loading");
-  await loadOrg(true);
+  if (!state.orgAt) show("s-loading");
+  await orgOpen(() => { if (!$("s-leaders").hidden && !leaderEdits().length && $("btn-ld-run").disabled !== true) renderLeaders(); });
   $("ld-err").textContent = ""; $("ld-log").textContent = "";
   renderLeaders(); show("s-leaders");
 }
@@ -8365,27 +8398,29 @@ function renderLeaders() {
   $("ld-list").innerHTML = jins.map(j => {
     const cells = leaderSeatCells().filter(c => c.jinId === j.id);
     if (!cells.length) return "";
-    return `<div class="card" style="margin-top:12px">
-      <h3 style="font-size:15px;font-weight:600;margin-bottom:4px">${esc(j.name)} <span class="muted" style="font-size:12px;font-weight:400">셀 ${cells.length}개</span></h3>
+    return `<div class="ld-jin"><h3>${esc(j.name)} <span class="muted">셀 ${cells.length}개</span></h3><div class="ld-grid">
       ${cells.map(c => {
         const ls = seatList("leader", j.id, c.id);
         const n = (state.dir || []).filter(m => m.cellId === c.id && m.active !== false).length;
         const entries = ls.length ? ls : [{ t: "none", name: "" }];
         return entries.map((p, k) => {
           const i = state.ldRows.push({ ...p, jinId: j.id, cellId: c.id }) - 1;
-          const head = `<span class="cn">${k ? "" : esc(c.name)}</span>`;
-          if (p.t === "acc") return `<div class="lrow">${head}<div class="grow"><p class="nm">${esc(p.name)} <span class="chip ok">가입함</span>${p.sub ? ` <span class="chip">${esc(p.sub)}</span>` : ""}</p>
-              <p class="sub">${esc((userOf(p.uid) || {}).email || "")}</p></div><span class="cnt">${k ? "" : n + "명"}</span></div>`;
-          if (p.t === "inv") return `<div class="lrow">${head}<div class="grow"><p class="nm">${esc(p.name)} <span class="chip warn">초대 보냄</span></p>
-              <p class="sub">${esc(p.email)} · 이 구글 계정으로 로그인하면 바로 들어와요</p></div><span class="cnt">${k ? "" : n + "명"}</span></div>`;
-          return `<div class="lrow">${head}<div class="grow ld-in">
+          const head = k ? "" : `<div class="ld-ch"><span class="cbadge">${esc(c.name)}</span><span class="muted">셀원 ${n}명</span></div>`;
+          const lm = p.t === "acc" ? memberOfUid(p.uid) : p.t === "noe" ? p.m : null;
+          const ava = lm ? avatar(lm, 36) : `<span class="ava" style="width:36px;height:36px;font-size:14px">${esc(initial(p.name || "?"))}</span>`;
+          const box = (inner, cls) => `${k ? "" : `<div class="ld-card ${cls || ""}">`}${head}${inner}`;
+          if (p.t === "acc") return box(`<div class="ld-p">${ava}<div class="grow"><p class="nm">${esc(p.name)} <span class="chip ok">가입함</span>${p.sub ? ` <span class="chip">${esc(p.sub)}</span>` : ""}</p>
+              <p class="sub">${esc((userOf(p.uid) || {}).email || "")}</p></div></div>`, "acc");
+          if (p.t === "inv") return box(`<div class="ld-p">${ava}<div class="grow"><p class="nm">${esc(p.name)} <span class="chip warn">초대 보냄</span></p>
+              <p class="sub">${esc(p.email)} · 이 계정으로 로그인하면 바로 들어와요</p></div></div>`, "inv");
+          return box(`<div class="ld-in">
               <input data-ldname="${i}" value="${esc(p.name || "")}" placeholder="셀리더 이름" aria-label="${esc(c.name)} 셀리더 이름">
               <input data-ldmail="${i}" type="email" inputmode="email" autocomplete="off" placeholder="구글 이메일" aria-label="${esc(c.name)} 셀리더 구글 이메일">
-              <p class="muted" style="font-size:12px">${p.t === "noe" ? "가입 전 — 이메일을 넣으면 초대돼요" : "셀리더 자리가 비어 있어요"}</p>
-            </div><span class="cnt">${k ? "" : n + "명"}</span></div>`;
-        }).join("");
+              <p class="muted" style="font-size:12px">${p.t === "noe" ? "가입 전 — 구글 이메일을 넣으면 초대돼요" : "셀리더 자리가 비어 있어요"}</p>
+            </div>`, "open");
+        }).join("") + "</div>";
       }).join("")}
-    </div>`;
+    </div></div>`;
   }).join("") || `<p class="muted" style="margin-top:14px">아직 셀이 없어요. 조직 구성에서 셀을 만들어 주세요.</p>`;
   syncLeadersBtn();
 }
@@ -8403,6 +8438,7 @@ function leaderEdits() {
 function syncLeadersBtn() {
   const ed = leaderEdits(), inv = ed.filter(e => e.email).length, only = ed.length - inv;
   $("btn-ld-run").hidden = !ed.length;
+  const mo = $("ld-mail") && $("ld-mail").closest(".mailopt"); if (mo) mo.hidden = !inv;   /* 이메일을 넣었을 때만 고르기 */
   $("btn-ld-run").textContent = inv ? `초대 보내기 (${inv}명)${only ? ` · 이름만 ${only}` : ""}` : `이름만 넣기 (${only})`;
 }
 $("ld-list").addEventListener("input", () => syncLeadersBtn());
@@ -8417,8 +8453,9 @@ $("btn-ld-run").onclick = async () => {
   const mails = ed.filter(e => e.email).map(e => e.email);
   const dup = mails.find((m, k) => mails.indexOf(m) !== k);
   if (dup) { $("ld-err").textContent = `같은 이메일이 두 번 있어요: ${dup}`; return; }
-  const inv = mails.length;
-  if (inv && !confirm(`${inv}명에게 초대를 걸까요?\n그분이 그 구글 계정으로 로그인하면 바로 그 셀 셀리더로 들어와요.`)) return;
+  const inv = mails.length, wantMail = !!($("ld-mail") && $("ld-mail").checked);
+  if (inv && !confirm(`${inv}명에게 초대를 걸까요?\n그분이 그 구글 계정으로 로그인하면 바로 그 셀 셀리더로 들어와요.\n${wantMail ? "끝나면 안내 메일 쓰기 창을 열 수 있어요." : "안내 메일은 보내지 않아요 (조용히 등록만)."}`)) return;
+  const mailList = [];
   $("btn-ld-run").disabled = true;
   const fails = []; let okInv = 0, okName = 0;
   for (const e of ed) {
@@ -8440,6 +8477,7 @@ $("btn-ld-run").onclick = async () => {
         if (res.err) { fails.push(`${name}: ${res.err}`); continue; }
         await updateDoc(doc(db, "members", m.id), { pendingSeat: null }); m.pendingSeat = null;
         await log("셀리더 명단 초대", name, cellNameOf(r.cellId)); okInv++;
+        mailList.push({ name, email, role: "셀리더", cell: cellNameOf(r.cellId) });
       } else {
         const seat = { role: "leader", cellId: r.cellId, cellIds: [] };
         await updateDoc(doc(db, "members", m.id), { pendingSeat: seat, updatedAt: serverTimestamp() }); m.pendingSeat = seat;
@@ -8452,6 +8490,7 @@ $("btn-ld-run").onclick = async () => {
   $("ld-log").textContent = `끝났어요 — 초대 ${okInv}명${okName ? ` · 이름만 ${okName}` : ""}${fails.length ? ` · 못 한 것 ${fails.length}` : ""}`;
   if (fails.length) $("ld-err").textContent = fails.join(" / ");
   toast(okInv ? "초대를 걸었어요." : "넣었어요.");
+  if (wantMail && mailList.length) mailTray(mailList);
 };
 
 /* ════════ 25단계 — 셀리더 카드 (셀 관리 · 교회 명부) ════════
@@ -8521,6 +8560,7 @@ function memCardHTML(m, o) {
   }
   if (m.uid === me.id) chips.push(`<span class="chip rose">나</span>`);
   if (m.intern && !lead) chips.push(`<span class="chip intern">인턴</span>`);
+  else if (!lead) { const sv = soulOfMember(m); if (sv && !isLeaderCard(sv) && sv.cand) chips.push(`<span class="chip cand" title="비공식 — 셀리더 · 코치 · 진장만 봐요">후보</span>`); }
   if (!e && pendingInvite(m)) chips.push(`<span class="chip warn">초대 중</span>`);
   if (handPendingFor(m)) chips.push(`<span class="chip warn">카드 넘어가는 중</span>`);
   const role = lead ? "셀리더" : (m.role && m.role !== "member" ? (ROLEBADGE[m.role] || "") : "");
@@ -9364,8 +9404,8 @@ async function syncRankToDir(souls) {
   const ws = [];
   for (const s of souls) {
     const m = s.memberId ? memberById(s.memberId) : null; if (!m || m.uid) continue;
-    const want = { rank: s.seq || 0, intern: !!s.intern };
-    if ((m.rank || 0) !== want.rank || !!m.intern !== want.intern)
+    const want = { rank: s.seq || 0, intern: !!s.intern, internSince: s.intern ? (s.internSince || "") : "" };
+    if ((m.rank || 0) !== want.rank || !!m.intern !== want.intern || (m.internSince || "") !== want.internSince)
       ws.push(updateDoc(doc(db, "members", m.id), want).then(() => Object.assign(m, want)).catch(e => console.warn("명부 순서", m.name, e)));
   }
   await Promise.all(ws);
@@ -9490,8 +9530,8 @@ document.addEventListener("click", (ev) => {
    자리는 '조직 구성'(수퍼)에서 짜고, 여기는 누구나(같은 진) 보는 그림이에요. */
 async function openOrgChart() {
   if (!state.me || state.me.role === "member") return;
-  show("s-loading");
-  await loadOrg(true);
+  if (!state.orgAt) show("s-loading");
+  await orgOpen(() => { if (!$("s-orgchart").hidden) renderOrgChart(); });
   if (!state.orgName) { try { const o = await getDoc(doc(db, "org", "main")); if (o.exists()) state.orgName = o.data().name; } catch {} }
   $("oc-edit").hidden = state.me.role !== "super";
   renderOrgChart(); markSide && markSide(""); show("s-orgchart");
@@ -9526,8 +9566,9 @@ function ocCell(c) {
   </button>`;
 }
 function renderOrgChart() {
-  const me = state.me;
-  const jins = state.jins.filter(j => j.active !== false && (me.role === "super" || j.id === me.jinId));
+  const me = state.me, sup = me.role === "super";
+  const jins = state.jins.filter(j => j.active !== false && (sup || j.id === me.jinId));
+  const gridCls = (n) => n > 8 ? " c3" : n > 4 ? " c2" : "";
   const body = jins.map(j => {
     const cells = activeCells().filter(c => c.jinId === j.id);
     const jj = seatList("jinjang", j.id), co = seatList("coach", j.id);
@@ -9538,24 +9579,34 @@ function renderOrgChart() {
     const groups = co.map(p => { const ids = cellIdsOf(p).filter(id => cells.some(c => c.id === id)); ids.forEach(id => used.add(id));
       return { p, cells: cells.filter(c => ids.includes(c.id)) }; });
     const rest = cells.filter(c => !used.has(c.id));
-    const jjHTML = jj.length ? `<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">${jj.map(p => ocPerson(p, "진장", "oc-jj")).join("")}</div>`
-      : `<div class="oc-node empty">진장 자리 비어 있음${me.role === "super" ? " — '자리 고치기'에서 넣어요" : ""}</div>`;
+    const jjHTML = jj.length ? jj.map(p => ocPerson(p, "진장", "oc-jj")).join("")
+      : `<div class="oc-node empty">진장 자리 비어 있음${sup ? " — '자리 고치기'에서" : ""}</div>`;
+    /* 진장 옆 — 보좌하는 코치 */
+    const aide = co.length ? co.map((p, i) => ocPerson({ ...p, sub: groups[i].cells.length ? `담당 셀 ${groups[i].cells.length}개` : "담당 셀 미정" }, "코치", "oc-coach")).join("")
+      : `<button type="button" class="oc-node oc-coach none"${sup ? ` data-ocaddcoach="1"` : ""}><span class="t"><span class="r">코치</span>
+          <span class="n" style="display:block;color:var(--dim)">코치 자리 비어 있음</span>
+          <span class="s" style="display:block">${sup ? "눌러서 조직 구성 → ＋ 코치" : "진장님이 바로 셀을 돌봐요"}</span></span></button>`;
+    const lead = `<div class="oc-lead">
+        <div class="oc-jjs">${jjHTML}</div>
+        <div class="oc-aide"><span class="oc-aide-l">진장 보좌</span><div class="oc-aide-row">${aide}</div></div>
+      </div>`;
+    /* 진장 → 코치 → 셀 */
     let lower;
     if (groups.length) {
-      const cols = groups.map(g => `<div class="oc-col">${ocPerson({ ...g.p, sub: `맡은 셀 ${g.cells.length}개` }, "코치", "oc-coach")}
-          ${g.cells.length ? `<div class="oc-cells${g.cells.length > 8 ? " c3" : g.cells.length > 4 ? " c2" : ""}">${g.cells.map(ocCell).join("")}</div>` : ""}</div>`);
-      if (rest.length) cols.push(`<div class="oc-col"><div class="oc-node oc-coach none" style="cursor:default"><span class="t"><span class="r">코치</span>
-          <span class="n" style="display:block;color:var(--dim)">코치 미지정</span><span class="s" style="display:block">셀 ${rest.length}개 — 진장이 바로</span></span></div>
-          <div class="oc-cells${rest.length > 8 ? " c3" : rest.length > 4 ? " c2" : ""}">${rest.map(ocCell).join("")}</div></div>`);
+      const head = (p, n) => `<div class="oc-gh"><span class="oc-dot coach"></span><b>${esc(p.name || "")}</b> 코치 담당 <span>${n}개 셀</span></div>`;
+      const cols = groups.map(g => `<div class="oc-col">${head(g.p, g.cells.length)}
+          ${g.cells.length ? `<div class="oc-cells${gridCls(g.cells.length)}">${g.cells.map(ocCell).join("")}</div>` : `<div class="oc-node empty" style="min-width:200px">아직 맡은 셀이 없어요</div>`}</div>`);
+      if (rest.length) cols.push(`<div class="oc-col"><div class="oc-gh"><span class="oc-dot"></span><b>진장</b> 직접 <span>${rest.length}개 셀</span></div>
+          <div class="oc-cells${gridCls(rest.length)}">${rest.map(ocCell).join("")}</div></div>`);
       lower = `<div class="oc-v"></div><div class="oc-scroll"><div class="oc-cols">${cols.join("")}</div></div>`;
     } else {
-      lower = `<div class="oc-v"></div>${cells.length ? `<div class="oc-grid">${cells.map(ocCell).join("")}</div>`
-        : `<div class="oc-node empty">아직 셀이 없어요</div>`}`;
+      lower = `<div class="oc-v"></div>${cells.length ? `<div class="oc-band"><span class="oc-band-l">셀 ${cells.length}개 · 진장 직접</span>
+          <div class="oc-grid">${cells.map(ocCell).join("")}</div></div>` : `<div class="oc-node empty">아직 셀이 없어요</div>`}`;
     }
     return `<div class="oc-jinwrap">
       <div class="oc-node oc-jin"><span class="t"><span class="r">진</span><span class="n" style="display:block">${esc(j.name)}</span>
         <span class="s" style="display:block">셀 ${cells.length}개 · ${people}명${co.length ? ` · 코치 ${co.length}명` : ""}</span></span></div>
-      <div class="oc-v"></div>${jjHTML}${lower}</div>`;
+      <div class="oc-v"></div>${lead}${lower}</div>`;
   }).join("");
   $("oc-body").innerHTML = `<div class="oc">
     <div class="oc-node oc-church">${esc(state.orgName || "교회")}</div>
@@ -9566,6 +9617,7 @@ $("oc-edit").onclick = () => openOrg();
 $("btn-home-orgchart").onclick = () => openOrgChart();
 $("oc-body").addEventListener("click", (ev) => {
   const p = ev.target.closest("[data-ocmem]"); if (p) { openMember(p.dataset.ocmem); return; }
+  if (ev.target.closest("[data-ocaddcoach]")) { openOrg(); return; }
   const c = ev.target.closest("[data-occell]");
   if (c) { state.dirCell = c.dataset.occell; state.dirView = "list"; state.dirRole = "all"; openDir(); }
 });
@@ -9683,7 +9735,7 @@ const HELP = [
     steps: [["plus", "영혼 더하기", `영혼들 오른쪽 위 ${kb("plus", "")} — 명부에서 고르거나 새로`],
       ["pen", "만남 기록", `카드를 열고 ${kb("", "만남")} · ${kb("", "1:1")} · 심방`],
       ["pray", "기도제목", `기도 중 → 응답됨으로 바꿔 가며`],
-      ["sort", "순서 · 인턴", `${kb("", "순서")} — 영적 순서와 인턴을 한 창에서`]],
+      ["sort", "순서 · 인턴 · 후보", `${kb("", "순서")} — 영적 순서, ${kb("", "인턴")}(공식) · ${kb("", "후보")}(비공식 · 본인은 못 봄)`]],
     tips: [["lock", "기록마다 공개 범위: 나만 · 코치·진장 · 교역자"], ["star", "명함 카드 네 칸 = 만남 · 1:1 · 출석 · 기도"]], go: ["souls", "영혼들 열기"] },
   { id: "meet", ic: "meet", c: "#7FA8E8", t: "셀모임 · 보고", s: "출석 체크 → 보고까지 한 번에", who: "lead",
     steps: [["plus", "셀모임 열기", `셀모임 ${kb("plus", "")} — 날짜 · 시간 · 장소 · 주제`],
@@ -10083,3 +10135,151 @@ function meetRte() {
   return state._mrte;
 }
 document.addEventListener("mousedown", (e) => { if (!e.target.closest(".rte-pop,.cbtn")) document.querySelectorAll(".rte-pop").forEach(x => x.remove()); });
+
+
+/* ════════ 35단계 — 초대 안내 메일 (보낼지 고르기) ════════
+   앱이 메일을 몰래 보내지 않아요. 체크한 경우에만 끝난 뒤 '메일 쓰기' 창을 열 수 있게 모아 둡니다.
+   [메일 쓰기]를 누르면 Gmail(또는 폰 메일 앱)에 받는 사람 · 제목 · 내용이 채워진 채로 열려요 — 보내기는 직접. */
+function inviteMail(x) {
+  const url = "https://artist4rhythm-hub.github.io/mokyang-note/";
+  const su = `[목자의 삶] ${x.name}님, ${x.cell ? x.cell + " " : ""}${x.role}로 초대했어요`;
+  const body = `${x.name}님, 안녕하세요.\n\n목자의 삶 앱에 ${x.cell ? x.cell + " " : ""}${x.role}로 초대했어요.\n\n1. 아래 주소를 열고\n   ${url}\n2. [구글로 시작]을 눌러 이 메일을 받은 구글 계정(${x.email})으로 로그인하면\n3. 바로 자리가 잡혀요.\n\n홈 화면에 바로가기를 만들어 두면 앱처럼 열려요 (앱 안 '도우미'에 그림 안내가 있어요).\n\n${(state.me && state.me.name) || ""} 드림`;
+  return { su, body, gmail: `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(x.email)}&su=${encodeURIComponent(su)}&body=${encodeURIComponent(body)}`,
+    mailto: `mailto:${encodeURIComponent(x.email)}?subject=${encodeURIComponent(su)}&body=${encodeURIComponent(body)}` };
+}
+function mailTray(list) {
+  let el = $("mail-tray");
+  if (!el) { el = document.createElement("div"); el.id = "mail-tray"; el.className = "mtray"; el.setAttribute("role", "dialog"); el.setAttribute("aria-label", "초대 안내 메일"); document.body.appendChild(el); }
+  state.mailList = list;
+  const phone = /iPhone|iPad|Android/.test(navigator.userAgent);
+  el.innerHTML = `<div class="mt-h"><b>초대 안내 메일 ${list.length}통</b><button type="button" class="x" data-mtx="1" aria-label="닫기">×</button></div>
+    <p class="mt-s">눌러야 메일 쓰기 창이 열려요 — 내용을 보고 직접 [보내기]. 안 보내도 초대는 이미 걸려 있어요.</p>
+    ${list.map((x, i) => { const m = inviteMail(x); return `<div class="mt-r"><span class="grow"><b>${esc(x.name)}</b><small>${esc(x.email)}</small></span>
+      <a class="btn-sm" href="${esc(phone ? m.mailto : m.gmail)}" target="_blank" rel="noopener" data-mtdone="${i}">메일 쓰기</a>
+      <button type="button" class="btn-sm" data-mtcopy="${i}">문구 복사</button></div>`; }).join("")}`;
+  el.hidden = false;
+}
+document.addEventListener("click", async (ev) => {
+  const t = ev.target.closest("[data-mtx], [data-mtcopy], [data-mtdone]"); if (!t) return;
+  if (t.dataset.mtx) { $("mail-tray").hidden = true; return; }
+  if (t.dataset.mtdone !== undefined) { t.textContent = "열었어요"; return; }
+  const x = (state.mailList || [])[+t.dataset.mtcopy]; if (!x) return;
+  const m = inviteMail(x);
+  try { await navigator.clipboard.writeText(`${m.su}\n\n${m.body}`); toast("안내 문구를 복사했어요 — 카톡 · 문자에 붙여 넣어도 돼요."); }
+  catch { toast("복사하지 못했어요."); }
+});
+
+/* ════════ 35단계 — 인턴 · 인턴 후보 ════════
+   인턴: 공식 리더 후보 — 명부에도 표시되고 같은 진이 봐요.
+   인턴 후보: 셀리더가 마음에 둔 비공식 후보 — 목양 카드(souls)에만 적어요.
+     → 셀리더 · 그 셀 코치 · 진장만 보고, 본인과 같은 진의 다른 분에게는 안 보여요 (명부로 절대 안 넘어감).
+   정하는 곳: 영혼들 · 셀모임 · 명부의 [순서 · 인턴] 창 (일반 · 후보 · 인턴). */
+const monthsSince = (d) => { if (!d) return null; const n = Math.floor((Date.now() - new Date(d + "T00:00").getTime()) / 864e5); return n < 0 ? 0 : Math.floor(n / 30.44); };
+state.itv = state.itv || { tab: "intern", sort: "cell" };
+async function openInterns() {
+  if (!state.me || state.me.role === "member") return;
+  if (!state.orgAt) show("s-loading");
+  await loadOrg();
+  if (canLead() || ["coach", "jinjang"].includes(state.me.role)) await loadSouls();
+  renderInterns(); markSide("interns"); show("s-interns");
+  loadAttReps().then(() => { if (!$("s-interns").hidden) renderInterns(); }).catch(() => {});
+}
+function internData() {
+  const me = state.me;
+  const cells = activeCells().filter(c => me.role === "super" || c.jinId === me.jinId);
+  const ids = new Set(cells.map(c => c.id));
+  const dir = (state.dir || []).filter(m => m.active !== false && ids.has(m.cellId));
+  const lead = new Set(); cells.forEach(c => cellLeadEntries(c).forEach(e => e.m && lead.add(e.m.id)));
+  const P = [], seenSoul = new Set();
+  dir.forEach(m => {
+    if (lead.has(m.id)) return;
+    let sv = soulOfMember(m); if (sv && isLeaderCard(sv)) sv = null; if (sv) seenSoul.add(sv.id);
+    const intern = !!m.intern || !!(sv && sv.intern), cand = !intern && !!(sv && sv.cand);
+    if (intern || cand) P.push({ key: m.id, name: m.name, cellId: m.cellId, m, s: sv, tier: intern ? "intern" : "cand",
+      since: intern ? ((sv && sv.internSince) || m.internSince || "") : ((sv && sv.candSince) || "") });
+  });
+  (state.souls || []).forEach(sv => {
+    if (seenSoul.has(sv.id) || isLeaderCard(sv) || !ids.has(sv.cellId) || sv.active === false) return;
+    if (sv.intern || sv.cand) P.push({ key: "s" + sv.id, name: sv.name, cellId: sv.cellId, m: null, s: sv, tier: sv.intern ? "intern" : "cand", since: sv.intern ? sv.internSince : sv.candSince });
+  });
+  P.forEach(x => { const a = x.m && state.attRep ? attStats(x.m.id, x.cellId) : null; x.rate = a ? a.rate : null; x.mo = monthsSince(x.since); });
+  const rows = cells.map(c => {
+    const ms = dir.filter(m => m.cellId === c.id && !lead.has(m.id));
+    const it = P.filter(x => x.cellId === c.id && x.tier === "intern"), cd = P.filter(x => x.cellId === c.id && x.tier === "cand");
+    const n = ms.length;
+    const tag = it.length && n >= 10 ? ["ok", "분가 준비"] : !it.length && n >= 8 ? ["warn", "인턴을 세울 때"] : !it.length && cd.length ? ["", "후보 있음"] : null;
+    return { c, n, it, cd, tag, lead: (cellLeadEntries(c)[0] || {}).p };
+  });
+  return { cells, dir, P, rows };
+}
+function renderInterns() {
+  const D = internData(), V = state.itv, me = state.me;
+  const I = D.P.filter(x => x.tier === "intern"), C = D.P.filter(x => x.tier === "cand");
+  const seesCand = canLead() || ["coach", "jinjang"].includes(me.role);
+  const avg = (a) => a.length ? a.reduce((n, v) => n + v, 0) / a.length : null;
+  const moAvg = avg(I.map(x => x.mo).filter(v => v !== null)), rAvg = avg(I.map(x => x.rate).filter(v => v !== null));
+  const withI = D.rows.filter(r => r.it.length).length, need = D.rows.filter(r => r.tag && r.tag[1] === "인턴을 세울 때").length;
+  const K = (ic, k, v, sub, tone) => `<div class="kpi${tone ? " " + tone : ""}"><span class="ki">${HIC[ic]}</span><p class="k">${k}</p><p class="v">${v}</p>${sub ? `<p class="s">${sub}</p>` : ""}</div>`;
+  const dots = (r) => {
+    const a = [...r.it.map(() => "i"), ...r.cd.map(() => "c")]; while (a.length < r.n) a.push("");
+    return `<span class="it-dots" aria-hidden="true">${a.slice(0, 24).map(t => `<i class="${t}"></i>`).join("")}${a.length > 24 ? `<em>+${a.length - 24}</em>` : ""}</span>`;
+  };
+  const cOrd = Object.fromEntries(D.cells.map((c, i) => [c.id, i]));
+  const sortF = { cell: (a, b) => (cOrd[a.cellId] ?? 99) - (cOrd[b.cellId] ?? 99) || (a.name || "").localeCompare(b.name || "", "ko"),
+    long: (a, b) => (b.mo ?? -1) - (a.mo ?? -1), att: (a, b) => (b.rate ?? -1) - (a.rate ?? -1), name: (a, b) => (a.name || "").localeCompare(b.name || "", "ko") }[V.sort];
+  const list = (V.tab === "cand" ? C : I).slice().sort(sortF);
+  const card = (x) => {
+    const c = state.cells.find(z => z.id === x.cellId), who = x.m || x.s;
+    const tr = ((x.m && x.m.trainingsDone) || []).slice(0, 3);
+    return `<button type="button" class="it-card ${x.tier}" ${x.m ? `data-itmem="${x.m.id}"` : x.s ? `data-itsoul="${x.s.id}"` : ""}>
+      ${avatar(who, 46)}
+      <span class="grow"><span class="nm">${esc(x.name || "")} ${x.tier === "intern" ? `<span class="chip intern">인턴</span>` : `<span class="chip cand">후보</span>`}</span>
+        <span class="sub">${c ? `<span class="cbadge sm">${esc(c.name)}</span>` : ""}${x.since ? `${fmtDate(x.since)}부터${x.mo !== null ? ` · <b>${x.mo ? x.mo + "개월째" : "이번 달"}</b>` : ""}` : `<span class="muted">시작일 없음</span>`}</span>
+        <span class="tags">${x.rate !== null ? `<span class="tpill${x.rate < 50 ? " streak" : ""}">출석 ${x.rate}%</span>` : ""}${tr.map(t => `<span class="tpill">${esc(t)}</span>`).join("")}</span></span>
+    </button>`;
+  };
+  $("it-body").innerHTML = `
+    <div class="us-kpis">
+      ${K("star", "공식 인턴", `${I.length}<small>명</small>`, `인턴이 있는 셀 ${withI} / ${D.cells.length}곳`)}
+      ${seesCand ? K("eye", "인턴 후보", `${C.length}<small>명</small>`, "비공식 · 셀리더가 마음에 둔 분") : ""}
+      ${K("cal", "평균 인턴 기간", moAvg !== null ? `${Math.round(moAvg)}<small>개월</small>` : "—", "시작일이 적힌 분 기준")}
+      ${K("chart", "인턴 출석률", rAvg !== null ? `${Math.round(rAvg)}<small>%</small>` : "—", "최근 3개월 셀모임")}
+      ${K("org", "인턴을 세울 셀", `${need}<small>곳</small>`, "셀원 8명 넘는데 인턴 없음", need ? "warn" : "")}
+    </div>
+    <div class="it-grid">
+      <div class="card it-cells">
+        <div class="us-h"><h3>셀별</h3><span class="muted"><i class="it-k i"></i>인턴 <i class="it-k c"></i>후보 <i class="it-k"></i>셀원</span></div>
+        ${D.rows.map(r => `<div class="itc">
+          <span class="cbadge">${esc(r.c.name)}</span><span class="ln">${esc((r.lead && r.lead.name) || "—")}</span>
+          ${dots(r)}
+          <span class="tx">셀원 ${r.n} · 인턴 <b>${r.it.length}</b>${seesCand ? ` · 후보 ${r.cd.length}` : ""}</span>
+          ${r.tag ? `<span class="chip ${r.tag[0]}">${r.tag[1]}</span>` : `<span></span>`}
+        </div>`).join("") || `<p class="muted">셀이 없어요.</p>`}
+      </div>
+      <div class="card it-list">
+        <div class="us-h">
+          <div class="seg mini">${[["intern", `공식 인턴 ${I.length}`], ...(seesCand ? [["cand", `인턴 후보 ${C.length}`]] : [])].map(([k, l]) => `<button type="button" data-itt="${k}" class="${V.tab === k ? "on" : ""}">${l}</button>`).join("")}</div>
+          <select id="it-sort" aria-label="정렬" style="width:auto;height:34px;font-size:13px;padding:0 30px 0 10px;margin-left:auto">${[["cell", "셀 순"], ["long", "오래된 순"], ["att", "출석 높은 순"], ["name", "가나다순"]].map(([k, l]) => `<option value="${k}" ${V.sort === k ? "selected" : ""}>${l}</option>`).join("")}</select>
+        </div>
+        ${V.tab === "cand" ? `<p class="it-note">${HIC.lock.replace("<svg", '<svg width="15" height="15"')}비공식 — 셀리더 · 그 셀 코치 · 진장만 봐요. 본인과 같은 진의 다른 분에게는 보이지 않고, 명부에도 나오지 않아요.</p>` : ""}
+        <div class="it-cards">${list.map(card).join("") || `<p class="muted" style="padding:10px 2px">${V.tab === "cand" ? "아직 인턴 후보가 없어요." : "아직 공식 인턴이 없어요."}</p>`}</div>
+        ${canLead() ? `<div class="acts" style="margin-top:12px"><button type="button" class="btn-sm" id="it-order">우리 셀 인턴 · 후보 정하기</button></div>` : ""}
+      </div>
+    </div>`;
+}
+$("it-back").onclick = () => openHome();
+$("it-body").addEventListener("click", (ev) => {
+  const t = ev.target.closest("[data-itt]"); if (t) { state.itv.tab = t.dataset.itt; renderInterns(); return; }
+  const m = ev.target.closest("[data-itmem]"); if (m) { openMember(m.dataset.itmem); return; }
+  const so = ev.target.closest("[data-itsoul]"); if (so) { openSoul(so.dataset.itsoul); return; }
+  if (ev.target.closest("#it-order")) openOrderDlg(null, () => renderInterns());
+});
+$("it-body").addEventListener("change", (ev) => { if (ev.target.id === "it-sort") { state.itv.sort = ev.target.value; renderInterns(); } });
+
+function internCount() {
+  const me = state.me; if (!me) return 0;
+  const ids = new Set(activeCells().filter(c => me.role === "super" || c.jinId === me.jinId).map(c => c.id));
+  const fromDir = new Set((state.dir || []).filter(m => m.active !== false && m.intern && ids.has(m.cellId)).map(m => m.id));
+  (state.souls || []).forEach(sv => { if (sv.intern && !isLeaderCard(sv) && ids.has(sv.cellId)) fromDir.add(sv.memberId || "s" + sv.id); });
+  return fromDir.size;
+}

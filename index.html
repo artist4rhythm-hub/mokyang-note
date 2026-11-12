@@ -720,6 +720,81 @@
   }
 
 
+
+  /* 35단계 — 인턴 · 후보 */
+  .chip.cand{background:transparent;color:var(--ok-tx);border:1px dashed var(--ok-line)}
+  .ordrow .tier{display:inline-flex;gap:4px;flex-shrink:0}
+  .ordrow button.cand{width:auto;padding:0 10px;font-size:12px;color:var(--dim);font-family:inherit;border-style:dashed}
+  .ordrow button.cand.on{border-color:var(--ok-line);color:var(--ok-tx);font-weight:600;background:transparent}
+  @media (min-width:1200px){ #s-interns,#s-leaders,#s-orgchart{max-width:1440px} }
+  .it-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;margin-top:12px}
+  @media (min-width:1000px){ .it-grid{grid-template-columns:minmax(0,5fr) minmax(0,6fr);align-items:start} }
+  .it-cells,.it-list{margin:0;padding:16px}
+  .itc{display:grid;grid-template-columns:104px 72px minmax(0,1fr) auto;grid-template-areas:"b l d g" "b l t g";column-gap:10px;row-gap:3px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+  .itc:first-of-type{border-top:none}
+  .itc .cbadge{grid-area:b;justify-self:start;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.itc .ln{grid-area:l;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .itc .it-dots{grid-area:d}.itc .tx{grid-area:t;font-size:11.5px;color:var(--dim)}.itc .tx b{color:var(--ok-tx)}
+  .itc>.chip,.itc>span:last-child{grid-area:g;font-size:11px}
+  .it-dots{display:flex;flex-wrap:wrap;gap:3px;align-items:center}
+  .it-dots i,.it-k{display:inline-block;width:11px;height:11px;border-radius:3px;background:var(--track)}
+  .it-dots i.i,.it-k.i{background:var(--ok-tx)}
+  .it-dots i.c,.it-k.c{background:transparent;border:1.5px dashed var(--ok-tx)}
+  .it-dots em{font-style:normal;font-size:10.5px;color:var(--dim);margin-left:2px}
+  .it-k{width:9px;height:9px;margin:0 3px 0 8px;vertical-align:-1px}
+  .it-note{display:flex;gap:8px;align-items:flex-start;font-size:12px;color:var(--sub-tx);background:var(--surface2);border-radius:12px;padding:9px 12px;margin:0 0 10px;line-height:1.55}
+  .it-note svg{flex-shrink:0;margin-top:2px}
+  .it-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+  .it-card{display:flex;gap:12px;align-items:flex-start;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px;cursor:pointer;font:inherit;color:inherit}
+  .it-card:hover{border-color:var(--line3)}
+  .it-card.cand{border-style:dashed}
+  .it-card .grow{display:flex;flex-direction:column;gap:5px;min-width:0}
+  .it-card .nm{font-size:15px;font-weight:600;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .it-card .nm .chip{font-size:10.5px;padding:2px 8px}
+  .it-card .sub{font-size:12px;color:var(--sub-tx);display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .it-card .sub b{color:var(--text);font-weight:600}
+  .it-card .tags{display:flex;gap:5px;flex-wrap:wrap}
+  .cbadge.sm{height:22px;padding:0 9px;font-size:11.5px}
+  /* 35단계 — 조직도: 진장 옆 보좌 코치 · 코치별 담당 셀 */
+  .oc-lead{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;width:100%;gap:0}
+  .oc-jjs{grid-column:2;display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  .oc-aide{grid-column:3;justify-self:start;display:flex;align-items:center;position:relative;padding-left:44px}
+  .oc-aide::before{content:"";position:absolute;left:0;top:50%;width:40px;border-top:2px dashed #7FA8E8;opacity:.8}
+  .oc-aide-l{position:absolute;left:2px;top:calc(50% - 20px);font-size:10.5px;color:#7FA8E8;white-space:nowrap}
+  .oc-aide-row{display:flex;gap:8px;flex-wrap:wrap}
+  .oc-aide .oc-coach{min-width:180px}
+  .oc-gh{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--sub-tx);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:5px 12px;white-space:nowrap}
+  .oc-gh b{color:var(--text);font-weight:600}.oc-gh span{color:var(--dim)}
+  .oc-dot{width:8px;height:8px;border-radius:50%;background:var(--rose-tx)}.oc-dot.coach{background:#7FA8E8}
+  .oc-band{width:100%;display:flex;flex-direction:column;align-items:center;gap:10px}
+  .oc-band-l{font-size:11.5px;color:var(--dim);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:4px 12px}
+  @media (max-width:760px){
+    .oc-lead{grid-template-columns:1fr;row-gap:12px}
+    .oc-jjs{grid-column:1}.oc-aide{grid-column:1;justify-self:center;padding-left:0;padding-top:22px;flex-direction:column}
+    .oc-aide::before{left:50%;top:0;width:0;height:20px;border-top:none;border-left:2px dashed #7FA8E8}
+    .oc-aide-l{left:calc(50% + 8px);top:2px}
+  }
+  /* 35단계 — 셀리더 명단: 카드 격자 */
+  .ld-jin{margin-top:14px}
+  .ld-jin>h3{font-size:15px;font-weight:600;margin:0 2px 10px}.ld-jin>h3 .muted{font-size:12px;font-weight:400}
+  .ld-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px}
+  .ld-card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+  .ld-card.open{border-style:dashed}
+  .ld-ch{display:flex;align-items:center;gap:8px}.ld-ch .muted{margin-left:auto;font-size:12px}
+  .ld-p{display:flex;gap:10px;align-items:center}.ld-p .grow{min-width:0}
+  .ld-p .nm{font-size:14.5px;font-weight:600;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .ld-p .sub{font-size:12px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ld-save{display:flex;align-items:center;gap:14px;flex-wrap:wrap;justify-content:center}
+  .ld-save .btn{max-width:320px}
+  .mailopt{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font-size:13px;margin:0 0 12px}
+  .mailopt small{flex-basis:100%;font-size:11.5px;color:var(--dim);padding-left:26px}
+  .ld-save .mailopt{margin:0}
+  .mtray{position:fixed;right:18px;bottom:18px;z-index:90;width:min(380px,calc(100vw - 32px));background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:14px 16px;box-shadow:0 18px 48px rgba(0,0,0,.4)}
+  .mtray .mt-h{display:flex;align-items:center;justify-content:space-between}.mtray .x{background:none;border:none;color:var(--dim);font-size:22px;cursor:pointer}
+  .mtray .mt-s{font-size:12px;color:var(--dim);margin:4px 0 10px;line-height:1.55}
+  .mtray .mt-r{display:flex;align-items:center;gap:6px;padding:8px 0;border-top:1px solid var(--line)}
+  .mtray .mt-r .btn-sm{white-space:nowrap;flex-shrink:0;display:inline-flex;align-items:center}
+  .mtray .mt-r .grow{display:flex;flex-direction:column;min-width:0}.mtray .mt-r small{font-size:11.5px;color:var(--dim);overflow:hidden;text-overflow:ellipsis}
+  .mtray a.btn-sm{text-decoration:none}
   /* 34단계 — 구글 캘린더 실시간 · 수퍼 서버 설정 */
   .gcfg{margin-top:14px;border-top:1px dashed var(--line);padding-top:12px}
   .gcfg summary{cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;list-style:none}
@@ -1291,6 +1366,14 @@
 
   <!-- 22단계 — 셀 보고 모아보기 -->
   <!-- 31단계 — 도우미 -->
+  <!-- 35단계 — 인턴 · 인턴 후보 -->
+  <section class="screen" id="s-interns" hidden>
+    <div class="topbar"><button class="icon-btn" id="it-back" aria-label="뒤로"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5m6-6-6 6 6 6"/></svg></button>
+      <h2 style="font-size:17px;font-weight:600">인턴 · 후보</h2><span style="width:44px"></span></div>
+    <div class="scroll pad"><div id="it-body"></div><div style="height:28px"></div></div>
+    <nav class="tabbar" data-nav="home"></nav>
+  </section>
+
   <section class="screen" id="s-help" hidden>
     <div class="topbar">
       <button class="icon-btn" id="hp-back" aria-label="뒤로"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5m6-6-6 6 6 6"/></svg></button>
@@ -1382,15 +1465,15 @@
       <h2 style="font-size:17px;font-weight:600">셀리더 명단</h2>
       <button class="btn-sm" id="btn-ld-org">조직 구성</button>
     </div>
-    <div class="scroll pad" style="max-width:640px">
-      <p class="hint" style="margin:0 2px 12px">셀마다 셀리더와 가입 상태예요. 이메일 칸에 그분의 <b>구글 이메일</b>을 넣고 아래 [초대 보내기]를 누르면,
+    <div class="scroll pad">
+      <p class="hint" style="margin:0 2px 12px;max-width:760px">셀마다 셀리더와 가입 상태예요. 이메일 칸에 그분의 <b>구글 이메일</b>을 넣고 아래 [초대 보내기]를 누르면,
         그분이 그 구글 계정으로 로그인할 때 바로 그 셀 셀리더로 들어와요. 셀원 목양 카드도 그때 생기고 노션 명단으로 채워져요.</p>
       <div class="tiles" id="ld-sum"></div>
       <div id="ld-list"></div>
       <p class="err" id="ld-err"></p>
       <p class="muted" id="ld-log" style="margin-top:8px"></p>
     </div>
-    <div class="savebar"><button class="btn" id="btn-ld-run" hidden>초대 보내기</button></div>
+    <div class="savebar ld-save"><label class="check mailopt"><input type="checkbox" id="ld-mail"> 초대 안내 메일도 쓰기 <small>체크하면 끝난 뒤 '메일 쓰기' 창을 열 수 있어요 · 안 하면 조용히 등록만</small></label><button class="btn" id="btn-ld-run" hidden>초대 보내기</button></div>
   </section>
 
   <!-- 홈 -->
@@ -2366,6 +2449,7 @@
     <div class="field"><label for="sx-email">구글 이메일 <span style="color:var(--dim)">(모르면 비워 두기)</span></label>
       <input id="sx-email" type="email" placeholder="그분이 로그인할 구글 계정"></div>
   </div>
+  <label class="check mailopt"><input type="checkbox" id="sx-mail"> 초대 안내 메일도 쓰기 <small>체크하면 끝난 뒤 '메일 쓰기' 창을 열 수 있어요 · 안 하면 조용히 등록만</small></label>
   <label class="check" id="sx-coach-wrap" style="margin:-4px 0 14px"><input type="checkbox" id="sx-coach"> 코치도 겸함 (다른 셀도 돌봄)</label>
   <div class="field" id="sx-cells-wrap"><label>돌볼 셀 (코치)</label><div class="ckl" id="sx-cells"></div></div>
   <p class="hint" id="sx-hint"></p>
@@ -2432,6 +2516,7 @@
     <p class="hint" id="iv-role-hint"></p></div>
   <div class="field" id="iv-jin-wrap" hidden><label for="iv-jin">진</label><select id="iv-jin"></select></div>
   <div class="field" id="iv-cell-wrap"><label for="iv-cell">셀</label><select id="iv-cell"></select></div>
+  <label class="check mailopt"><input type="checkbox" id="iv-mail"> 초대 안내 메일도 쓰기 <small>체크하면 끝난 뒤 '메일 쓰기' 창을 열 수 있어요 · 안 하면 조용히 등록만</small></label>
   <p class="err" id="invite-err"></p>
   <div class="dlg-btns">
     <button class="btn-ghost" id="iv-cancel">취소</button>
