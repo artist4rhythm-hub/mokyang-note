@@ -24,7 +24,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
 const APP_NAME = "목자의 삶";
-const APP_VERSION = "40.0 (2026-11-13)";
+const APP_VERSION = "40.1 (2026-11-13)";
 /* 35단계 — 버전 표시: v35.0 · 2026.11.12 업데이트 */
 const verNo = () => APP_VERSION.split(" ")[0];
 const verDate = () => (APP_VERSION.match(/\((.*)\)/) || [])[1] || "";
@@ -5305,6 +5305,10 @@ async function backfillThumbs() {
    올릴 때마다 version.json 도 같이 올립니다. 앱은 열 때 · 다시 볼 때 · 10분마다
    그 파일만 살짝 확인해서(아주 작은 파일), 지금 버전보다 새것이면 위에 알림을 띄웁니다. */
 const CHANGELOG = [
+  { v:"40.1", d:"2026-11-13", items:[
+    "새 앱 아이콘 — 익숙한 컵 모양은 그대로, 와인색 · 아이보리와 쑥쑥체 글씨로",
+    "안드로이드 동그란 아이콘에서도 글씨가 잘리지 않게 따로 맞춤",
+    "브라우저 탭 아이콘(컵 + '목' 한 글자) 새로 · 왼쪽 메뉴 로고도 새 아이콘으로" ] },
   { v:"40.0", d:"2026-11-13", items:[
     "규격 통일 — 버튼 · 칸 높이를 3단계(36 · 44 · 52)로, 배지는 24 한 가지로",
     "아이콘 크기를 3가지(16 · 20 · 22)로, 아이콘 상자는 40 × 40으로 맞춤",
