@@ -24,7 +24,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
 const APP_NAME = "목자의 삶";
-const APP_VERSION = "41.0 (2026-11-13)";
+const APP_VERSION = "42.0 (2026-11-13)";
 /* 35단계 — 버전 표시: v35.0 · 2026.11.12 업데이트 */
 const verNo = () => APP_VERSION.split(" ")[0];
 const verDate = () => (APP_VERSION.match(/\((.*)\)/) || [])[1] || "";
@@ -3658,6 +3658,7 @@ async function openMore() {
   $("btn-manage-org") && ($("btn-manage-org").hidden = me.role !== "super");
   $("install-sub").textContent = window.matchMedia("(display-mode: standalone)").matches
     ? "이미 앱으로 설치되어 있어요":"폰 홈 화면에서 바로 열 수 있어요";
+  renderFontPick();
   markSide("more"); show("s-more");
 }
 $("btn-go-train").onclick=()=>openTrainBoard();
@@ -4134,7 +4135,7 @@ const SCREEN_SKIP = new Set(["login", "verify", "setup", "accept", "pending", "c
 const ACT_NAME = { recordCreate:"기록 남김", planCreate:"만남 예약", meetingSave:"셀모임 저장",
   soulCreate:"영혼 추가", trainSave:"훈련 기록", exportCsv:"내려받기", myNote:"내 기록", handover:"카드 인계",
   promote:"셀리더 세우기", comment:"댓글", dm:"쪽지", careContact:"챙김 연락", meetingReport:"셀 보고",
-  gcalConnect:"구글 캘린더 연결", gcalSync:"구글 캘린더 맞추기", photoUpload:"셀모임 사진 올림", themeChange:"화면 밝기 바꿈", fontSize:"글자 크기 바꿈",
+  gcalConnect:"구글 캘린더 연결", gcalSync:"구글 캘린더 맞추기", photoUpload:"셀모임 사진 올림", themeChange:"화면 밝기 바꿈", fontSize:"글자 크기 바꿈", fontFace:"글꼴 바꿈",
   memoFormat:"메모 꾸미기 사용", installApp:"홈 화면 앱 설치", welcomeOff:"처음 안내 닫음",
   faithSet:"신앙 · 훈련 체크", ticket_ask:"사용 문의 보냄", ticket_idea:"기능 제안 보냄", ticket_bug:"오류 알림 보냄", ticketReply:"문의 답 · 덧붙임" };
 const actName = (k) => ACT_NAME[k] || (k.startsWith("help_") ? `도우미 · ${(HELP.find(t => t.id === k.slice(5)) || {}).t || k.slice(5)}` : k);
@@ -5127,6 +5128,13 @@ async function backfillThumbs() {
    올릴 때마다 version.json 도 같이 올립니다. 앱은 열 때 · 다시 볼 때 · 10분마다
    그 파일만 살짝 확인해서(아주 작은 파일), 지금 버전보다 새것이면 위에 알림을 띄웁니다. */
 const CHANGELOG = [
+  { v:"42.0", d:"2026-11-13", items:[
+    "교회 명부를 열면 통계 · 그래프부터 (탭 순서도 통계 → 명단) · 찾기에 글자를 넣으면 명단으로",
+    "셀 관리 · 조직도에서 셀을 눌러 명부로 올 때는 그 셀 명단으로 바로",
+    "글꼴 고르기 — 더보기 › 화면: 쑥쑥 · 프리텐다드 · 기기 기본 · 써라운드 · 오스퀘어 · 슈퍼매직 · 심플해 · 단정해 · PRO 슬림",
+    "고른 글꼴만 내려받아요 (안 고른 글꼴은 받지 않음) · 이 기기에 기억 · 그리기 전에 적용돼 깜빡임 없음",
+    "명부 생일 — 이번 달에 이미 지난 생일은 'D-359' 대신 'n일 지남'",
+    "문의 · 제안에 보내는 기기 정보에 글꼴도 함께" ] },
   { v:"41.0", d:"2026-11-13", items:[
     "숫자를 그림으로 — 홈 맨 위 '한눈에 보기': 큰 숫자 4칸(첫 칸 모카빛) · 8주 출석 둥근 막대 · 최근 셀모임 반원 · 신앙 · 훈련 고리",
     "셀 건강 — 반원 출석률 · 주마다 온 사람(출석 + 온라인) 쌓인 막대 · 모임 없는 주는 점선 · 사람별 8주 칸 + 고리 · 그 전 4주와 비교 한 줄",
@@ -5943,7 +5951,9 @@ async function syncMemberTrain(soulId, fresh) {
 
 /* ════════ 명부 화면 ════════ */
 const canRegister = () => isManager() || (canLead() && !!state.me.cellId);
-async function openDir() {
+async function openDir(view) {
+  /* 42단계 — 교회 명부는 통계 · 그래프부터 (셀 · 조직도에서 사람 보러 올 때는 명단) */
+  state.dirView = view === "list" || view === "stats" ? view : "stats";
   show("s-loading"); markSide("dir");
   await loadOrg();
   if (canLead() || ["coach","jinjang","pastor"].includes(state.me.role)) await loadSouls();
@@ -5976,7 +5986,7 @@ function renderDir() {
   $("dir-cells").querySelectorAll("[data-dc]").forEach(b => b.classList.toggle("on", b.dataset.dc === state.dirCell));
   $("dir-roles").innerHTML = DROLES.map(([k,l]) => `<button type="button" data-dr="${k}" class="${state.dirRole===k?"on":""}">${l}</button>`).join("");
   const isLead = (m) => (m.role && m.role !== "member") || LM.has(m.id);
-  state.dirView = state.dirView || "list";
+  state.dirView = state.dirView || "stats";
   $("dir-view").querySelectorAll("[data-dv]").forEach(b => b.classList.toggle("on", b.dataset.dv === state.dirView));
   $("dir-roles").hidden = state.dirView === "stats";
   if (state.dirView === "stats") {
@@ -6063,7 +6073,7 @@ function renderDir() {
   fillCardsPriv($("dir-list"));
   loadAttReps().then(() => fillAtt($("dir-list"))).catch(() => {});
 }
-$("dir-search").oninput = () => renderDir();
+$("dir-search").oninput = () => { if ($("dir-search").value.trim() && state.dirView === "stats") state.dirView = "list"; renderDir(); };
 $("dir-cells").addEventListener("click", (ev) => { const b = ev.target.closest("[data-dc]"); if (!b) return;
   state.dirCell = b.dataset.dc; renderDir(); });
 $("dir-roles").addEventListener("click", (ev) => { const b = ev.target.closest("[data-dr]"); if (!b) return;
@@ -6635,7 +6645,7 @@ $("s-cellmgr").addEventListener("click", async (ev) => {
   }
   const cell = (k) => { const v = g(k); return v ? state.cells.find(c => c.id === v) : null; };
   let c;
-  if ((c = cell("cmview"))) { state.dirCell = c.id; state.dirRole = "all"; $("dir-search").value = ""; openDir(); return; }
+  if ((c = cell("cmview"))) { state.dirCell = c.id; state.dirRole = "all"; $("dir-search").value = ""; openDir("list"); return; }
   if ((c = cell("cmlead"))) { openClDlg(c); return; }
   if ((c = cell("cmsplit"))) { openSplit(c); return; }
   if ((c = cell("cmrename"))) {
@@ -6935,7 +6945,7 @@ $("s-org").addEventListener("click", async (ev) => {
     return;
   }
   if (d.oadd) { openSeat({ kind: d.oadd, jinId: d.jin, cellId: d.cell || null }); return; }
-  if (d.ocview) { state.dirCell = d.ocview; state.dirRole = "all"; $("dir-search").value = ""; openDir(); return; }
+  if (d.ocview) { state.dirCell = d.ocview; state.dirRole = "all"; $("dir-search").value = ""; openDir("list"); return; }
   if (d.ojrename) {
     const j = state.jins.find(x => x.id === d.ojrename);
     const name = prompt("진 이름", j.name); if (!name || !name.trim() || name.trim() === j.name) return;
@@ -9469,7 +9479,7 @@ $("oc-body").addEventListener("click", (ev) => {
     return;
   }
   const c = ev.target.closest("[data-occell]");
-  if (c) { state.dirCell = c.dataset.occell; state.dirView = "list"; state.dirRole = "all"; openDir(); }
+  if (c) { state.dirCell = c.dataset.occell; state.dirView = "list"; state.dirRole = "all"; openDir("list"); }
 });
 $("btn-org-chart").onclick = () => openOrgChart();
 
@@ -9589,13 +9599,15 @@ const HELP = [
       ["폰과 컴퓨터 둘 다 써도 되나요?", `네. 같은 구글 계정으로 로그인하면 어디서든 같은 내용이 보여요. 글자 크기 · 밝기는 기기마다 따로 기억해요.`]],
     go: ["install", "홈 화면에 바로가기"] },
   { id: "install", g: "start", ic: "phone", c: "#2E9D8F", t: "홈 화면에 바로가기", s: "아이폰 · 안드로이드 · 컴퓨터", who: "all", special: "install" },
-  { id: "screen", g: "start", ic: "moon", c: "#6F5BA8", t: "화면 · 글자 크기", s: "라이트 · 블랙 · 글자 4단계", who: "all",
+  { id: "screen", g: "start", ic: "moon", c: "#6F5BA8", t: "화면 · 글자 · 글꼴", s: "라이트 · 블랙 · 글자 4단계 · 글꼴 9가지", who: "all",
     steps: [["moon", "라이트 · 블랙", `홈 위 ${kb("moon", "")} 달 · 해 버튼 — 누르면 바로 바뀌어요 (컴퓨터는 왼쪽 메뉴 맨 아래에도)`],
       ["pen", "글자 크기", `더보기 › 화면 › 글자 크기 — ${kb("", "작게")} ${kb("", "보통")} ${kb("", "크게")} ${kb("", "아주 크게")}`],
+      ["pen", "글꼴", `더보기 › 화면 › 글꼴 — ${kb("", "쑥쑥")} ${kb("", "프리텐다드")} ${kb("", "기기 기본")} 과 카페24 글꼴 6가지 (카드에 미리보기)`],
       ["phone", "기기마다 따로", `폰은 크게, 컴퓨터는 보통처럼 기기마다 기억해요`],
       ["refresh", "새 버전", `앱 위 '새 버전' 알림 → ${kb("refresh", "지금 새로고침")}`]],
     tips: [["eye", "글자만 커지고 카드 배치는 그대로라 화면이 밀리지 않아요"], ["star", "'기기 설정 따르기'로 두면 폰이 어두울 때 블랙으로"]],
-    more: [["글자가 흐리게 보여요", `본문은 가는 글꼴(쑥쑥 Light)이에요. 더보기 › 화면에서 ${kb("", "크게")}로 올리면 훨씬 또렷해요.`],
+    more: [["글자가 흐리게 보여요", `쑥쑥 본문은 가는 글꼴이에요. 더보기 › 화면에서 글꼴을 ${kb("", "프리텐다드")}로 바꾸거나 글자를 ${kb("", "크게")}로 올리면 훨씬 또렷해요.`],
+      ["글꼴은 어떤 걸 고르면 좋아요?", `오래 읽기에는 ${kb("", "프리텐다드")}(반듯 · 또렷), 따뜻한 느낌은 ${kb("", "쑥쑥")}, 데이터를 아끼려면 ${kb("", "기기 기본")}(받을 것 없음). 이 기기에만 적용돼서 폰과 컴퓨터를 다르게 둘 수 있어요.`],
       ["버전은 어디서 보나요?", `홈 오른쪽 위 'v00.0 · 날짜 업데이트'를 누르면 무엇이 바뀌었는지 목록이 나와요.`]] },
   { id: "home", g: "daily", ic: "home", c: "#5B8DEF", t: "홈 화면", s: "오늘 할 일이 한눈에", who: "lead",
     steps: [["pray", "오늘의 전시", `기도할 영혼 한 사람 → ${kb("", "기도했어요")}`],
@@ -9819,6 +9831,7 @@ function helpFaq() {
     ["생년 · 침례가 '—'로 보여요", `노션 명단(잠긴 칸)은 수퍼 · 진장 · 코치 · 그 셀 셀리더만 봐요. 본인 것은 본인에게 안 보여요.`],
     ["화면이 너무 어둡거나 밝아요", `홈 위 ${kb("moon", "")} 달 · 해 버튼으로 라이트 · 블랙을 바로 바꿔요. 더보기 › 화면에서 '기기 설정 따르기'도 있어요.`],
     ["글씨가 작아요", `더보기 › 화면 › 글자 크기에서 ${kb("", "크게")} · ${kb("", "아주 크게")}. 이 기기에만 적용돼요.`],
+    ["글씨가 보기 어려워요 · 글꼴을 바꾸고 싶어요", `더보기 › 화면 › 글꼴에서 ${kb("", "프리텐다드")} · ${kb("", "기기 기본")} 등 9가지 중 골라요. 카드를 누르면 바로 바뀌고 이 기기에 기억돼요.`],
     ["인턴 후보는 누가 보나요?", `그 셀 셀리더 · 그 셀 코치 · 진장 · 소유자만. 후보 본인과 다른 셀리더에게는 보이지 않고, 명부에도 넘어가지 않아요.`],
     ["초대 메일 없이 등록만 하고 싶어요", `셀리더 명단 위 '초대 안내 메일' → ${kb("", "등록만")}. 나중에 직접 연락해 전해도 돼요.`],
     ["문의한 내용은 누가 보나요?", `쓴 사람과 수퍼 관리자만 봐요. 답이 오면 소식(종)으로 알려 드려요.`],
@@ -10432,10 +10445,11 @@ function tkCtx() {
   const br = /Edg\//.test(ua) ? "엣지" : /SamsungBrowser/.test(ua) ? "삼성 인터넷" : /CriOS|Chrome\//.test(ua) ? "크롬" : /Safari\//.test(ua) ? "사파리" : "기타";
   const os = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) ? "iOS" : /Android/.test(ua) ? "안드로이드" : /Mac/.test(ua) ? "맥" : /Windows/.test(ua) ? "윈도우" : "";
   const fs = { s: "작게", m: "보통", l: "크게", xl: "아주 크게" }[fsPref()] || "보통";
-  return { ver: verNo(), dev: tkDev(), w: innerWidth, os, br, theme: document.documentElement.dataset.theme === "dark" ? "블랙" : "라이트", fs,
+  const font = ((window.MOKJA_FONTS || {})[fontPref()] || {}).n || "";
+  return { ver: verNo(), dev: tkDev(), w: innerWidth, os, br, theme: document.documentElement.dataset.theme === "dark" ? "블랙" : "라이트", fs, font,
     from: state.tkFrom ? (SCREEN_NAME[state.tkFrom] || state.tkFrom) : "" };
 }
-const tkCtxTxt = (c) => c ? [`v${c.ver}`, [c.dev, c.w ? c.w + "px" : ""].filter(Boolean).join(" "), [c.os, c.br].filter(Boolean).join(" · "), c.theme, `글자 ${c.fs}`, c.from ? `'${c.from}' 화면에서` : ""].filter(Boolean).join(" · ") : "";
+const tkCtxTxt = (c) => c ? [`v${c.ver}`, [c.dev, c.w ? c.w + "px" : ""].filter(Boolean).join(" "), [c.os, c.br].filter(Boolean).join(" · "), c.theme, `글자 ${c.fs}`, c.font ? `글꼴 ${c.font}` : "", c.from ? `'${c.from}' 화면에서` : ""].filter(Boolean).join(" · ") : "";
 const tkWhen = (ms) => { if (!ms) return ""; const d = new Date(ms); return `${d.getMonth() + 1}.${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
 
 function openTickets(view, kind) {
@@ -10892,7 +10906,7 @@ function gxRing(p, col, sz = 96, sw = 10, mid = "", sub = "") {
   return `<svg class="gx-ring" viewBox="0 0 ${sz} ${sz}" width="${sz}" height="${sz}" aria-label="${mid}">
     <circle cx="${sz / 2}" cy="${sz / 2}" r="${r}" fill="none" style="stroke:var(--track)" stroke-width="${sw}"/>
     ${p == null || v <= 0 ? "" : `<circle cx="${sz / 2}" cy="${sz / 2}" r="${r}" fill="none" style="stroke:${col}" stroke-width="${sw}" stroke-linecap="round" stroke-dasharray="${cf * v / 100} ${cf}" transform="rotate(-90 ${sz / 2} ${sz / 2})"/>`}
-    ${mid !== "" ? `<text x="50%" y="${sub ? "47%" : "50%"}" dominant-baseline="central" text-anchor="middle" style="fill:var(--text);font-family:SsukR;font-size:${sz * .23}px">${mid}</text>` : ""}
+    ${mid !== "" ? `<text x="50%" y="${sub ? "47%" : "50%"}" dominant-baseline="central" text-anchor="middle" style="fill:var(--text);font-family:SsukR,Ssuk,sans-serif;font-size:${sz * .23}px">${mid}</text>` : ""}
     ${sub ? `<text x="50%" y="68%" text-anchor="middle" style="fill:var(--dim);font-size:${sz * .12}px">${sub}</text>` : ""}</svg>`;
 }
 /* 반원 — segs: [{v, c}] · {v, stp:true} 는 빗금 */
@@ -10907,7 +10921,7 @@ function gxGauge(segs, mid, sub, w = 300, sw = 34) {
   return `<svg class="gx-gauge" viewBox="0 0 ${w} ${cy + 6}" aria-label="${mid} ${sub}">
     <defs><pattern id="gxstp" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="8" height="8" style="fill:var(--gx-stp-a)"/><rect width="4" height="8" style="fill:var(--gx-stp-b)"/></pattern></defs>
     <path d="${arc}" fill="none" style="stroke:var(--track)" stroke-width="${sw}" stroke-linecap="round"/>${parts}
-    <text x="${w / 2}" y="${cy - 20}" text-anchor="middle" style="fill:var(--text);font-family:SsukR;font-size:${w * .17}px">${mid}</text>
+    <text x="${w / 2}" y="${cy - 20}" text-anchor="middle" style="fill:var(--text);font-family:SsukR,Ssuk,sans-serif;font-size:${w * .17}px">${mid}</text>
     <text x="${w / 2}" y="${cy + 2}" text-anchor="middle" style="fill:var(--dim);font-size:${w * .052}px">${sub}</text></svg>`;
 }
 /* 둥근 알약 막대 — data: [{l, v, c, stp, tag, title, cls}] */
@@ -10932,7 +10946,7 @@ function gxArea(series, labels, w = 680, h = 240) {
     ${series.map((s, i) => `<path d="${path(s.v)} L${px(n - 1)} ${h - 28} L${px(0)} ${h - 28} Z" style="fill:url(#gxag${i})"/><path d="${path(s.v)}" fill="none" style="stroke:${s.c}" stroke-width="2.5"/>`).join("")}
     ${labels.map((l, i) => i % step && i !== n - 1 ? "" : `<text x="${px(i)}" y="${h - 7}" text-anchor="middle" style="fill:var(--dim);font-size:12px">${l}</text>`).join("")}
     ${s0.v[hi] ? `<circle cx="${px(hi)}" cy="${py(s0.v[hi])}" r="6" style="fill:var(--surface);stroke:${s0.c}" stroke-width="3"/>
-    <g transform="translate(${Math.min(w - 40, Math.max(40, px(hi)))} ${py(s0.v[hi]) - 18})"><rect x="-34" y="-28" width="68" height="26" rx="10" style="fill:var(--text)"/><text y="-10" text-anchor="middle" style="fill:var(--bg);font-family:SsukR;font-size:13px">${s0.v[hi]}회</text></g>` : ""}</svg>`;
+    <g transform="translate(${Math.min(w - 40, Math.max(40, px(hi)))} ${py(s0.v[hi]) - 18})"><rect x="-34" y="-28" width="68" height="26" rx="10" style="fill:var(--text)"/><text y="-10" text-anchor="middle" style="fill:var(--bg);font-family:SsukR,Ssuk,sans-serif;font-size:13px">${s0.v[hi]}회</text></g>` : ""}</svg>`;
 }
 /* 도넛 — segs: [{v, c}] */
 function gxDonut(segs, mid, sub, sz = 180, sw = 26) {
@@ -10940,7 +10954,7 @@ function gxDonut(segs, mid, sub, sz = 180, sw = 26) {
   return `<svg class="gx-donut" viewBox="0 0 ${sz} ${sz}" width="${sz}" height="${sz}" aria-label="${mid} ${sub}">
     <circle cx="${sz / 2}" cy="${sz / 2}" r="${r}" fill="none" style="stroke:var(--track)" stroke-width="${sw}"/>
     ${tot ? segs.map(s => { const len = cf * s.v / tot; const o = s.v ? `<circle cx="${sz / 2}" cy="${sz / 2}" r="${r}" fill="none" style="stroke:${s.c}" stroke-width="${sw}" stroke-dasharray="${Math.max(0, len - (segs.filter(x => x.v).length > 1 ? 4 : 0))} ${cf}" stroke-dashoffset="${-acc}" transform="rotate(-90 ${sz / 2} ${sz / 2})"/>` : ""; acc += len; return o; }).join("") : ""}
-    <text x="50%" y="47%" dominant-baseline="central" text-anchor="middle" style="fill:var(--text);font-family:SsukR;font-size:${sz * .19}px">${mid}</text>
+    <text x="50%" y="47%" dominant-baseline="central" text-anchor="middle" style="fill:var(--text);font-family:SsukR,Ssuk,sans-serif;font-size:${sz * .19}px">${mid}</text>
     <text x="50%" y="64%" text-anchor="middle" style="fill:var(--dim);font-size:${sz * .08}px">${sub}</text></svg>`;
 }
 const gxLeg = (items) => `<div class="gx-leg">${items.map(([c, l]) => `<span><i class="${c === "stp" ? "gx-stp" : c === "dash" ? "gx-dash" : ""}" style="${c === "stp" || c === "dash" ? "" : `background:${c}`}"></i>${l}</span>`).join("")}</div>`;
@@ -11341,12 +11355,12 @@ function dirStatsHTML(scope, cells, cellOfM, LM) {
   const interns = scope.filter(m => m.intern).length;
   const streak = at.filter(x => x.st.streak >= 2).length;
   const now = new Date(), mo = now.getMonth() + 1, mo2 = mo % 12 + 1;
-  const dday = (md) => { const [mm, dd] = String(md).split("-").map(Number); let t = new Date(now.getFullYear(), mm - 1, dd);
-    const t0 = new Date(now.getFullYear(), now.getMonth(), now.getDate()); if (t < t0) t = new Date(now.getFullYear() + 1, mm - 1, dd); return Math.round((t - t0) / 864e5); };
+  const dday = (md) => { const [mm, dd] = String(md).split("-").map(Number); const t0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    let t = new Date(now.getFullYear(), mm - 1, dd); if (t < t0 && mm !== mo) t = new Date(now.getFullYear() + 1, mm - 1, dd); return Math.round((t - t0) / 864e5); };
   const bd = (mm) => scope.filter(m => m.birthMD && Number(String(m.birthMD).slice(0, 2)) === mm)
     .sort((a, b) => String(a.birthMD).localeCompare(String(b.birthMD)));
   const bdHTML = (mm) => { const l = bd(mm); return l.length ? `<div class="gx-bd">${l.map(m => { const d = dday(m.birthMD);
-      return `<div class="gx-p">${avatar(m, 36)}<span class="g"><b>${esc(m.name)}</b><small>${Number(String(m.birthMD).slice(0, 2))}월 ${Number(String(m.birthMD).slice(3, 5))}일${m.lunar ? " (음력)" : ""}</small></span><span class="chip ${d <= 7 ? "rose" : "gold"}">${d === 0 ? "오늘" : "D-" + d}</span></div>`; }).join("")}</div>`
+      return `<div class="gx-p">${avatar(m, 36)}<span class="g"><b>${esc(m.name)}</b><small>${Number(String(m.birthMD).slice(0, 2))}월 ${Number(String(m.birthMD).slice(3, 5))}일${m.lunar ? " (음력)" : ""}</small></span><span class="chip ${d < 0 ? "" : d <= 7 ? "rose" : "gold"}">${d === 0 ? "오늘" : d < 0 ? `${-d}일 지남` : "D-" + d}</span></div>`; }).join("")}</div>`
     : `<p class="gx-empty" style="padding:8px 0">없어요</p>`; };
   const perCell = state.dirCell === "all" ? cells.map(c => {
     const ms = scope.filter(m => cellOfM(m) === c.id); if (!ms.length) return null;
@@ -11381,3 +11395,33 @@ function dirStatsHTML(scope, cells, cellOfM, LM) {
     <p class="hint">나이는 노션 명단(잠긴 칸)의 생년월일로 세요 — 그걸 볼 수 있는 분(수퍼 · 진장 · 코치 · 그 셀 셀리더)에게만 나이가 잡혀요.</p>
   </div>`;
 }
+
+/* ════════ 42단계 — 글꼴 고르기 (더보기 › 화면) ════════
+   쑥쑥 · 프리텐다드 · 기기 기본 · 카페24 6가지. 이 기기에 기억(글자 크기 · 밝기처럼).
+   글꼴 파일은 고를 때 · 이 칸을 볼 때만 받아요(미리보기는 굵은 글꼴 한 장씩). */
+const FONT_ORDER = ["ssuk", "pretendard", "system", "ssurround", "ohsquare", "supermagic", "simplehae", "danjunghae", "proslim"];
+function fontPref() { try { const k = localStorage.getItem("mokja-font") || "ssuk"; return (window.MOKJA_FONTS || {})[k] ? k : "ssuk"; } catch { return "ssuk"; } }
+function renderFontPick() {
+  const box = $("more-font"); if (!box || !window.MOKJA_FONTS) return;
+  const F = window.MOKJA_FONTS, cur = fontPref();
+  if (!document.getElementById("mokja-font-pv")) {
+    const st = document.createElement("style"); st.id = "mokja-font-pv";
+    st.textContent = FONT_ORDER.filter(k => !F[k].sys).map(k => `@font-face{font-family:"PV-${k}";src:url("./fonts/${F[k].R}.woff2") format("woff2");font-display:swap}`).join("")
+      + `@font-face{font-family:"PV-system";src:local("Apple SD Gothic Neo Bold"),local("AppleSDGothicNeo-Bold"),local("Malgun Gothic Bold"),local("MalgunGothicBold"),local("Noto Sans CJK KR Bold"),local("NotoSansCJKkr-Bold")}`;
+    document.head.appendChild(st);
+  }
+  box.innerHTML = FONT_ORDER.map(k => `<button type="button" role="radio" aria-checked="${k === cur}" data-font="${k}" class="${k === cur ? "on" : ""}">
+      <span class="fn" style="font-family:'PV-${k}','Apple SD Gothic Neo','Malgun Gothic',sans-serif">${esc(F[k].n)}${k === "pretendard" ? ` <span class="fp-rec">읽기 편해요</span>` : ""}</span>
+      <span class="fs" style="font-family:'PV-${k}','Apple SD Gothic Neo','Malgun Gothic',sans-serif">맡은 영혼 12명 · 78%</span>
+      <span class="fd">${esc(F[k].d)}</span></button>`).join("");
+  const c = F[cur];
+  $("more-font-credit").textContent = c.sys ? "기기에 들어 있는 글꼴로 보여요 (애플 SD 산돌고딕 Neo · 맑은 고딕 · 노토 산스 등)."
+    : `이 앱에는 ${c.by.includes("카페24") ? "카페24(주)이 제공한 " + c.by.split(" · ")[1] : c.by.split(" (")[0]} 글꼴이 적용되어 있어요 (SIL 오픈 폰트 라이선스).`;
+}
+document.addEventListener("click", (ev) => {
+  const b = ev.target.closest("#more-font [data-font]"); if (!b) return;
+  const k = window.mokjaApplyFont(b.dataset.font);
+  try { localStorage.setItem("mokja-font", k); } catch {}
+  renderFontPick(); bump("fontFace");
+  toast(`${window.MOKJA_FONTS[k].n} 글꼴로 바꿨어요.${k === "system" ? "" : " 처음 한 번은 글꼴을 받느라 잠깐 걸려요."}`);
+});

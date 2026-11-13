@@ -12,8 +12,6 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="목자의 삶">
-<link rel="preload" href="./fonts/Cafe24SsukssukRegular.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="./fonts/Cafe24SsukssukLight.woff2" as="font" type="font/woff2" crossorigin>
 <style>
   :root{
     --bg:#0F0F0F; --surface:#191616; --surface2:#221D1E; --line:#2E2727;
@@ -1255,7 +1253,7 @@
      Light에 없는 드문 글자는 Regular로 채워요 (SsukR). 글꼴: 카페24(주) 제공 — SIL OFL 1.1 */
   @font-face{font-family:"Ssuk";src:url("./fonts/Cafe24SsukssukLight.woff2") format("woff2");font-weight:100 449;font-display:swap}
   @font-face{font-family:"Ssuk";src:url("./fonts/Cafe24SsukssukRegular.woff2") format("woff2");font-weight:450 900;font-display:swap}
-  @font-face{font-family:"SsukR";src:url("./fonts/Cafe24SsukssukRegular.woff2") format("woff2");font-display:swap}
+  @font-face{font-family:"SsukR","Ssuk",sans-serif;src:url("./fonts/Cafe24SsukssukRegular.woff2") format("woff2");font-display:swap}
   html,body{font-family:"Ssuk","SsukR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;font-synthesis:none;letter-spacing:.005em}
   .serif{font-family:inherit;font-weight:500}
   /* 굵은 글씨(b · strong · 제목)는 굵기 700 그대로 두고 Regular 글꼴로 그려요 — 편집기 [굵게] 표시가 맞게 */
@@ -1674,10 +1672,10 @@
   button.gx-kpi{cursor:pointer;transition:transform .15s,box-shadow .15s}
   button.gx-kpi:hover{transform:translateY(-1px)}
   .gx-kpi .l{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:calc(13px*var(--fs,1));color:var(--dim)}
-  .gx-kpi .v{font-family:"SsukR";font-size:calc(34px*var(--fs,1));line-height:1;margin:12px 0 10px;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+  .gx-kpi .v{font-family:"SsukR","Ssuk",sans-serif;font-size:calc(34px*var(--fs,1));line-height:1;margin:12px 0 10px;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
   .gx-kpi .v em{font-style:normal;font-size:calc(14px*var(--fs,1));color:var(--dim);margin-left:3px;font-family:inherit}
   .gx-kpi .d{margin-top:auto;display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:calc(12px*var(--fs,1));color:var(--dim);line-height:1.4}
-  .gx-up{display:inline-flex;align-items:center;height:24px;padding:0 9px;border-radius:12px;background:var(--gx-sage-s);color:var(--gx-sage);font-family:"SsukR";font-size:calc(11px*var(--fs,1));white-space:nowrap}
+  .gx-up{display:inline-flex;align-items:center;height:24px;padding:0 9px;border-radius:12px;background:var(--gx-sage-s);color:var(--gx-sage);font-family:"SsukR","Ssuk",sans-serif;font-size:calc(11px*var(--fs,1));white-space:nowrap}
   .gx-up.dn{background:var(--gx-wine-s);color:var(--rose-tx)}
   .gx-kpi.hero{border:none;color:#F6EEE4;background:radial-gradient(90% 120% at 100% 0%,rgba(228,72,95,.16),transparent 60%),radial-gradient(120% 140% at 0% 0%,rgba(255,255,255,.08),transparent 55%),linear-gradient(150deg,var(--feat-a),var(--feat-b))}
   .gx-kpi.hero .l,.gx-kpi.hero .d,.gx-kpi.hero .v em{color:#CDBFB0}
@@ -1719,8 +1717,8 @@
   .gx-pc{flex:1 1 0;min-width:0;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:8px;position:relative}
   .gx-pc i{display:block;width:100%;max-width:46px;border-radius:999px}
   .gx-pc>span{font-size:calc(11px*var(--fs,1));color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-  .gx-pc .gx-top{font-family:"SsukR";font-size:calc(12px*var(--fs,1));font-weight:400}
-  .gx-tag{position:absolute;left:50%;transform:translateX(-50%);font-family:"SsukR";font-size:calc(11px*var(--fs,1));background:var(--surface);border:1px solid var(--line3);border-radius:8px;padding:2px 6px;white-space:nowrap}
+  .gx-pc .gx-top{font-family:"SsukR","Ssuk",sans-serif;font-size:calc(12px*var(--fs,1));font-weight:400}
+  .gx-tag{position:absolute;left:50%;transform:translateX(-50%);font-family:"SsukR","Ssuk",sans-serif;font-size:calc(11px*var(--fs,1));background:var(--surface);border:1px solid var(--line3);border-radius:8px;padding:2px 6px;white-space:nowrap}
   .gx-gauge{display:block;width:100%;max-width:300px;margin:0 auto}
   .gx-gauge+.gx-leg{justify-content:center;margin-top:12px}
   .gx-rings{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;text-align:center}
@@ -1737,7 +1735,7 @@
   .gx-hc .hc-sum .gx-gauge{max-width:280px}
   .gx-hc .hc-kpi{margin-top:14px;gap:8px}
   .gx-hc .hc-kpi div{background:var(--surface);border-radius:12px;padding:10px 12px}
-  .gx-hc .hc-kpi b{font-family:"SsukR";font-weight:400;font-size:calc(22px*var(--fs,1))}
+  .gx-hc .hc-kpi b{font-family:"SsukR","Ssuk",sans-serif;font-weight:400;font-size:calc(22px*var(--fs,1))}
   .gx-hc .hc-kpi b em{font-style:normal;font-size:calc(12px*var(--fs,1));color:var(--dim);margin-left:2px;font-family:inherit}
   .gx-hc .hc-kpi .sage b{color:var(--gx-sage)}.gx-hc .hc-kpi .gold b{color:var(--gx-gold)}.gx-hc .hc-kpi .wine b{color:var(--rose-tx)}
   .gx-hc .hc-chart{background:var(--surface2);border-radius:18px;padding:16px 18px}
@@ -1748,7 +1746,7 @@
   .gx-stack .col i.ok{background:var(--gx-sage)}.gx-stack .col i.on{background:var(--gx-blue)}
   .gx-stack .col i.c{background:var(--c-cell)}.gx-stack .col i.m{background:var(--c-one)}
   .gx-stack .lb{font-size:calc(11px*var(--fs,1));color:var(--dim);white-space:nowrap}
-  .gx-stack .gx-top{font-family:"SsukR";font-weight:400;font-size:calc(12px*var(--fs,1))}
+  .gx-stack .gx-top{font-family:"SsukR","Ssuk",sans-serif;font-weight:400;font-size:calc(12px*var(--fs,1))}
   .gx-hc .hppl{grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:0 24px}
   .gx-hc .hp{grid-template-columns:36px 64px minmax(0,1fr) 48px;gap:12px;background:none;border-radius:0;padding:10px 2px;border-top:1px solid var(--line2)}
   .gx-hc .hp .dd{gap:6px}
@@ -1761,7 +1759,7 @@
   /* 활동 통계 */
   .gx-mine{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}
   .gx-mine span{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 14px;border-radius:12px;background:var(--surface);border:1px solid var(--line);font-size:calc(13px*var(--fs,1));color:var(--dim)}
-  .gx-mine b{color:var(--text);font-family:"SsukR";font-weight:400}
+  .gx-mine b{color:var(--text);font-family:"SsukR","Ssuk",sans-serif;font-weight:400}
   .gx-dwrap{display:flex;justify-content:center;margin-bottom:12px}
   .gx-dside{display:flex;align-items:center;gap:16px}.gx-dside svg{flex-shrink:0}
   .gx-dside .gx-klist{flex:1;min-width:0}
@@ -1769,7 +1767,7 @@
   .gx-klist .kbar{display:grid;grid-template-columns:10px minmax(0,1fr) auto auto;gap:10px;align-items:center;padding:6px 0;font-size:calc(13px*var(--fs,1));border:none;margin:0}
   .gx-klist .kbar i{width:10px;height:10px;border-radius:3px}
   .gx-klist .kbar span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .gx-klist .kbar b{font-family:"SsukR";font-weight:400}.gx-klist .kbar small{color:var(--dim);font-size:calc(11px*var(--fs,1));width:36px;text-align:right}
+  .gx-klist .kbar b{font-family:"SsukR","Ssuk",sans-serif;font-weight:400}.gx-klist .kbar small{color:var(--dim);font-size:calc(11px*var(--fs,1));width:36px;text-align:right}
   .gx-area{display:block;width:100%;height:auto}
   .gx-people{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:0 28px}
   @media (max-width:879px){ .gx-people{grid-template-columns:minmax(0,1fr)} }
@@ -1779,7 +1777,7 @@
   .gx-pcard .srow .tr:has(.chip){background:none;overflow:visible}
   .gx-pcard .hbar{height:14px;gap:0;border-radius:7px;overflow:hidden}
   .gx-pcard .hbar i:last-child{border-radius:0}
-  .gx-pcard .srow .n{font-family:"SsukR"}
+  .gx-pcard .srow .n{font-family:"SsukR","Ssuk",sans-serif}
   .gx-pcard .srow .det{margin-top:-2px}
   .no1{font-style:normal;color:var(--rose-tx)}
   /* 훈련 현황 */
@@ -1795,7 +1793,7 @@
   .gx-bar2 i{display:block;height:100%}
   .gx-steps{display:flex;align-items:flex-end;gap:10px;height:220px}
   .gx-steps .st{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:8px;height:100%}
-  .gx-steps .blk{width:100%;border-radius:18px 18px 10px 10px;display:flex;justify-content:center;padding-top:10px;font-family:"SsukR";font-size:calc(20px*var(--fs,1));color:#fff}
+  .gx-steps .blk{width:100%;border-radius:18px 18px 10px 10px;display:flex;justify-content:center;padding-top:10px;font-family:"SsukR","Ssuk",sans-serif;font-size:calc(20px*var(--fs,1));color:#fff}
   .gx-steps .lb{font-size:calc(12px*var(--fs,1));color:var(--dim);text-align:center;line-height:1.3;word-break:keep-all}
   .gx-mx{margin-top:0}
   .gx-mx table{border-collapse:separate;border-spacing:0 6px}
@@ -1804,7 +1802,7 @@
   .gx-mx td{background:var(--surface2)}
   .gx-mx td:first-child{border-radius:12px 0 0 12px}.gx-mx td:last-child{border-radius:0 12px 12px 0}
   .gx-mx td.nm{display:flex;align-items:center;gap:8px;white-space:nowrap}
-  .ck{display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:24px;padding:0 6px;border-radius:8px;font-size:calc(12px*var(--fs,1));font-family:"SsukR"}
+  .ck{display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:24px;padding:0 6px;border-radius:8px;font-size:calc(12px*var(--fs,1));font-family:"SsukR","Ssuk",sans-serif}
   .ck.done{background:var(--gx-sage);color:#fff}
   .ck.ongoing,.ck.planned{background:var(--gx-gold-s);color:var(--gx-gold);font-size:calc(11px*var(--fs,1))}
   .ck.dropped{background:var(--warn-bg);color:var(--warn-tx);font-size:calc(11px*var(--fs,1))}
@@ -1816,18 +1814,30 @@
   .gx-dst .agebars .ab{gap:8px}
   .gx-dst .agebars .ab i{background:none;border-radius:999px}
   .dst-tr{margin:12px 0}.dst-tr .t{display:flex;justify-content:space-between;font-size:calc(13px*var(--fs,1))}
-  .dst-tr b{font-family:"SsukR";font-weight:400}.dst-tr small{color:var(--dim);font-size:calc(11px*var(--fs,1));margin-left:4px;font-family:"Ssuk"}
+  .dst-tr b{font-family:"SsukR","Ssuk",sans-serif;font-weight:400}.dst-tr small{color:var(--dim);font-size:calc(11px*var(--fs,1));margin-left:4px;font-family:"Ssuk",sans-serif}
   .gx-dst .ctab{grid-template-columns:minmax(110px,150px) minmax(0,1fr);gap:16px;padding:10px 0;border-top:1px solid var(--line2)}
   .gx-dst .ctab .nm small{display:block;margin-top:2px}
   .gx-dst .ctab .bars{display:flex;flex-direction:column;gap:6px}
   .gx-dst .ctab .br{display:flex;align-items:center;gap:8px}
   .gx-dst .ctab .br i{display:block;height:12px;border-radius:6px}
-  .gx-dst .ctab .br b{font-size:calc(12px*var(--fs,1));font-family:"SsukR";font-weight:400;white-space:nowrap}
+  .gx-dst .ctab .br b{font-size:calc(12px*var(--fs,1));font-family:"SsukR","Ssuk",sans-serif;font-weight:400;white-space:nowrap}
   .gx-p{display:flex;align-items:center;gap:12px;padding:8px 0;border-top:1px solid var(--line2)}
   .gx-p:first-child{border-top:none}
   .gx-p .g{flex:1;min-width:0;display:flex;flex-direction:column}
   .gx-p .g b{font-size:calc(14px*var(--fs,1));font-weight:600}.gx-p .g small{font-size:calc(12px*var(--fs,1));color:var(--dim)}
   .gx-t2{font-size:calc(12px*var(--fs,1));color:var(--dim);margin:0 0 4px}
+  /* 42단계 — 글꼴 고르기 카드 (높이 같게 · 2~3칸) */
+  .fontpick{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;max-width:760px}
+  .fontpick button{display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-height:96px;padding:12px 14px;border-radius:14px;
+    border:1px solid var(--line);background:var(--surface);color:var(--text);cursor:pointer;text-align:left;font:inherit;position:relative}
+  .fontpick button .fn{font-size:calc(17px*var(--fs,1));line-height:1.25}
+  .fontpick button .fs{font-size:calc(13px*var(--fs,1));color:var(--sub-tx);line-height:1.35}
+  .fontpick button .fd{font-size:calc(11px*var(--fs,1));color:var(--dim);margin-top:auto;font-family:"Ssuk",sans-serif}
+  .fontpick button.on{border-color:var(--brand);box-shadow:inset 0 0 0 1px var(--brand);background:var(--gx-wine-s,var(--rose-bg))}
+  .fontpick button.on::after{content:"✓";position:absolute;right:10px;top:10px;width:22px;height:22px;border-radius:50%;background:var(--brand);color:#fff;
+    font-size:12px;display:flex;align-items:center;justify-content:center;font-family:sans-serif}
+  .fontpick .fp-rec{display:inline-flex;align-items:center;height:20px;padding:0 8px;margin-left:4px;border-radius:10px;vertical-align:middle;background:var(--gx-gold-s);color:var(--gx-gold);font-size:calc(11px*var(--fs,1));font-family:"Ssuk",sans-serif}
+  @media (max-width:520px){ .fontpick{grid-template-columns:repeat(2,minmax(0,1fr))} .fontpick button{min-height:104px} }
 </style>
 <script>
   /* 27단계 — 화면 밝기: 다크(기본) · 라이트 · 기기 설정 따르기. 깜빡임 없게 그리기 전에 정해요. */
@@ -1837,6 +1847,44 @@
     if (t === "system") t = window.matchMedia && matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
     document.documentElement.dataset.theme = t;
     try { var fs = localStorage.getItem("mokja-fs"); if (fs) document.documentElement.dataset.fs = fs; } catch (e) {}
+    /* 42단계 — 글꼴 고르기 (더보기 › 화면). 고른 글꼴만 받아요 — 안 고른 글꼴은 내려받지 않아요.
+       앱 곳곳이 'Ssuk'(본문) · 'SsukR'(제목 · 숫자) 이름을 쓰므로, 고른 글꼴 파일을 그 이름에 다시 걸어요. */
+    window.MOKJA_FONTS = {
+      ssuk:       { n: "쑥쑥", d: "손글씨 느낌 · 처음 글꼴", L: "Cafe24SsukssukLight", R: "Cafe24SsukssukRegular", by: "카페24(주) · Cafe24 Ssukssuk" },
+      pretendard: { n: "프리텐다드", d: "반듯하고 가장 잘 읽혀요", L: "Pretendard-Regular", R: "Pretendard-SemiBold", by: "Pretendard (길형진)" },
+      system:     { n: "기기 기본", d: "폰 · 컴퓨터에 있는 글꼴 · 받을 것 없음", sys: 1 },
+      ssurround:  { n: "써라운드", d: "둥글고 또렷하게", L: "Cafe24SsurroundAir", R: "Cafe24Ssurround", by: "카페24(주) · Cafe24 Ssurround" },
+      ohsquare:   { n: "오스퀘어", d: "각지고 단단하게", L: "Cafe24OhsquareAir", R: "Cafe24Ohsquare", by: "카페24(주) · Cafe24 Ohsquare" },
+      supermagic: { n: "슈퍼매직", d: "굵고 동글동글", L: "Cafe24SupermagicRegular", R: "Cafe24SupermagicBold", by: "카페24(주) · Cafe24 Supermagic" },
+      simplehae:  { n: "심플해", d: "가늘고 깔끔하게", L: "Cafe24Simplehae", R: "Cafe24Simplehae", syn: 1, by: "카페24(주) · Cafe24 Simplehae" },
+      danjunghae: { n: "단정해", d: "굵고 단정하게", L: "Cafe24Danjunghae", R: "Cafe24Danjunghae", by: "카페24(주) · Cafe24 Danjunghae" },
+      proslim:    { n: "PRO 슬림", d: "가늘고 길쭉하게 · 드문 글자는 기기 글꼴", L: "Cafe24PROSlimAir", R: "Cafe24PROSlimMax", by: "카페24(주) · Cafe24 PRO Slim" }
+    };
+    window.mokjaFontCSS = function (k) {
+      var F = window.MOKJA_FONTS[k]; if (!F || k === "ssuk") return "";
+      var u = function (f) { return 'url("./fonts/' + f + '.woff2") format("woff2")'; };
+      var SYS_L = 'local("Apple SD Gothic Neo"),local("AppleSDGothicNeo-Regular"),local("Malgun Gothic"),local("MalgunGothic"),local("Noto Sans CJK KR"),local("NotoSansCJKkr-Regular"),local("Noto Sans KR"),local("NotoSansKR-Regular")';
+      var SYS_B = 'local("Apple SD Gothic Neo Bold"),local("AppleSDGothicNeo-Bold"),local("Malgun Gothic Bold"),local("MalgunGothicBold"),local("Noto Sans CJK KR Bold"),local("NotoSansCJKkr-Bold"),local("Noto Sans KR Bold"),local("NotoSansKR-Bold")';
+      var L = F.sys ? SYS_L : u(F.L), R = F.sys ? SYS_B : u(F.R);
+      return '@font-face{font-family:"Ssuk";src:' + L + ';font-weight:100 449;font-display:swap}'
+        + '@font-face{font-family:"Ssuk";src:' + R + ';font-weight:450 900;font-display:swap}'
+        + '@font-face{font-family:"SsukR";src:' + R + ';font-display:swap}'
+        + (F.syn ? 'html,body{font-synthesis:weight}' : '');
+    };
+    window.mokjaApplyFont = function (k) {
+      if (!window.MOKJA_FONTS[k]) k = "ssuk";
+      var st = document.getElementById("mokja-font"); if (!st) { st = document.createElement("style"); st.id = "mokja-font"; document.head.appendChild(st); }
+      st.textContent = window.mokjaFontCSS(k);
+      document.documentElement.dataset.font = k;
+      var F = window.MOKJA_FONTS[k];
+      if (!F.sys) [F.R, F.L].filter(function (f, i, a) { return a.indexOf(f) === i; }).forEach(function (f) {
+        if (document.querySelector('link[data-pf="' + f + '"]')) return;
+        var l = document.createElement("link"); l.rel = "preload"; l.as = "font"; l.type = "font/woff2"; l.crossOrigin = "anonymous";
+        l.href = "./fonts/" + f + ".woff2"; l.setAttribute("data-pf", f); document.head.appendChild(l); });
+      return k;
+    };
+    var fk = "ssuk"; try { fk = localStorage.getItem("mokja-font") || "ssuk"; } catch (e) {}
+    window.mokjaApplyFont(fk);
     var m = document.querySelector('meta[name="theme-color"]'); if (m) m.content = t === "light" ? "#F6F1EA" : "#0F0D0C";
   })();
 </script>
@@ -2802,7 +2850,9 @@
         <button type="button" data-fs="l" style="font-size:calc(15px*var(--fs,1))">크게</button>
         <button type="button" data-fs="xl" style="font-size:calc(16.5px*var(--fs,1))">아주 크게</button>
       </div>
-      <p class="hint" style="margin-top:8px">이 앱에는 카페24(주)이 제공한 Cafe24 Ssukssuk 글꼴이 적용되어 있어요.</p>
+      <p class="hint" style="margin:18px 0 6px">글꼴 <span style="color:var(--faint)">— 이 기기에만 · 고른 글꼴만 받아요</span></p>
+      <div class="fontpick" id="more-font" role="radiogroup" aria-label="글꼴"></div>
+      <p class="hint" id="more-font-credit" style="margin-top:8px">이 앱에는 카페24(주)이 제공한 Cafe24 Ssukssuk 글꼴이 적용되어 있어요.</p>
       <h3 class="sec-title">앱</h3>
       <div class="list" style="max-width:520px">
         <button class="row" id="btn-go-help" style="text-align:left;cursor:pointer;width:100%">
@@ -2839,8 +2889,8 @@
     <div class="pad">
       <input id="dir-search" placeholder="이름 · 연락처로 찾기" style="height:44px">
       <div class="seg" id="dir-view" style="margin:12px 0 0">
-        <button type="button" data-dv="list" class="on">명단</button>
-        <button type="button" data-dv="stats">통계 · 그래프</button>
+        <button type="button" data-dv="stats" class="on">통계 · 그래프</button>
+        <button type="button" data-dv="list">명단</button>
       </div>
       <div class="seg" id="dir-cells"></div>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
