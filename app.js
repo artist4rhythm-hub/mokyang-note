@@ -24,7 +24,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
 const APP_NAME = "목자의 삶";
-const APP_VERSION = "40.1 (2026-11-13)";
+const APP_VERSION = "41.0 (2026-11-13)";
 /* 35단계 — 버전 표시: v35.0 · 2026.11.12 업데이트 */
 const verNo = () => APP_VERSION.split(" ")[0];
 const verDate = () => (APP_VERSION.match(/\((.*)\)/) || [])[1] || "";
@@ -1126,6 +1126,7 @@ function renderRooms() {
       + room("tickets","문의 · 제안", tkSuperNew(), tkSuperNew() ? "새 문의" : "받은 함", tkSuperNew() > 0);
   }
   $("home-rooms").innerHTML = html;
+  renderHomeDash();   // 41단계 — 위 '한눈에 보기'도 같은 숫자로 새로
 }
 /* 내가 볼 수 있는 셀 — 셀리더는 내 셀, 코치는 맡은 셀, 진장은 진 전체 */
 function seenCells() {
@@ -2717,83 +2718,9 @@ async function moveCourse(courseId, dir) {
 }
 
 /* ════════ 훈련 현황 ════════ */
-async function openTrainBoard() {
-  show("s-loading"); markSide("train");
-  await loadOrg(); await loadSouls();
-  const all = await loadAllTrainings();
-  const latest = {};
-  all.forEach(t=>{
-    const k = t.soulId+"|"+t.courseId, cur = latest[k];
-    if (!cur || String(t.startDate||"") > String(cur.startDate||"")) latest[k]=t;
-  });
-  const souls = state.souls;
-  const sum = state.courses.map(c=>{
-    const rows = souls.map(s=>latest[s.id+"|"+c.id]).filter(Boolean);
-    return { c, done:rows.filter(t=>t.status==="done").length,
-      ing:rows.filter(t=>t.status==="ongoing").length,
-      plan:rows.filter(t=>t.status==="planned").length,
-      drop:rows.filter(t=>t.status==="dropped").length, none:souls.length-rows.length };
-  });
-  const bapN = souls.filter(s=>s.baptizedAt).length;
-  $("train-sum").innerHTML = `
-    <div class="tiles" style="grid-template-columns:repeat(3,minmax(0,1fr))">
-      ${tile("영혼", souls.length+"명")}
-      ${tile("침례 받음", bapN+"명")}
-      ${tile("수강 중", sum.reduce((n,x)=>n+x.ing,0)+"명")}
-    </div>
-    ${!state.courses.length ? `<p class="muted" style="margin-top:14px">훈련 과정을 먼저 등록해 주세요.</p>` : `
-    <div class="courses">
-      <div class="cbox ${bapN===souls.length&&souls.length?"done":""}">
-        <p class="cn">침례</p>
-        <p class="cs">받음 ${bapN} · 아직 ${souls.length-bapN}</p>
-        <div class="pbar"><i style="width:${souls.length?Math.round(bapN/souls.length*100):0}%"></i></div>
-      </div>
-      ${sum.map(x=>`<div class="cbox"><p class="cn">${esc(x.c.name)}</p>
-        <p class="cs">${[`수료 ${x.done}`, `수강 중 ${x.ing}`,
-            x.plan?`예정 ${x.plan}`:"", x.drop?`포기 ${x.drop}`:"",
-            `아직 ${x.none}`].filter(Boolean).join(" · ")}</p>
-        <div class="pbar"><i style="width:${souls.length?Math.round(x.done/souls.length*100):0}%"></i></div>
-      </div>`).join("")}
-    </div>`}`;
-
-  const cell = (s,c) => {
-    const t = latest[s.id+"|"+c.id];
-    if (!t) return `<td class="planned">—</td>`;
-    const total=(c.sessions||1), ok=doneSessions(t);
-    const label = t.status==="ongoing"&&total>1?`${ok}/${total}`:(TSTAT[t.status]||"");
-    return `<td class="${t.status}">${label}</td>`;
-  };
-  const bapCell = (s) => s.baptizedAt
-    ? `<td class="done">${fmtDate(s.baptizedAt, true)}</td>`
-    : `<td class="planned">—</td>`;
-  $("train-matrix").innerHTML = souls.length ? `
-    <table><thead><tr><th style="text-align:left">이름</th><th>생년 · 생일</th><th>침례</th>
-      ${state.courses.map(c=>`<th>${esc(c.name)}${(c.sessions||1)>1?`<br><span style="font-weight:400">${c.sessions}회</span>`:""}</th>`).join("")}
-    </tr></thead><tbody>
-      ${souls.map(s=>`<tr><td class="nm">${esc(s.name)}</td>
-        <td class="planned">${esc(birthText(s)||"—")}</td>${bapCell(s)}${
-        state.courses.map(c=>cell(s,c)).join("")}</tr>`).join("")}
-    </tbody></table>` : "";
-
-  $("train-list").innerHTML = souls.map(s=>{
-    const mine = state.courses.map(c=>latest[s.id+"|"+c.id]).filter(Boolean);
-    const done = mine.filter(t=>t.status==="done").length;
-    const ing = mine.find(t=>t.status==="ongoing");
-    const plan = mine.find(t=>t.status==="planned");
-    const extra = ing ? ` · ${esc(ing.courseName)} 수강 중`
-      : plan ? ` · ${esc(plan.courseName)} 예정` : "";
-    return `<div class="row" data-gosoul3="${s.id}" style="cursor:pointer">
-      ${avatar(s)}
-      <div class="grow"><p class="nm">${esc(s.name)}</p>
-        <p class="sub">${s.baptizedAt?`침례 ${fmtDate(s.baptizedAt,true)}`:"침례 아직"}</p>
-        <p class="sub2">수료 ${done}개${extra}</p></div>
-      <span class="chip ${ing?"rose":""}">${done}/${state.courses.length}</span>
-    </div>`;
-  }).join("") || `<p class="muted">영혼을 먼저 등록해 주세요.</p>`;
-  show("s-train");
-}
+/* 41단계 — openTrainBoard 는 맨 아래 41단계 묶음으로 옮겼어요 */
 $("train-back").onclick = () => openMore();
-$("train-list").addEventListener("click",(ev)=>{
+$("s-train").addEventListener("click",(ev)=>{
   const r=ev.target.closest("[data-gosoul3]"); if(!r) return; openSoul(r.dataset.gosoul3);
 });
 
@@ -4980,112 +4907,7 @@ function statsFrom(per) {
   if (per === "y") return `${d.getFullYear()}-01-01`;
   d.setMonth(d.getMonth() - Number(per)); return ymd(d);
 }
-function renderStats() {
-  whoChips("st-who", "st-who-hint", state.stWho, canLead() ? "내 통계" : "나",
-    (u) => `${cellNameOf(u.cellId) || ""} ${u.name} 님 셀 — 셀모임 · 출석은 셀 보고에서, 만남은 횟수 · 종류만 (누구와 · 내용은 안 보여요).`);
-  ["st-cells", "st-opts", "st-people"].forEach(id => { $(id).hidden = stOther(); });
-  if (stOther()) { $("st-period").querySelectorAll("[data-per]").forEach(b => b.classList.toggle("on", b.dataset.per === state.st.per)); renderOtherStats(); return; }
-  const S = state.st, from = statsFrom(S.per), to = todayStr();
-  const inP = (d) => !!d && d >= from && d <= to;
-  $("st-period").querySelectorAll("[data-per]").forEach(b=>b.classList.toggle("on", b.dataset.per===S.per));
-  const ids = [...new Set(state.souls.map(cellOfSoul).filter(Boolean))];
-  const cells = ids.map(id=>state.cells.find(c=>c.id===id)).filter(Boolean);
-  if (S.cell !== "all" && !ids.includes(S.cell)) S.cell = "all";
-  $("st-cells").innerHTML = `<button type="button" data-stc="all">전체</button>`
-    + cells.map(c=>`<button type="button" data-stc="${c.id}">${cellChipIn(c)}</button>`).join("");
-  $("st-cells").style.display = cells.length < 2 ? "none" : "";
-  $("st-cells").querySelectorAll("[data-stc]").forEach(b=>b.classList.toggle("on", b.dataset.stc===S.cell));
-  $("st-opts").querySelector('[data-opt="cell"]').classList.toggle("on", S.withCell);
-  $("st-opts").querySelector('[data-opt="away"]').classList.toggle("on", S.away);
-
-  const inCell = (cid) => S.cell === "all" || cid === S.cell;
-  const souls = state.souls.filter(s => inCell(cellOfSoul(s)));
-  const soulIds = new Set(souls.map(s=>s.id));
-  const meets = state.meetings.filter(m => inCell(m.cellId) && inP(m.date));
-  /* 예정은 빼고, '나 없이'는 고른 경우만 */
-  /* 셀모임 때 적은 근황(meetingId)은 셀모임 출석으로 이미 세었으니 빼고 */
-  const recs = (state.allRecords||[]).filter(r => r.type==="meet" && !r.planned && !r.meetingId && inP(r.date)
-    && soulIds.has(r.soulId) && (S.away || !r.away));
-  const uniq = {}; recs.forEach(r => { const k = r.groupId || r.id; if (!uniq[k]) uniq[k] = r; });
-  const once = Object.values(uniq);
-
-  /* ── 모임 횟수 ── */
-  const nCell = meets.length, nOther = once.length;
-  let marked = 0, came = 0;
-  meets.forEach(m => Object.entries(m.attendance||{}).forEach(([sid,v]) => {
-    if (!soulIds.has(sid)) return; marked++; if (v !== "absent") came++; }));
-  const nOne = once.filter(r=>r.kind==="one").length;
-  $("st-tiles").innerHTML = `
-    <div class="tiles" style="margin-top:14px;grid-template-columns:repeat(2,minmax(0,1fr))">
-      ${tile("모든 모임 · 셀모임 포함", (nCell+nOther)+"회")}
-      ${tile("셀모임 빼고", nOther+"회")}
-      ${tile("셀모임 · 평균 출석", `${nCell}회 · ${marked?Math.round(came/marked*100)+"%":"—"}`)}
-      ${tile("1:1 만남", nOne+"회")}
-    </div>
-    ${canLead() ? (() => { const a = myActivity(from); return `
-    <div class="tiles" style="margin-top:8px;grid-template-columns:repeat(2,minmax(0,1fr))">
-      ${tile("나 · 셀모임 출석", a.marked ? `${a.came}/${a.marked}` : "—")}
-      ${tile("나 · 직접 함께한 모임", a.met+"회")}
-    </div>`; })() : ""}`;
-
-  /* ── 종류별 ── */
-  const kinds = {};
-  once.forEach(r => {
-    const key = r.kind==="train" ? "train|"+(r.courseId||"") : r.kind;
-    const label = r.kind==="train" ? `훈련 · ${r.courseName||"과정"}` : (kindOf(r.kind).id===r.kind ? kindName(r.kind) : (r.kindLabel||"모임"));
-    (kinds[key] = kinds[key] || { label, cat:catOf(r), n:0 }).n++;
-  });
-  let krows = Object.values(kinds).sort((a,b)=>b.n-a.n);
-  if (S.withCell) krows = [{ label:"셀모임", cat:"cell", n:nCell }, ...krows];
-  const kmax = Math.max(1, ...krows.map(k=>k.n));
-  const col = (c) => SCAT.find(x=>x[0]===c)[2];
-  $("st-kinds").innerHTML = `
-    <div class="card" style="margin-top:14px">
-      <h3 style="font-size:calc(13px*var(--fs,1));font-weight:600">종류별 모임 횟수</h3>
-      <p class="muted" style="font-size:calc(12px*var(--fs,1));margin-top:4px">여러 명이 함께한 모임은 한 번으로 셉니다.</p>
-      <div style="margin-top:10px">${krows.length ? krows.map(k=>`
-        <div class="kbar" title="${esc(k.label)} ${k.n}회"><span>${esc(k.label)}</span>
-          <div><div class="t" style="width:${Math.max(1, k.n/kmax*100)}%;background:${col(k.cat)}"></div></div>
-          <span style="text-align:right;font-variant-numeric:tabular-nums">${k.n}</span></div>`).join("")
-        : `<p class="muted">이 기간에는 기록이 없어요.</p>`}</div>
-    </div>`;
-
-  /* ── 사람별 ── */
-  const rows = souls.map(s => {
-    const c = { cell:0, train:0, one:0, etc:0 };
-    if (S.withCell) c.cell = meets.filter(m => {
-      const v = (m.attendance||{})[s.id]; return v === "present" || v === "online"; }).length;
-    recs.filter(r=>r.soulId===s.id).forEach(r => c[catOf(r)]++);
-    return { s, c, total: c.cell + c.train + c.one + c.etc };
-  }).sort((a,b)=> b.total - a.total || String(a.s.name).localeCompare(String(b.s.name)));
-  const max = Math.max(1, ...rows.map(x=>x.total));
-  const avg = rows.length ? rows.reduce((n,x)=>n+x.total,0) / rows.length : 0;
-  const low = rows.filter(x => x.total === 0 || (avg > 0 && x.total <= avg * 0.5));
-  const used = SCAT.filter(([k]) => k !== "cell" || S.withCell);
-  $("st-people").innerHTML = `
-    <div class="card" style="margin-top:14px">
-      <h3 style="font-size:calc(13px*var(--fs,1));font-weight:600">누구를 얼마나 만났나</h3>
-      <p class="muted" style="font-size:calc(12px*var(--fs,1));margin-top:4px">${S.away
-        ? "나 없이 모인 것까지 셉니다 — 그 사람의 활동량이에요."
-        : "내가 직접 함께한 것만 셉니다 — 내가 만난 횟수예요."} 평균 ${avg.toFixed(1)}회.</p>
-      ${low.length ? `<p style="font-size:calc(13px*var(--fs,1));margin-top:10px;color:var(--warn-tx)">이 기간에 적게 만난 사람 — ${
-        low.slice().reverse().slice(0,5).map(x=>`${esc(x.s.name)} ${x.total}회`).join(", ")}</p>` : ""}
-      <div class="legend" style="margin-top:12px">${used.map(([k,l,c])=>
-        `<span><i style="background:${c};border:none"></i>${l}</span>`).join("")}</div>
-      <div style="margin-top:6px">${rows.map(x=>{
-        const segs = used.filter(([k])=>x.c[k]>0).map(([k,l,c])=>
-          `<i style="flex:${x.c[k]};background:${c}" title="${l} ${x.c[k]}회"></i>`).join("");
-        const n = daysSince(x.s.lastMetAt);
-        return `<div class="srow" title="${esc(x.s.name)} — ${used.map(([k,l])=>`${l} ${x.c[k]}`).join(" · ")}">
-          <span class="who">${avatar(x.s,24)}<span>${esc(x.s.name)}</span></span>
-          <div>${x.total ? `<div class="hbar" style="width:${x.total/max*100}%">${segs}</div>`
-            : `<span class="chip warn" style="font-size:calc(11px*var(--fs,1))">한 번도 없음</span>`}</div>
-          <span class="n">${x.total}</span>
-          <span class="det">${used.filter(([k])=>x.c[k]).map(([k,l])=>`${l} ${x.c[k]}`).join(" · ") || "—"}${
-            n!==null?` · 마지막 만남 ${n===0?"오늘":n+"일 전"}`:""}</span>
-        </div>`; }).join("") || `<p class="muted">영혼 카드가 없어요.</p>`}</div>
-    </div>`;
-}
+/* 41단계 — renderStats 는 맨 아래 41단계 묶음으로 옮겼어요 */
 $("st-period").addEventListener("click",(ev)=>{
   const b = ev.target.closest("[data-per]"); if (!b) return; state.st.per = b.dataset.per; renderStats(); });
 $("st-cells").addEventListener("click",(ev)=>{
@@ -5305,6 +5127,14 @@ async function backfillThumbs() {
    올릴 때마다 version.json 도 같이 올립니다. 앱은 열 때 · 다시 볼 때 · 10분마다
    그 파일만 살짝 확인해서(아주 작은 파일), 지금 버전보다 새것이면 위에 알림을 띄웁니다. */
 const CHANGELOG = [
+  { v:"41.0", d:"2026-11-13", items:[
+    "숫자를 그림으로 — 홈 맨 위 '한눈에 보기': 큰 숫자 4칸(첫 칸 모카빛) · 8주 출석 둥근 막대 · 최근 셀모임 반원 · 신앙 · 훈련 고리",
+    "셀 건강 — 반원 출석률 · 주마다 온 사람(출석 + 온라인) 쌓인 막대 · 모임 없는 주는 점선 · 사람별 8주 칸 + 고리 · 그 전 4주와 비교 한 줄",
+    "활동 통계 — 큰 숫자 4칸 · 어떤 모임이었나(도넛) · 주마다(긴 기간은 달마다) 곡선 · 누구를 얼마나(얼굴 + 색 막대) · 1:1 못 만난 사람",
+    "훈련 현황 — 과정마다 고리 카드 · 성장 계단(영혼 → 침례 → 과정 → 인턴) · 사람별 ✓ 칸 · 인턴 추천 · 다음 과정 기다리는 사람",
+    "훈련 현황이 39단계 체크(영혼 카드 침례 '받음' · 명부 카드 '수료한 훈련')도 같이 세요",
+    "교회 명부 통계 — 큰 숫자 · 연령대 막대 · 출석률 도넛 · 수료 막대 · 셀별 비교 막대 · 생일 D-day",
+    "라이트 · 블랙 둘 다 같은 색 규칙 · 폰에서는 한 줄씩" ] },
   { v:"40.1", d:"2026-11-13", items:[
     "새 앱 아이콘 — 익숙한 컵 모양은 그대로, 와인색 · 아이보리와 쑥쑥체 글씨로",
     "안드로이드 동그란 아이콘에서도 글씨가 잘리지 않게 따로 맞춤",
@@ -7436,59 +7266,7 @@ function renderHealth() {
     || `<p class="muted">볼 수 있는 셀이 없어요.</p>`;
 }
 /* 28단계 — 셀 하나 = 카드 하나: [고리 + 숫자 4칸] [8주 출석 막대] / 사람별 출석 / 인턴 */
-function healthCard(c, h, mine) {
-  const ms = cellMeetings(c.id).filter(m => { const n = daysSince(m.date); return n !== null && n >= 0 && n < 56; })
-    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
-  const R = 34, C = 2 * Math.PI * R, rate = h.rate;
-  const col = rate == null ? "var(--faint)" : rate >= 75 ? "var(--ok-strong)" : rate >= 50 ? "var(--warn-tx)" : "var(--brand)";
-  const ring = `<svg viewBox="0 0 84 84" width="104" height="104" style="flex-shrink:0" aria-label="출석률 ${rate == null ? "기록 없음" : rate + "%"}">
-      <circle cx="42" cy="42" r="${R}" fill="none" style="stroke:var(--track)" stroke-width="9"/>
-      ${rate == null ? "" : `<circle cx="42" cy="42" r="${R}" fill="none" style="stroke:${col}" stroke-width="9" stroke-linecap="round"
-        stroke-dasharray="${C * rate / 100} ${C}" transform="rotate(-90 42 42)"/>`}
-      <text x="42" y="45" text-anchor="middle" style="fill:var(--text);font-size:calc(18px*var(--fs,1));font-weight:600">${rate == null ? "—" : rate + "%"}</text>
-      <text x="42" y="59" text-anchor="middle" style="fill:var(--dim);font-size:calc(8.5px*var(--fs,1))">출석률</text></svg>`;
-  const cnt = (m) => { const v = Object.values(m.attendance || {}); return { ok: v.filter(x => x && x !== "absent").length, all: v.filter(Boolean).length }; };
-  const max = Math.max(1, ...ms.map(m => cnt(m).all));
-  const md = (d) => { const p = String(d).split("-"); return `${Number(p[1])}/${Number(p[2])}`; };
-  const chart = ms.length ? `<div class="vbars" style="height:130px">${ms.map(m => { const k = cnt(m);
-      return `<div class="vb${k.all && k.ok / k.all < .5 ? " low" : ""}" title="${esc(fmtDate(m.date, true))} 출석 ${k.ok}/${k.all}">
-        <i class="all" style="height:${k.all / max * 100}%"></i><i class="ok" style="height:${k.ok / max * 100}%"></i></div>`; }).join("")}</div>
-      <div class="vlabels">${ms.map(m => `<span>${md(m.date)} · ${cnt(m).ok}명</span>`).join("")}</div>`
-    : `<p class="muted" style="font-size:calc(12px*var(--fs,1));padding:46px 0;text-align:center">최근 8주 셀모임 기록이 없어요</p>`;
-  const ppl = h.people.map(s => {
-    const k = attKey(s), cells = ms.map(m => (m.attendance || {})[k] || "");
-    const okn = cells.filter(v => v && v !== "absent").length, rec = cells.filter(Boolean).length;
-    const r = rec ? Math.round(okn / rec * 100) : null, tone = r == null ? "" : r >= 75 ? "good" : r >= 50 ? "mid" : "low";
-    return { s, cells, r, tone };
-  });
-  if (state.hlSort === "low") ppl.sort((a, b) => (a.r == null ? 101 : a.r) - (b.r == null ? 101 : b.r));   // 빠지는 사람이 위로
-  const canTick = mine && h.people.some(isLeaderOf);
-  return `<div class="hc">
-    <div class="hc-h"><span class="cbadge">${esc(c.name)}</span>
-      <span class="who">${esc(cellLeadName(c) ? cellLeadName(c) + " 셀리더" : leaderLabel(c.id))}</span>
-      <span class="notes">${h.notes.map(([k, t]) => `<span class="chip ${k}">${esc(t)}</span>`).join("") || `<span class="chip">기록이 더 쌓이면 보여요</span>`}</span></div>
-    <div class="hc-top">
-      <div class="hc-sum">${ring}
-        <div class="hc-kpi">
-          <div><p>8주 셀모임</p><b>${h.ms}회</b></div>
-          <div><p>평균 출석</p><b>${h.avg === null ? "—" : h.avg + "명"}</b></div>
-          <div><p>새 방문자</p><b>${h.visitors}명</b></div>
-          <div><p>연달아 결석</p><b style="color:${h.care ? "var(--warn-tx)" : "inherit"}">${h.care}명</b></div>
-        </div></div>
-      <div class="hc-chart"><p class="t"><b>8주 출석</b><span>초록 = 온 사람 · 회색 = 체크한 인원</span></p>${chart}</div>
-    </div>
-    ${ppl.length && ms.length ? `<p class="hc-sec">사람별 출석 <span>최근 8주 · ${state.hlSort === "low" ? "자주 빠지는 사람이 위에" : "셀리더가 정한 순서"}</span></p>
-      <div class="hppl">${ppl.map(p => `<div class="hp ${p.tone}">
-        <span class="nm" title="${esc(p.s.name)}">${esc(p.s.name)}</span>
-        <span class="dd">${p.cells.map((v, i) => `<i class="${v || "nr"}" title="${esc(md(ms[i].date))} ${v ? ATT[v] : "기록 없음"}"></i>`).join("")}</span>
-        <span class="rt"><b>${p.r == null ? "—" : p.r + "%"}</b><span class="at-bar"><i style="width:${p.r || 0}%"></i></span></span></div>`).join("")}</div>
-      <p class="hlegend"><span><i style="background:var(--ok-strong)"></i>출석</span><span><i style="background:#7FA8E8"></i>온라인</span><span><i style="background:var(--brand)"></i>결석</span><span><i style="box-shadow:inset 0 0 0 1.5px var(--line3)"></i>기록 없음</span></p>` : ""}
-    <p class="hc-sec">인턴 (예비 셀리더) ${h.interns.length}명 <span>${canTick ? "눌러서 세우거나 빼요 · 순서는 '순서 · 인턴'에서" : ""}</span></p>
-    ${canTick ? `<div class="hints">${h.people.filter(isLeaderOf).map(s => `
-        <label class="${s.intern ? "on" : ""}"><input type="checkbox" data-intern="${s.id}" ${s.intern ? "checked" : ""}>${esc(s.name)}${s.intern && s.internSince ? `<span class="muted" style="font-size:calc(11px*var(--fs,1))">${fmtDate(s.internSince)}~</span>` : ""}</label>`).join("")}</div>`
-      : `<p style="font-size:calc(14px*var(--fs,1))">${h.interns.map(s => esc(s.name)).join(", ") || "아직 없어요"}</p>`}
-  </div>`;
-}
+/* 41단계 — healthCard 는 맨 아래 41단계 묶음으로 옮겼어요 */
 $("hl-body").addEventListener("change", async (ev) => {
   const cb = ev.target.closest("[data-intern]"); if (!cb) return;
   const s = state.souls.find(x => x.id === cb.dataset.intern); if (!s || !isLeaderOf(s)) return;
@@ -9118,41 +8896,7 @@ async function loadOtherStats(id) {
   try { const d = await getDoc(doc(db, "calShare", id)); if (d.exists()) { items = d.data().items || []; off = d.data().on === false; } } catch {}
   state.stOtherData = { u: R.u, reps: R.reps, items, off };
 }
-function renderOtherStats() {
-  const D = state.stOtherData; if (!D) return;
-  const from = statsFrom(state.st.per), to = todayStr(), inP = (d) => !!d && d >= from && d <= to;
-  const reps = D.reps.filter(r => inP(r.date)).sort((a, b) => String(a.date).localeCompare(String(b.date)));
-  let ok = 0, all = 0; reps.forEach(r => { const k = repCount(r); ok += k.ok; all += k.all; });
-  const meets = D.items.filter(x => !x.p && inP(x.d));
-  const kinds = {}; meets.forEach(x => { kinds[x.k || "만남"] = (kinds[x.k || "만남"] || 0) + 1; });
-  const krows = [{ label: "셀모임", n: reps.length, cell: true }, ...Object.entries(kinds).map(([label, n]) => ({ label, n })).sort((a, b) => b.n - a.n)];
-  const kmax = Math.max(1, ...krows.map(k => k.n));
-  /* 달마다 — 셀모임 · 만남 */
-  const months = {}; reps.forEach(r => { const m = ymOf(r.date); (months[m] = months[m] || { c: 0, m: 0 }).c++; });
-  meets.forEach(x => { const m = ymOf(x.d); (months[m] = months[m] || { c: 0, m: 0 }).m++; });
-  const mk = Object.keys(months).sort().slice(-12), mmax = Math.max(1, ...mk.map(k => months[k].c + months[k].m));
-  $("st-tiles").innerHTML = `
-    <div class="tiles" style="margin-top:14px;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">
-      ${tile("셀모임", reps.length + "회")}
-      ${tile("평균 출석률", all ? Math.round(ok / all * 100) + "%" : "—")}
-      ${tile("평균 출석", reps.length ? Math.round(ok / reps.length * 10) / 10 + "명" : "—")}
-      ${tile("만남 · 1:1 등", D.off ? "공유 꺼짐" : meets.length + "회")}
-    </div>`;
-  $("st-kinds").innerHTML = `
-    <div class="card" style="margin-top:14px">
-      <h3 style="font-size:calc(13px*var(--fs,1));font-weight:600">종류별 모임 횟수</h3>
-      <p class="muted" style="font-size:calc(12px*var(--fs,1));margin-top:4px">${D.off ? "이 셀리더는 만남 일정 공유를 꺼 두어서 셀모임만 보여요." : "만남은 셀리더가 공유한 날짜 · 종류로만 셉니다."}</p>
-      <div style="margin-top:10px">${krows.map(k => `
-        <div class="kbar" title="${esc(k.label)} ${k.n}회"><span>${esc(k.label)}</span>
-          <div><div class="t" style="width:${Math.max(1, k.n / kmax * 100)}%;background:${k.cell ? "var(--c-cell)" : "var(--c-one)"}"></div></div>
-          <span style="text-align:right;font-variant-numeric:tabular-nums">${k.n}</span></div>`).join("")}</div>
-    </div>
-    ${mk.length ? `<div class="card" style="margin-top:12px">
-      <h3 style="font-size:calc(13px*var(--fs,1));font-weight:600">달마다 — <span style="color:var(--c-cell)">셀모임</span> · <span style="color:var(--c-one)">만남</span></h3>
-      <div class="vbars" style="height:110px;margin-top:10px">${mk.map(k => { const o = months[k];
-        return `<div class="vb" title="${k} 셀모임 ${o.c} · 만남 ${o.m}"><i class="ok" style="height:${o.m / mmax * 100}%;background:var(--c-one);border-radius:0"></i><i class="ok" style="height:${o.c / mmax * 100}%;background:var(--c-cell)"></i></div>`; }).join("")}</div>
-      <div class="vlabels">${mk.map(k => `<span>${Number(k.slice(5))}월</span>`).join("")}</div></div>` : ""}`;
-}
+/* 41단계 — renderOtherStats 는 맨 아래 41단계 묶음으로 옮겼어요 */
 $("st-who").addEventListener("click", async (ev) => {
   const b = ev.target.closest("[data-who]"); if (!b) return;
   state.stWho = b.dataset.who || "";
@@ -9606,70 +9350,7 @@ function renderDirStats(scope, cells, cellOfM, LM) {
     $("dir-list").innerHTML = dirStatsHTML(scope, cells, cellOfM, LM);
   });
 }
-function dirStatsHTML(scope, cells, cellOfM, LM) {
-  const by = state.bdate || {}, N = scope.length;
-  const ages = scope.map(m => ageOf(by[m.id])).filter(a => a !== null);
-  const avgAge = ages.length ? Math.round(ages.reduce((a, b) => a + b, 0) / ages.length * 10) / 10 : null;
-  const AB = [["20대 이하", a => a < 30], ["30대", a => a >= 30 && a < 40], ["40대", a => a >= 40 && a < 50], ["50대", a => a >= 50 && a < 60], ["60대 이상", a => a >= 60]];
-  const ab = AB.map(([l, f]) => ({ l, n: ages.filter(f).length })), abMax = Math.max(1, ...ab.map(x => x.n));
-  /* 출석 — 최근 3개월 셀 보고 */
-  const at = scope.map(m => ({ m, st: attStats(m.id, cellOfM(m)) }));
-  let okS = 0, nS = 0; at.forEach(x => { okS += x.st.ok; nS += x.st.n; });
-  const rate = nS ? Math.round(okS / nS * 100) : null;
-  const RB = [["75% 이상", "var(--ok-strong)", r => r >= 75], ["50~74%", "var(--warn-tx)", r => r >= 50 && r < 75], ["25~49%", "#E07B5A", r => r >= 25 && r < 50], ["25% 미만", "var(--brand)", r => r < 25]];
-  const rated = at.filter(x => x.st.rate !== null), noRec = N - rated.length;
-  const rb = RB.map(([l, c, f]) => ({ l, c, n: rated.filter(x => f(x.st.rate)).length }));
-  /* 수료 */
-  const has = (m, t) => (m.trainingsDone || []).includes(t);
-  const both = scope.filter(m => has(m, "새로운 삶") && has(m, "제자의 삶")).length;
-  const nl = scope.filter(m => has(m, "새로운 삶")).length, dl = scope.filter(m => has(m, "제자의 삶")).length;
-  const onlyN = nl - both, onlyD = dl - both, none = N - both - onlyN - onlyD;
-  const pct = (x) => N ? Math.round(x / N * 100) : 0;
-  const interns = scope.filter(m => m.intern).length;
-  const streak = at.filter(x => x.st.streak >= 2).length;
-  /* 생일 — 이번 달 · 다음 달 */
-  const mo = Number(todayStr().slice(5, 7)), mo2 = mo % 12 + 1;
-  const bd = (mm) => scope.filter(m => m.birthMD && Number(String(m.birthMD).slice(0, 2)) === mm)
-    .sort((a, b) => String(a.birthMD).localeCompare(String(b.birthMD)));
-  const bdHTML = (mm) => { const l = bd(mm); return l.length ? `<div class="bdays">${l.map(m => `<span>${esc(m.name)} · ${Number(String(m.birthMD).slice(3, 5))}일</span>`).join("")}</div>` : `<p class="muted" style="font-size:calc(12px*var(--fs,1))">없어요</p>`; };
-  /* 셀별 */
-  const perCell = state.dirCell === "all" ? cells.map(c => {
-    const ms = scope.filter(m => cellOfM(m) === c.id); if (!ms.length) return null;
-    const ag = ms.map(m => ageOf(by[m.id])).filter(a => a !== null);
-    let o = 0, n = 0; ms.forEach(m => { const st = attStats(m.id, c.id); o += st.ok; n += st.n; });
-    return { c, n: ms.length, age: ag.length ? Math.round(ag.reduce((a, b) => a + b, 0) / ag.length) : null, rate: n ? Math.round(o / n * 100) : null };
-  }).filter(Boolean) : [];
-  const nMax = Math.max(1, ...perCell.map(x => x.n));
-  return `<div class="dst">
-    <div class="dst-kpi">
-      <div><p>인원</p><b>${N}명</b><small>${state.dirCell === "all" ? `셀 ${cells.length}개 · 셀당 ${cells.length ? Math.round(N / cells.length * 10) / 10 : 0}명` : esc(cellNameOf(state.dirCell) || "")}</small></div>
-      <div><p>평균 나이 (만)</p><b>${avgAge === null ? "—" : avgAge + "세"}</b><small>${ages.length}명 기준</small></div>
-      <div><p>평균 출석률</p><b style="color:${rate === null ? "inherit" : rate >= 75 ? "var(--ok-tx)" : rate >= 50 ? "var(--warn-tx)" : "var(--rose-tx)"}">${rate === null ? "—" : rate + "%"}</b><small>최근 3개월 셀 보고</small></div>
-      <div><p>새로운 삶 수료</p><b>${pct(nl)}%</b><small>${nl}명</small></div>
-      <div><p>제자의 삶 수료</p><b>${pct(dl)}%</b><small>${dl}명</small></div>
-      <div><p>인턴 · 연속 결석</p><b>${interns} · <span style="color:${streak ? "var(--warn-tx)" : "inherit"}">${streak}</span></b><small>인턴 ${interns}명 · 2번 넘게 결석 ${streak}명</small></div>
-    </div>
-    <div class="dst-grid">
-      <div class="dst-c"><h3>연령대 <span>만 나이 · ${ages.length}명 (모름 ${N - ages.length}명)</span></h3>
-        <div class="agebars">${ab.map(x => `<div class="ab${x.n ? "" : " dim"}"><b>${x.n}</b><i style="height:${Math.max(3, x.n / abMax * 100)}%"></i></div>`).join("")}</div>
-        <div class="agelab">${ab.map(x => `<span>${x.l}</span>`).join("")}</div></div>
-      <div class="dst-c"><h3>출석률 분포 <span>최근 3개월 · 기록 있는 ${rated.length}명</span></h3>
-        <div class="stk">${rb.map(x => x.n ? `<i style="width:${x.n / Math.max(1, rated.length) * 100}%;background:${x.c}" title="${x.l} ${x.n}명"></i>` : "").join("")}</div>
-        <div class="lgd">${rb.map(x => `<span><i style="background:${x.c}"></i>${x.l} ${x.n}명</span>`).join("")}<span><i style="background:var(--track)"></i>기록 없음 ${noRec}명</span></div>
-        <h3 style="margin-top:18px">수료 현황 <span>새로운 삶 · 제자의 삶</span></h3>
-        <div class="stk">${[[both, "var(--ok-strong)"], [onlyN, "#7FA8E8"], [onlyD, "#9A8CF0"]].map(([n, c]) => n ? `<i style="width:${pct(n)}%;background:${c}"></i>` : "").join("")}</div>
-        <div class="lgd"><span><i style="background:var(--ok-strong)"></i>둘 다 ${both}명</span><span><i style="background:#7FA8E8"></i>새로운 삶만 ${onlyN}명</span><span><i style="background:#9A8CF0"></i>제자의 삶만 ${onlyD}명</span><span><i style="background:var(--track)"></i>아직 ${none}명</span></div></div>
-      ${perCell.length ? `<div class="dst-c" style="grid-column:1/-1"><h3>셀별 <span>인원 · 평균 나이 · 출석률 (최근 3개월)</span></h3>
-        <div class="ctab h"><span>셀</span><span>인원</span><span class="v">평균 나이</span><span class="v">출석률</span></div>
-        ${perCell.map(x => `<div class="ctab"><span class="nm"><b>${esc(x.c.name)}</b><small>${esc(cellLeadName(x.c))}</small></span>
-          <span style="display:flex;align-items:center;gap:8px"><span class="tr" style="flex:1"><i style="width:${x.n / nMax * 100}%;background:var(--brand)"></i></span><span style="width:28px;text-align:right">${x.n}</span></span>
-          <span class="v">${x.age === null ? "—" : x.age + "세"}</span>
-          <span class="v" style="color:${x.rate === null ? "var(--dim)" : x.rate >= 75 ? "var(--ok-tx)" : x.rate >= 50 ? "var(--warn-tx)" : "var(--rose-tx)"}">${x.rate === null ? "보고 없음" : x.rate + "%"}</span></div>`).join("")}</div>` : ""}
-      <div class="dst-c"><h3>이번 달 생일 <span>${mo}월</span></h3>${bdHTML(mo)}<h3 style="margin-top:16px">다음 달 생일 <span>${mo2}월</span></h3>${bdHTML(mo2)}</div>
-    </div>
-    <p class="hint">나이는 노션 명단(잠긴 칸)의 생년월일로 세요 — 그걸 볼 수 있는 분(수퍼 · 진장 · 코치 · 그 셀 셀리더)에게만 나이가 잡혀요.</p>
-  </div>`;
-}
+/* 41단계 — dirStatsHTML 는 맨 아래 41단계 묶음으로 옮겼어요 */
 
 $("dir-list").addEventListener("click", async (ev) => {
   const b = ev.target.closest("[data-ordcell]"); if (!b) return;
@@ -9919,11 +9600,13 @@ const HELP = [
   { id: "home", g: "daily", ic: "home", c: "#5B8DEF", t: "홈 화면", s: "오늘 할 일이 한눈에", who: "lead",
     steps: [["pray", "오늘의 전시", `기도할 영혼 한 사람 → ${kb("", "기도했어요")}`],
       ["heart", "오늘 챙길 사람", `결석 · 오래 못 만난 사람 · 다가오는 예정`],
+      ["chart", "한눈에 보기", `맨 위 큰 숫자 4칸 · 8주 출석 막대 · 최근 셀모임 반원 · 신앙 · 훈련 고리 — 누르면 그 화면`],
       ["chart", "전시실", `영혼들 · 셀모임 · 캘린더 · 명부 … 방을 누르면 그 화면`],
       ["dots", "관리 서랍", `조직 구성 · 셀리더 명단 · 사진 · 알림 · 설정`]],
     tips: [["plus", "오른쪽 위 ＋ 로 빠른 기록"], ["star", "홈 위 '버전'을 누르면 바뀐 것"]],
     more: [["오늘의 전시에는 누가 뜨나요?", `기도제목이 있는 영혼이 하루에 한 사람씩 떠요. ${kb("", "기도했어요")}를 누르면 다음 사람, 오늘 모두 기도하면 내일 아침에 다시 떠요.`],
       ["오늘 챙길 사람은 어떻게 정해지나요?", `연속으로 결석한 사람, 1:1로 만난 지 30일이 넘은 사람, 다가오는 만남 예약 · 기념일 · 챙길 일이 모여요. 옆 버튼(1:1 잡기 등)으로 바로 기록해요.`],
+      ["맨 위 그래프는 무엇인가요?", `내 셀(코치 · 진장은 맡은 셀) 숫자를 그림으로 — 최근 출석률은 최근 4주, 옆 ▲▼는 그 전 4주보다 얼마나 늘었나예요. 막대에서 빗금 칸은 셀모임이 없던 주, 빨간 막대는 가장 최근 주예요. 새로 보이는 정보는 없고, 원래 볼 수 있던 숫자만 모았어요.`],
       ["전시실 숫자는 무엇인가요?", `방마다 한 가지 숫자 — 영혼들은 맡은 영혼, 셀모임은 최근 출석률, 캘린더는 이번 주 일정. <b>빨간 점</b>이 붙은 글은 지금 챙길 것이 있다는 뜻이에요.`]] },
   { id: "souls", g: "daily", ic: "souls", c: "#E07B5A", t: "영혼 카드", s: "만남 · 기도 · 상태를 한 장에", who: "lead",
     steps: [["plus", "영혼 더하기", `영혼들 오른쪽 위 ${kb("plus", "")} — 명부에서 고르거나 새로`],
@@ -9968,16 +9651,17 @@ const HELP = [
     steps: [["dir", "셀별로", `맨 위 '섬기는 분들'(진장 · 코치), 그 아래 셀마다 셀리더와 셀원이 가지처럼`],
       ["sort", "목록 · 정렬", `${kb("", "셀원")} ${kb("", "리더들")} → 가나다 · 나이 · 출석률 · 생일순`],
       ["star", "직분 배지", `진장 · 코치 · 셀리더 · 인턴 배지 (후보는 볼 수 있는 분에게만)`],
-      ["chart", "통계 · 그래프", `평균 나이 · 연령대 · 출석률 · 셀별 표`]],
+      ["chart", "통계 · 그래프", `큰 숫자 · 연령대 막대 · 출석률 도넛 · 수료 막대 · 셀별 비교 · 생일 D-day`]],
     tips: [["lock", "생년 · 가족 · 침례는 잠긴 칸 — 볼 수 있는 분만"], ["eye", "카드를 누르면 출석 줄 · 기본 사항 · 전화 · 문자"]],
     more: [["침례 · 정회원 · 수료는 어디서 체크하나요?", `명부 카드(또는 영혼 카드 › 프로필) '신앙 · 훈련'에서 ${kb("", "받음")} ${kb("", "정회원")} ${kb("", "✓ 새로운 삶")}처럼 눌러요. 바로 저장되고 명부 '한눈에 보기' 통계에 반영돼요. 한 번 더 누르면 '모름'으로.`],
       ["진장님 연락처는 어디서 보나요?", `교회 명부 맨 위 '섬기는 분들'에서 진장 · 코치 카드를 누르면 전화 · 문자 버튼이 있어요.`],
       ["명부를 고치고 싶어요", `카드 아래 ${kb("", "명부 고치기")} — 셀리더는 자기 셀(계정 없는 분), 진장 · 소유자는 진 전체를 고쳐요.`]],
     go: ["dir", "교회 명부 열기"] },
   { id: "health", g: "look", ic: "chart", c: "#2E7D54", t: "셀 건강 · 통계 · 사진", s: "그래프로 보는 우리 셀", who: "all",
-    steps: [["chart", "셀 건강", `출석률 고리 · 8주 막대 · 사람별 출석 줄`],
+    steps: [["chart", "셀 건강", `반원 출석률 · 주마다 온 사람 막대 · 사람별 8주 칸 + 고리`],
       ["sort", "자주 빠지는 순", `${kb("", "자주 빠지는 순")} 으로 먼저 챙길 사람`],
-      ["chart", "활동 통계", `종류별 모임 · 누구를 얼마나 만났나 — 기간을 골라서`],
+      ["chart", "활동 통계", `큰 숫자 · 어떤 모임이었나(도넛) · 주마다 얼마나(곡선) · 누구를 얼마나 — 기간을 골라서`],
+      ["star", "훈련 현황", `과정마다 고리 · 성장 계단(영혼 → 침례 → 과정 → 인턴) · 사람별 체크 칸`],
       ["camera", "사진 모아보기", `셀모임 사진 · 셀원 얼굴 · 남은 용량`]],
     go: ["health", "셀 건강 열기"] },
   { id: "interns", g: "look", ic: "star", c: "#2E9D6A", t: "인턴 · 후보", s: "공식 인턴과 마음에 둔 후보", who: "lead",
@@ -11166,3 +10850,534 @@ const bapSegVal = (id) => { const b = $(id); return b ? (b.dataset.v || "") : ""
     }
   });
 })();
+
+/* ════════ 41단계 — 데이터 그래픽 (B안 '모카 포인트') ════════
+   보고서처럼 글 · 표로만 보이던 숫자를 한눈에 — 큰 숫자 칸 · 고리 · 반원 · 둥근 막대 · 곡선 · 도넛.
+   새로 읽는 정보는 없어요: 지금 그 화면에서 이미 볼 수 있는 숫자만 모아 그림으로 그려요.
+   색은 테마 변수(--gx-*)라서 라이트 · 블랙 둘 다 맞아요. 규격: 아이콘 20 · 아이콘 상자 40 · 배지 24 · 모서리 10/12/18/24. */
+const GXI = {
+  users: '<path d="M16 19v-1a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v1M10 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6M20 19v-1a4 4 0 0 0-3-3.9M15 4.1a3 3 0 0 1 0 5.8"/>',
+  check: '<rect x="4" y="4" width="16" height="16" rx="4"/><path d="m8.5 12 2.5 2.5 4.5-5"/>',
+  coffee: '<path d="M5 9h11v5a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5zM16 10h1.5a2.5 2.5 0 0 1 0 5H16M8 3v3M11 3v3"/>',
+  heart: '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',
+  cap: '<path d="m3 9 9-5 9 5-9 5zM7 11v4c0 1.5 2.5 3 5 3s5-1.5 5-3v-4"/>',
+  drop: '<path d="M12 4s6 6.5 6 10.5a6 6 0 0 1-12 0C6 10.5 12 4 12 4z"/>',
+  cake: '<path d="M4 20h16M5 20v-6a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v6M12 12V8M12 5.5v.01"/>',
+  arrow: '<path d="M7 17 17 7M9 7h8v8"/>',
+  star: '<path d="m12 4 2.4 5 5.4.6-4 3.7 1.1 5.3L12 16l-4.9 2.6 1.1-5.3-4-3.7 5.4-.6z"/>',
+  chart: '<path d="M5 19V9M10 19V5M15 19v-7M20 19v-4"/>',
+  bell: '<path d="M6 16.5V11a6 6 0 1 1 12 0v5.5l1.5 2H4.5z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/>',
+  doc: '<path d="M7 3.5h7l4 4V20a.5.5 0 0 1-.5.5h-10A.5.5 0 0 1 7 20z"/><path d="M14 3.5V8h4M9.5 12.5h5M9.5 16h5"/>',
+  alert: '<path d="M12 9.2v4m0 2.9h.01"/><path d="M10.4 4.3 3 17.2A1.8 1.8 0 0 0 4.6 20h14.8a1.8 1.8 0 0 0 1.6-2.8L13.6 4.3a1.8 1.8 0 0 0-3.2 0Z"/>'
+};
+const gxSvg = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${GXI[k] || GXI.chart}</svg>`;
+const gxIco = (k, tone) => `<span class="gx-ico ${tone || ""}" aria-hidden="true">${gxSvg(k)}</span>`;
+const gxPct = (a, b) => b ? Math.round(a / b * 100) : null;
+const gxMD = (d) => { const p = String(d || "").split("-"); return p.length > 2 ? `${Number(p[1])}/${Number(p[2])}` : ""; };
+const gxAgo = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return ymd(d); };
+/* 서버 시각 · 숫자 · 글자 어느 것이든 밀리초로 */
+const gxMs = (x) => !x ? 0 : typeof x.toMillis === "function" ? x.toMillis() : x.seconds ? x.seconds * 1000 : (Date.parse(x) || 0);
+
+/* 큰 숫자 칸 — hero = 모카빛 액자 (화면마다 첫 칸 하나만) */
+function gxKpi(o) {
+  const tag = o.go ? "button" : "div";
+  return `<${tag} ${o.go ? `type="button" data-gxgo="${o.go}"` : ""} class="gx-kpi${o.hero ? " hero" : ""}">
+    <span class="l"><span>${o.l}</span>${o.hero ? (o.go ? `<span class="gx-go" aria-hidden="true">${gxSvg("arrow")}</span>` : "") : gxIco(o.ic || "chart", o.tone)}</span>
+    <span class="v">${o.v}${o.u ? `<em>${o.u}</em>` : ""}</span>
+    <span class="d">${o.t ? `<span class="gx-up${o.dn ? " dn" : ""}">${o.t}</span>` : ""}${o.d || ""}</span></${tag}>`;
+}
+/* 고리 — p(0~100), 가운데 글자 */
+function gxRing(p, col, sz = 96, sw = 10, mid = "", sub = "") {
+  const r = (sz - sw) / 2, cf = 2 * Math.PI * r, v = Math.max(0, Math.min(100, p || 0));
+  return `<svg class="gx-ring" viewBox="0 0 ${sz} ${sz}" width="${sz}" height="${sz}" aria-label="${mid}">
+    <circle cx="${sz / 2}" cy="${sz / 2}" r="${r}" fill="none" style="stroke:var(--track)" stroke-width="${sw}"/>
+    ${p == null || v <= 0 ? "" : `<circle cx="${sz / 2}" cy="${sz / 2}" r="${r}" fill="none" style="stroke:${col}" stroke-width="${sw}" stroke-linecap="round" stroke-dasharray="${cf * v / 100} ${cf}" transform="rotate(-90 ${sz / 2} ${sz / 2})"/>`}
+    ${mid !== "" ? `<text x="50%" y="${sub ? "47%" : "50%"}" dominant-baseline="central" text-anchor="middle" style="fill:var(--text);font-family:SsukR;font-size:${sz * .23}px">${mid}</text>` : ""}
+    ${sub ? `<text x="50%" y="68%" text-anchor="middle" style="fill:var(--dim);font-size:${sz * .12}px">${sub}</text>` : ""}</svg>`;
+}
+/* 반원 — segs: [{v, c}] · {v, stp:true} 는 빗금 */
+function gxGauge(segs, mid, sub, w = 300, sw = 34) {
+  const r = (w - sw) / 2, cy = r + sw / 2, L = Math.PI * r, tot = segs.reduce((a, s) => a + (s.v || 0), 0);
+  const arc = `M${sw / 2} ${cy} A${r} ${r} 0 0 1 ${w - sw / 2} ${cy}`;
+  let acc = 0;
+  const parts = tot ? segs.map((s, i) => { const len = L * (s.v || 0) / tot; const o = len <= 0 ? "" : s.stp
+      ? `<path d="${arc}" fill="none" style="stroke:url(#gxstp)" stroke-width="${sw}" stroke-dasharray="0 ${acc} ${len} ${L * 2}"/>`
+      : `<path d="${arc}" fill="none" style="stroke:${s.c}" stroke-width="${sw}" stroke-dasharray="0 ${acc} ${Math.max(0, len - (i < segs.length - 1 ? 3 : 0))} ${L * 2}"/>`;
+    acc += len; return o; }).join("") : "";
+  return `<svg class="gx-gauge" viewBox="0 0 ${w} ${cy + 6}" aria-label="${mid} ${sub}">
+    <defs><pattern id="gxstp" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="8" height="8" style="fill:var(--gx-stp-a)"/><rect width="4" height="8" style="fill:var(--gx-stp-b)"/></pattern></defs>
+    <path d="${arc}" fill="none" style="stroke:var(--track)" stroke-width="${sw}" stroke-linecap="round"/>${parts}
+    <text x="${w / 2}" y="${cy - 20}" text-anchor="middle" style="fill:var(--text);font-family:SsukR;font-size:${w * .17}px">${mid}</text>
+    <text x="${w / 2}" y="${cy + 2}" text-anchor="middle" style="fill:var(--dim);font-size:${w * .052}px">${sub}</text></svg>`;
+}
+/* 둥근 알약 막대 — data: [{l, v, c, stp, tag, title, cls}] */
+function gxPills(data, h = 150, cls = "") {
+  const mx = Math.max(1, ...data.map(d => d.v || 0));
+  return `<div class="gx-pills ${cls}" style="--h:${h}px">${data.map(d => {
+    const hh = d.stp ? Math.round(h * .42) : d.v ? Math.max(22, Math.round(h * d.v / mx)) : 10;
+    return `<div class="gx-pc ${d.cls || ""}" title="${esc(d.title || d.l)}">${d.tag ? `<span class="gx-tag" style="bottom:${hh + 8}px">${d.tag}</span>` : ""}${d.top != null ? `<b class="gx-top">${d.top}</b>` : ""}
+      <i class="${d.stp ? "gx-stp" : ""}" style="height:${hh}px;${d.stp ? "" : `background:${d.c || "var(--gx-mocha)"}`}"></i><span>${d.l}</span></div>`; }).join("")}</div>`;
+}
+/* 부드러운 곡선 그래프 — series: [{v:[], c, n}] */
+function gxArea(series, labels, w = 680, h = 240) {
+  const n = labels.length; if (!n) return "";
+  const mx = Math.max(1, ...series.flatMap(s => s.v)) * 1.18;
+  const px = (i) => n === 1 ? w / 2 : 30 + i * (w - 50) / (n - 1), py = (v) => h - 28 - (h - 52) * v / mx;
+  const path = (v) => v.map((y, i) => { if (!i) return `M${px(0)} ${py(y)}`; const x0 = px(i - 1), x1 = px(i), c = (x1 - x0) / 2;
+    return `C${x0 + c} ${py(v[i - 1])} ${x1 - c} ${py(y)} ${x1} ${py(y)}`; }).join(" ");
+  let grid = ""; for (let k = 0; k <= 3; k++) { const y = 22 + (h - 50) * k / 3; grid += `<line x1="30" x2="${w - 20}" y1="${y}" y2="${y}" style="stroke:var(--line)" stroke-dasharray="3 4"/>`; }
+  const step = Math.ceil(n / 12);
+  const s0 = series[0], hi = s0.v.reduce((b, v, i) => v >= s0.v[b] ? i : b, 0);
+  return `<svg class="gx-area" viewBox="0 0 ${w} ${h}" aria-hidden="true"><defs>${series.map((s, i) => `<linearGradient id="gxag${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:${s.c};stop-opacity:.28"/><stop offset="1" style="stop-color:${s.c};stop-opacity:0"/></linearGradient>`).join("")}</defs>${grid}
+    ${series.map((s, i) => `<path d="${path(s.v)} L${px(n - 1)} ${h - 28} L${px(0)} ${h - 28} Z" style="fill:url(#gxag${i})"/><path d="${path(s.v)}" fill="none" style="stroke:${s.c}" stroke-width="2.5"/>`).join("")}
+    ${labels.map((l, i) => i % step && i !== n - 1 ? "" : `<text x="${px(i)}" y="${h - 7}" text-anchor="middle" style="fill:var(--dim);font-size:12px">${l}</text>`).join("")}
+    ${s0.v[hi] ? `<circle cx="${px(hi)}" cy="${py(s0.v[hi])}" r="6" style="fill:var(--surface);stroke:${s0.c}" stroke-width="3"/>
+    <g transform="translate(${Math.min(w - 40, Math.max(40, px(hi)))} ${py(s0.v[hi]) - 18})"><rect x="-34" y="-28" width="68" height="26" rx="10" style="fill:var(--text)"/><text y="-10" text-anchor="middle" style="fill:var(--bg);font-family:SsukR;font-size:13px">${s0.v[hi]}회</text></g>` : ""}</svg>`;
+}
+/* 도넛 — segs: [{v, c}] */
+function gxDonut(segs, mid, sub, sz = 180, sw = 26) {
+  const r = (sz - sw) / 2, cf = 2 * Math.PI * r, tot = segs.reduce((a, s) => a + s.v, 0); let acc = 0;
+  return `<svg class="gx-donut" viewBox="0 0 ${sz} ${sz}" width="${sz}" height="${sz}" aria-label="${mid} ${sub}">
+    <circle cx="${sz / 2}" cy="${sz / 2}" r="${r}" fill="none" style="stroke:var(--track)" stroke-width="${sw}"/>
+    ${tot ? segs.map(s => { const len = cf * s.v / tot; const o = s.v ? `<circle cx="${sz / 2}" cy="${sz / 2}" r="${r}" fill="none" style="stroke:${s.c}" stroke-width="${sw}" stroke-dasharray="${Math.max(0, len - (segs.filter(x => x.v).length > 1 ? 4 : 0))} ${cf}" stroke-dashoffset="${-acc}" transform="rotate(-90 ${sz / 2} ${sz / 2})"/>` : ""; acc += len; return o; }).join("") : ""}
+    <text x="50%" y="47%" dominant-baseline="central" text-anchor="middle" style="fill:var(--text);font-family:SsukR;font-size:${sz * .19}px">${mid}</text>
+    <text x="50%" y="64%" text-anchor="middle" style="fill:var(--dim);font-size:${sz * .08}px">${sub}</text></svg>`;
+}
+const gxLeg = (items) => `<div class="gx-leg">${items.map(([c, l]) => `<span><i class="${c === "stp" ? "gx-stp" : c === "dash" ? "gx-dash" : ""}" style="${c === "stp" || c === "dash" ? "" : `background:${c}`}"></i>${l}</span>`).join("")}</div>`;
+const gxCall = (ic, tone, html) => `<div class="gx-call ${tone}">${gxIco(ic, "w")}<span>${html}</span></div>`;
+const gxCard = (title, x, body, cls = "") => `<div class="gx-card ${cls}"><div class="gx-h"><h3>${title}</h3>${x || ""}</div>${body}</div>`;
+const gxRateTone = (r) => r == null ? "var(--faint)" : r >= 75 ? "var(--gx-sage)" : r >= 50 ? "var(--gx-gold)" : "var(--brand)";
+
+/* 최근 n주 — 주마다 셀모임 출석 (셀 여러 개면 합쳐서) */
+function gxWeeks(cellIds, n = 8) {
+  const ids = new Set(cellIds);
+  const W = Array.from({ length: n }, (_, k) => ({ k, start: gxAgo((n - 1 - k) * 7 + 6), ms: [], p: 0, o: 0, a: 0 }));
+  state.meetings.forEach(m => {
+    if (!ids.has(m.cellId)) return; const d = daysSince(m.date); if (d === null || d < 0 || d >= n * 7) return;
+    const w = W[n - 1 - Math.floor(d / 7)]; w.ms.push(m);
+    Object.values(m.attendance || {}).forEach(v => { if (v === "present") w.p++; else if (v === "online") w.o++; else if (v === "absent") w.a++; });
+  });
+  W.forEach(w => { w.came = w.p + w.o; w.marked = w.came + w.a; w.rate = gxPct(w.came, w.marked); w.lab = gxMD(w.ms.length === 1 ? w.ms[0].date : w.start); });
+  return W;
+}
+const gxSum = (W) => { const c = W.reduce((a, w) => a + w.came, 0), m = W.reduce((a, w) => a + w.marked, 0); return { came: c, marked: m, rate: gxPct(c, m) }; };
+
+/* ── 홈 — 한눈에 보기 (셀리더 · 코치 · 진장 · 교역자) ── */
+function homeScope() {
+  const me = state.me; if (!me) return null;
+  if (["coach", "jinjang", "pastor"].includes(me.role)) return { kind: "over", cells: seenCells(), souls: state.souls.filter(s => !isLeaderCard(s)) };
+  if (canLead()) return { kind: "lead", cells: ownCells(), souls: state.souls.filter(isLeaderOf) };
+  return null;
+}
+function renderHomeDash() {
+  const box = $("home-dash"); if (!box) return;
+  const S = homeScope();
+  if (!S || (!S.souls.length && !S.cells.length)) { box.innerHTML = ""; return; }
+  const ids = S.cells.map(c => c.id), W = gxWeeks(ids, 8);
+  const now4 = gxSum(W.slice(4)), pre4 = gxSum(W.slice(0, 4));
+  const diff = now4.rate != null && pre4.rate != null ? now4.rate - pre4.rate : null;
+  const recs = state.allRecords, ym = todayStr().slice(0, 7);
+  let K;
+  if (S.kind === "lead") {
+    const newN = S.souls.filter(s => { const t = gxMs(s.createdAt); return t && ymd(new Date(t)).slice(0, 7) === ym; }).length;
+    const careN = S.souls.filter(s => careDue(s) || s.status === "care").length;
+    const mon = recs ? recs.filter(r => r.type === "meet" && !r.planned && !r.away && String(r.date || "").slice(0, 7) === ym) : null;
+    const one = mon ? mon.filter(r => r.kind === "one").length : 0;
+    const prayN = prayList().length, todo = prayTodo().length;
+    K = [
+      { l: "맡은 영혼", v: S.souls.length, u: "명", hero: 1, go: "souls", t: newN ? `+${newN}` : "", d: newN ? "이번 달 새 가족" : careN ? `돌봄 필요 ${careN}명` : `셀 ${S.cells.length}개` },
+      { l: "최근 출석률", v: now4.rate == null ? "—" : now4.rate, u: now4.rate == null ? "" : "%", ic: "check", tone: "sage", go: "health",
+        t: diff == null ? "" : diff >= 0 ? `▲ ${diff}%p` : `▼ ${-diff}%p`, dn: diff != null && diff < 0, d: diff == null ? "최근 4주 셀모임" : "그 전 4주보다" },
+      { l: "이번 달 만남", v: mon ? mon.length : "—", u: mon ? "회" : "", ic: "coffee", go: "stats", t: mon && one ? `1:1 ${one}` : "", d: mon ? (mon.length - one ? `그 밖 ${mon.length - one}` : "내가 함께한 만남") : "기록을 불러오는 중" },
+      { l: "기도 중", v: prayN, u: "명", ic: "heart", tone: "wine", go: "souls", d: !prayN ? "기도제목이 있는 영혼" : todo ? `오늘 기도할 영혼 ${todo}명` : "오늘 모두 기도했어요" }];
+  } else {
+    const pastor = state.me.role === "pastor";
+    const wait = state.meetings.filter(m => m.reportedAt && (pastor || !m.check) && m.leaderUid !== uid()).length;
+    const careN = S.souls.filter(s => careStreak(attKey(s), attCell(s)).n >= CARE_AT).length;
+    K = [
+      { l: pastor ? "공유된 영혼" : "맡은 셀 영혼", v: S.souls.length, u: "명", hero: 1, go: "souls", d: `셀 ${S.cells.length}개` },
+      { l: "최근 출석률", v: now4.rate == null ? "—" : now4.rate, u: now4.rate == null ? "" : "%", ic: "check", tone: "sage", go: "health",
+        t: diff == null ? "" : diff >= 0 ? `▲ ${diff}%p` : `▼ ${-diff}%p`, dn: diff != null && diff < 0, d: diff == null ? "최근 4주 셀모임" : "그 전 4주보다" },
+      { l: pastor ? "공유된 보고" : "기다리는 보고", v: wait, u: "개", ic: "doc", go: "meet", d: pastor ? "셀 보고" : wait ? "확인을 기다려요" : "모두 확인했어요" },
+      { l: "결석 돌봄", v: careN, u: "명", ic: "alert", tone: "wine", go: "souls", d: `${CARE_AT}번 넘게 연달아 결석` }];
+  }
+  /* 8주 출석 — 둥근 막대 */
+  const lastK = W.map(w => w.ms.length ? w.k : -1).reduce((a, b) => Math.max(a, b), -1);
+  const pills = W.map((w, i) => w.ms.length
+    ? { l: w.lab, v: w.rate || 4, c: w.k === lastK ? "var(--brand)" : i % 2 ? "var(--gx-mocha)" : "var(--gx-mocha2)", tag: w.k === lastK && w.rate != null ? w.rate + "%" : "", title: `${w.lab} 출석 ${w.came}/${w.marked}` }
+    : { l: w.lab, stp: 1, title: `${w.lab} 모임 없음` });
+  /* 최근 셀모임 — 셀마다 2주 안의 마지막 모임 */
+  const lastM = S.cells.map(c => cellMeetings(c.id).filter(m => { const d = daysSince(m.date); return d !== null && d >= 0 && d < 14; })
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)))[0]).filter(Boolean);
+  let p = 0, o = 0, a = 0; lastM.forEach(m => Object.values(m.attendance || {}).forEach(v => { if (v === "present") p++; else if (v === "online") o++; else if (v === "absent") a++; }));
+  const mk = p + o + a, lastDate = lastM.map(m => m.date).sort().pop();
+  const gauge = mk ? `${gxGauge([{ v: p, c: "var(--brand)" }, { v: o, c: "var(--gx-goldl)" }, { v: a, stp: 1 }], gxPct(p + o, mk) + "%", `${mk}명 중 ${p + o}명`, 280, 32)}
+      ${gxLeg([["var(--brand)", `출석 ${p}`], ["var(--gx-goldl)", `온라인 ${o}`], ["stp", `결석 ${a}`]])}`
+    : `<p class="gx-empty">최근 2주 셀모임 기록이 없어요</p>`;
+  /* 신앙 · 훈련 — 명부 카드(같은 진이 보는 기본 사항)로 */
+  /* 맡은 영혼과 같은 사람들로 — 영혼 카드에 이어진 명부 카드, 없으면 그 셀 명부 */
+  const sid = new Set(S.souls.map(s => s.id)), mids = new Set(S.souls.map(s => s.memberId).filter(Boolean));
+  const dir = (state.dir || []).filter(m => m.active !== false);
+  let mem = dir.filter(m => mids.has(m.id) || (m.soulIds || []).some(id => sid.has(id)));
+  if (!mem.length) mem = dir.filter(m => ids.includes(m.cellId));
+  const N = mem.length, bap = mem.filter(m => bapOf(m) === "y").length;
+  const [c1, c2] = FAITH_DEF, n1 = mem.filter(m => trOf(m, c1) === "y").length, n2 = mem.filter(m => trOf(m, c2) === "y").length;
+  const wait2 = mem.filter(m => trOf(m, c1) === "y" && trOf(m, c2) !== "y").length;
+  const rings = N ? `<div class="gx-rings">${[["침례", bap, "var(--gx-sage)"], [c1, n1, "var(--gx-gold)"], [c2, n2, "var(--gx-lav)"]].map(([l, n, c]) =>
+      `<div>${gxRing(gxPct(n, N), c, 84, 9, gxPct(n, N) + "%")}<b>${esc(l)}</b><small>${n}/${N}명</small></div>`).join("")}</div>
+      ${wait2 ? gxCall("cap", "gold", `${esc(c1)}을 마친 <b>${wait2}명</b>이 ${esc(c2)}을 기다려요`) : ""}`
+    : `<p class="gx-empty">교회 명부가 모이면 보여요</p>`;
+  const go = (k) => `<button type="button" class="gx-more" data-gxgo="${k}" aria-label="자세히">›</button>`;
+  box.innerHTML = `<div class="gx-kpis">${K.map(gxKpi).join("")}</div>
+    <div class="gx-row gx-r3">
+      ${gxCard("셀모임 출석 · 8주", gxLeg([["var(--gx-mocha)", "출석률"], ["stp", "모임 없음"]]), gxPills(pills, 150), "gx-span")}
+      ${gxCard(lastDate ? `최근 셀모임 <small>${gxMD(lastDate)}</small>` : "최근 셀모임", go(S.kind === "lead" ? "meet" : "reports"), gauge)}
+      ${gxCard("신앙 · 훈련", go("train"), rings)}
+    </div>`;
+}
+document.addEventListener("click", (ev) => {
+  const b = ev.target.closest("[data-gxgo]"); if (!b) return;
+  ({ souls: openSouls, meet: openMeet, health: openHealth, stats: openStats, train: openTrainBoard, dir: openDir, reports: () => openReports("") }[b.dataset.gxgo] || (() => {}))();
+});
+
+/* ── 셀 건강 — 셀 하나 = 카드 하나 (41단계 그림판)
+   [반원 출석률 + 숫자 4칸] [주마다 온 사람 — 쌓인 막대] / 사람별 8주 칸 + 고리 / 인턴 ── */
+function healthCard(c, h, mine) {
+  const ms = cellMeetings(c.id).filter(m => { const n = daysSince(m.date); return n !== null && n >= 0 && n < 56; })
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  let P = 0, O = 0, A = 0;
+  ms.forEach(m => Object.values(m.attendance || {}).forEach(v => { if (v === "present") P++; else if (v === "online") O++; else if (v === "absent") A++; }));
+  const gauge = gxGauge([{ v: P, c: "var(--gx-sage)" }, { v: O, c: "var(--gx-blue)" }, { v: A, stp: 1 }],
+    h.rate == null ? "—" : h.rate + "%", h.rate == null ? "기록 없음" : "출석 + 온라인", 300, 34);
+  /* 주마다 — 온 사람 (출석 + 온라인), 모임 없는 주는 점선 */
+  const W = gxWeeks([c.id], 8), N = Math.max(1, h.people.length, ...W.map(w => w.marked));
+  const H = 190;
+  const bars = `<div class="vbars gx-stack" style="--h:${H}px">${W.map(w => { const hh = Math.round(H * w.came / N);
+    return `<div class="vb${w.ms.length ? "" : " none"}${w.marked && w.came / w.marked < .5 ? " low" : ""}" title="${esc(w.lab)} ${w.ms.length ? `출석 ${w.p} · 온라인 ${w.o} · 결석 ${w.a}` : "모임 없음"}">
+      ${w.ms.length ? `<b class="gx-top">${w.came}</b><span class="col" style="height:${Math.max(hh, 14)}px"><i class="on" style="flex:${w.o}"></i><i class="ok" style="flex:${w.p}"></i></span>` : `<span class="col gx-dash" style="height:${H}px"></span>`}
+      <span class="lb">${esc(w.lab)}</span></div>`; }).join("")}</div>`;
+  const a4 = W.slice(4).filter(w => w.ms.length), b4 = W.slice(0, 4).filter(w => w.ms.length);
+  const avg = (L) => L.length ? Math.round(L.reduce((s, w) => s + w.came, 0) / L.length * 10) / 10 : null;
+  const x1 = avg(a4), x0 = avg(b4), skip = W.filter(w => !w.ms.length).length;
+  const call = x1 == null ? "" : gxCall("chart", x0 != null && x1 < x0 ? "wine" : "sage",
+    `최근 4주 평균 <b>${x1}명</b>${x0 != null ? ` · 그 전보다 ${x1 >= x0 ? "+" : ""}${Math.round((x1 - x0) * 10) / 10}명` : ""}${skip ? ` · 모임 없는 주 ${skip}번` : ""}`);
+  const ppl = h.people.map(s => {
+    const k = attKey(s), cells = ms.map(m => (m.attendance || {})[k] || "");
+    const okn = cells.filter(v => v && v !== "absent").length, rec = cells.filter(Boolean).length;
+    const r = rec ? Math.round(okn / rec * 100) : null, tone = r == null ? "" : r >= 75 ? "good" : r >= 50 ? "mid" : "low";
+    return { s, cells, r, tone };
+  });
+  if (state.hlSort === "low") ppl.sort((a, b) => (a.r == null ? 101 : a.r) - (b.r == null ? 101 : b.r));   // 빠지는 사람이 위로
+  const canTick = mine && h.people.some(isLeaderOf);
+  const md = gxMD;
+  return `<div class="hc gx-hc">
+    <div class="hc-h"><span class="cbadge">${esc(c.name)}</span>
+      <span class="who">${esc(cellLeadName(c) ? cellLeadName(c) + " 셀리더" : leaderLabel(c.id))}</span>
+      <span class="notes">${h.notes.map(([k, t]) => `<span class="chip ${k}">${esc(t)}</span>`).join("") || `<span class="chip">기록이 더 쌓이면 보여요</span>`}</span></div>
+    <div class="hc-top">
+      <div class="hc-sum"><p class="gx-t">8주 출석률</p>${gauge}
+        <div class="hc-kpi">
+          <div><p>8주 셀모임</p><b>${h.ms}<em>회</em></b></div>
+          <div class="sage"><p>평균 출석</p><b>${h.avg === null ? "—" : h.avg + "<em>명</em>"}</b></div>
+          <div class="gold"><p>새 방문자</p><b>${h.visitors}<em>명</em></b></div>
+          <div class="${h.care ? "wine" : ""}"><p>연달아 결석</p><b>${h.care}<em>명</em></b></div>
+        </div></div>
+      <div class="hc-chart"><div class="gx-h"><h3>주마다 누가 왔나</h3>${gxLeg([["var(--gx-sage)", "출석"], ["var(--gx-blue)", "온라인"], ["dash", "모임 없음"]])}</div>
+        ${ms.length ? bars + call : `<p class="gx-empty" style="padding:60px 0">최근 8주 셀모임 기록이 없어요</p>`}</div>
+    </div>
+    ${ppl.length && ms.length ? `<p class="hc-sec">사람별 출석 <span>최근 8주 · 칸 하나 = 모임 하나 · ${state.hlSort === "low" ? "자주 빠지는 사람이 위에" : "셀리더가 정한 순서"}</span></p>
+      <div class="hppl">${ppl.map(p => `<div class="hp ${p.tone}">
+        ${avatar(p.s, 36)}<span class="nm" title="${esc(p.s.name)}">${esc(p.s.name)}</span>
+        <span class="dd">${p.cells.map((v, i) => `<i class="${v || "nr"}" title="${esc(md(ms[i].date))} ${v ? ATT[v] : "기록 없음"}"></i>`).join("")}</span>
+        <span class="rt">${gxRing(p.r, gxRateTone(p.r), 48, 5)}<b>${p.r == null ? "—" : p.r + "%"}</b></span></div>`).join("")}</div>
+      ${gxLeg([["var(--gx-sage)", "출석"], ["var(--gx-blue)", "온라인"], ["var(--brand)", "결석"], ["dash", "기록 없음"]])}` : ""}
+    <p class="hc-sec">인턴 (예비 셀리더) ${h.interns.length}명 <span>${canTick ? "눌러서 세우거나 빼요 · 순서는 '순서 · 인턴'에서" : ""}</span></p>
+    ${canTick ? `<div class="hints">${h.people.filter(isLeaderOf).map(s => `
+        <label class="${s.intern ? "on" : ""}"><input type="checkbox" data-intern="${s.id}" ${s.intern ? "checked" : ""}>${esc(s.name)}${s.intern && s.internSince ? `<span class="muted" style="font-size:calc(11px*var(--fs,1))">${fmtDate(s.internSince)}~</span>` : ""}</label>`).join("")}</div>`
+      : `<p style="font-size:calc(14px*var(--fs,1))">${h.interns.map(s => esc(s.name)).join(", ") || "아직 없어요"}</p>`}
+  </div>`;
+}
+
+/* ── 활동 통계 (내 통계) — 큰 숫자 4칸 · 어떤 모임이었나(도넛) · 주마다 얼마나(곡선) · 누구를 얼마나(막대) ── */
+function renderStats() {
+  whoChips("st-who", "st-who-hint", state.stWho, canLead() ? "내 통계" : "나",
+    (u) => `${cellNameOf(u.cellId) || ""} ${u.name} 님 셀 — 셀모임 · 출석은 셀 보고에서, 만남은 횟수 · 종류만 (누구와 · 내용은 안 보여요).`);
+  ["st-cells", "st-opts", "st-people"].forEach(id => { $(id).hidden = stOther(); });
+  if (stOther()) { $("st-period").querySelectorAll("[data-per]").forEach(b => b.classList.toggle("on", b.dataset.per === state.st.per)); renderOtherStats(); return; }
+  const S = state.st, from = statsFrom(S.per), to = todayStr();
+  const inP = (d) => !!d && d >= from && d <= to;
+  $("st-period").querySelectorAll("[data-per]").forEach(b => b.classList.toggle("on", b.dataset.per === S.per));
+  const ids = [...new Set(state.souls.map(cellOfSoul).filter(Boolean))];
+  const cells = ids.map(id => state.cells.find(c => c.id === id)).filter(Boolean);
+  if (S.cell !== "all" && !ids.includes(S.cell)) S.cell = "all";
+  $("st-cells").innerHTML = `<button type="button" data-stc="all">전체</button>`
+    + cells.map(c => `<button type="button" data-stc="${c.id}">${cellChipIn(c)}</button>`).join("");
+  $("st-cells").style.display = cells.length < 2 ? "none" : "";
+  $("st-cells").querySelectorAll("[data-stc]").forEach(b => b.classList.toggle("on", b.dataset.stc === S.cell));
+  $("st-opts").querySelector('[data-opt="cell"]').classList.toggle("on", S.withCell);
+  $("st-opts").querySelector('[data-opt="away"]').classList.toggle("on", S.away);
+
+  const inCell = (cid) => S.cell === "all" || cid === S.cell;
+  const souls = state.souls.filter(s => inCell(cellOfSoul(s)));
+  const soulIds = new Set(souls.map(s => s.id));
+  const meets = state.meetings.filter(m => inCell(m.cellId) && inP(m.date));
+  /* 예정은 빼고, '나 없이'는 고른 경우만 · 셀모임 때 적은 근황(meetingId)은 셀모임 출석으로 이미 세었으니 빼고 */
+  const recs = (state.allRecords || []).filter(r => r.type === "meet" && !r.planned && !r.meetingId && inP(r.date)
+    && soulIds.has(r.soulId) && (S.away || !r.away));
+  const uniq = {}; recs.forEach(r => { const k = r.groupId || r.id; if (!uniq[k]) uniq[k] = r; });
+  const once = Object.values(uniq);
+
+  const nCell = meets.length, nOther = once.length;
+  let marked = 0, came = 0;
+  meets.forEach(m => Object.entries(m.attendance || {}).forEach(([sid, v]) => {
+    if (!soulIds.has(sid)) return; marked++; if (v !== "absent") came++; }));
+  const nOne = once.filter(r => r.kind === "one").length;
+  const oneWho = new Set(recs.filter(r => r.kind === "one").map(r => r.soulId)).size;
+
+  /* ── 사람별 ── */
+  const rows = souls.map(s => {
+    const c = { cell: 0, train: 0, one: 0, etc: 0 };
+    if (S.withCell) c.cell = meets.filter(m => { const v = (m.attendance || {})[s.id]; return v === "present" || v === "online"; }).length;
+    recs.filter(r => r.soulId === s.id).forEach(r => c[catOf(r)]++);
+    return { s, c, total: c.cell + c.train + c.one + c.etc };
+  }).sort((a, b) => b.total - a.total || String(a.s.name).localeCompare(String(b.s.name)));
+  const avg = rows.length ? rows.reduce((n, x) => n + x.total, 0) / rows.length : 0;
+  const low = rows.filter(x => x.total === 0 || (avg > 0 && x.total <= avg * 0.5));
+  const noOne = rows.filter(x => !x.c.one && !isLeaderCard(x.s));
+  const rate = marked ? Math.round(came / marked * 100) : null;
+
+  $("st-tiles").innerHTML = `<div class="gx-kpis" style="margin-top:14px">
+      ${gxKpi({ l: "모든 모임", v: nCell + nOther, u: "회", hero: 1, d: `셀모임 ${nCell} · 그 밖 ${nOther}` })}
+      ${gxKpi({ l: "셀모임 평균 출석", v: rate == null ? "—" : rate, u: rate == null ? "" : "%", ic: "check", tone: "sage", d: `셀모임 ${nCell}회` })}
+      ${gxKpi({ l: "1:1 만남", v: nOne, u: "회", ic: "coffee", d: oneWho ? `${oneWho}명과` : "이 기간 1:1 없음" })}
+      ${gxKpi({ l: "1:1 못 만난 사람", v: noOne.length, u: "명", ic: "heart", tone: "wine", t: noOne.length ? "챙기기" : "", dn: 1, d: noOne.slice(0, 2).map(x => esc(x.s.name)).join(" · ") || "모두 만났어요" })}
+    </div>
+    ${canLead() ? (() => { const a = myActivity(from); return `<div class="gx-mine">
+      <span>나 · 셀모임 출석 <b>${a.marked ? `${a.came}/${a.marked}` : "—"}</b></span><span>나 · 직접 함께한 모임 <b>${a.met}회</b></span></div>`; })() : ""}`;
+
+  /* ── 종류별 (도넛) + 주마다 (곡선) ── */
+  const kinds = {};
+  once.forEach(r => {
+    const key = r.kind === "train" ? "train|" + (r.courseId || "") : r.kind;
+    const label = r.kind === "train" ? `훈련 · ${r.courseName || "과정"}` : (kindOf(r.kind).id === r.kind ? kindName(r.kind) : (r.kindLabel || "모임"));
+    (kinds[key] = kinds[key] || { label, cat: catOf(r), n: 0 }).n++;
+  });
+  let krows = Object.values(kinds).sort((a, b) => b.n - a.n);
+  if (S.withCell) krows = [{ label: "셀모임", cat: "cell", n: nCell }, ...krows];
+  const col = (c) => SCAT.find(x => x[0] === c)[2];
+  const ktot = krows.reduce((n, k) => n + k.n, 0);
+  /* 주마다 — 기간이 길면 달마다 */
+  const days = Math.max(7, Math.round((Date.parse(to) - Date.parse(from === "0000-00-00" ? ([...meets.map(m => m.date), ...once.map(r => r.date)].sort()[0] || to) : from)) / 864e5));
+  const byMonth = days > 190;
+  const keyOf = (d) => byMonth ? String(d).slice(0, 7) : gxAgo(Math.floor(daysSince(d) / 7) * 7);
+  const bucket = {};
+  const nb = byMonth ? Math.min(12, Math.ceil(days / 30)) : Math.min(14, Math.ceil(days / 7));
+  for (let i = nb - 1; i >= 0; i--) { const k = byMonth ? (() => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - i); return ymd(d).slice(0, 7); })() : gxAgo(i * 7); bucket[k] = { all: 0, one: 0 }; }
+  const put = (d, one) => { const k = keyOf(d); if (bucket[k]) { bucket[k].all++; if (one) bucket[k].one++; } };
+  if (S.withCell) meets.forEach(m => put(m.date, false));
+  once.forEach(r => put(r.date, r.kind === "one"));
+  const bk = Object.keys(bucket);
+  const labs = bk.map(k => byMonth ? `${Number(k.slice(5))}월` : gxMD(gxAgo(daysSince(k) + 6)));
+  $("st-kinds").innerHTML = `<div class="gx-row gx-r2">
+    ${gxCard("어떤 모임이었나", `<span class="x">여러 명이 함께한 모임은 한 번</span>`, krows.length && ktot ? `
+      <div class="gx-dwrap">${gxDonut(krows.slice(0, 6).map(k => ({ v: k.n, c: col(k.cat) })), ktot, "모임", 180, 26)}</div>
+      <div class="gx-klist">${krows.map(k => `<div class="kbar" title="${esc(k.label)} ${k.n}회"><i style="background:${col(k.cat)}"></i><span>${esc(k.label)}</span><b>${k.n}회</b><small>${gxPct(k.n, ktot) || 0}%</small></div>`).join("")}</div>`
+      : `<p class="gx-empty">이 기간에는 기록이 없어요.</p>`)}
+    ${gxCard(byMonth ? "달마다 얼마나 만났나" : "주마다 얼마나 만났나", gxLeg([["var(--c-cell)", "모든 모임"], ["var(--c-one)", "1:1"]]),
+      bk.length > 1 ? gxArea([{ v: bk.map(k => bucket[k].all), c: "var(--c-cell)" }, { v: bk.map(k => bucket[k].one), c: "var(--c-one)" }], labs, 680, 260) : `<p class="gx-empty">기간을 넓혀 보세요</p>`)}
+  </div>`;
+
+  /* ── 누구를 얼마나 만났나 ── */
+  const max = Math.max(1, ...rows.map(x => x.total));
+  const used = SCAT.filter(([k]) => k !== "cell" || S.withCell);
+  $("st-people").innerHTML = gxCard("누구를 얼마나 만났나", gxLeg(used.map(([k, l, c]) => [c, l])), `
+      <p class="muted" style="font-size:calc(12px*var(--fs,1));margin:-4px 0 6px">${S.away
+        ? "나 없이 모인 것까지 셉니다 — 그 사람의 활동량이에요."
+        : "내가 직접 함께한 것만 셉니다 — 내가 만난 횟수예요."} 평균 ${avg.toFixed(1)}회.</p>
+      ${low.length ? gxCall("heart", "wine", `이 기간에 적게 만난 사람 — ${low.slice().reverse().slice(0, 5).map(x => `<b>${esc(x.s.name)}</b> ${x.total}회`).join(", ")}`) : ""}
+      <div class="gx-people">${rows.map(x => {
+        const segs = used.filter(([k]) => x.c[k] > 0).map(([k, l, c]) => `<i style="flex:${x.c[k]};background:${c}" title="${l} ${x.c[k]}회"></i>`).join("");
+        const n = daysSince(x.s.lastMetAt);
+        return `<div class="srow" title="${esc(x.s.name)} — ${used.map(([k, l]) => `${l} ${x.c[k]}`).join(" · ")}">
+          <span class="who">${avatar(x.s, 36)}<span>${esc(x.s.name)}</span></span>
+          <div class="tr">${x.total ? `<div class="hbar" style="width:${Math.max(4, x.total / max * 100)}%">${segs}</div>` : `<span class="chip warn">한 번도 없음</span>`}</div>
+          <span class="n">${x.total}</span>
+          <span class="det">${used.filter(([k]) => x.c[k]).map(([k, l]) => `${l} ${x.c[k]}`).join(" · ") || "—"}${n !== null ? ` · 마지막 만남 ${n === 0 ? "오늘" : n + "일 전"}` : ""}${!x.c.one && !isLeaderCard(x.s) ? ` · <em class="no1">1:1 없음</em>` : ""}</span>
+        </div>`; }).join("") || `<p class="muted">영혼 카드가 없어요.</p>`}</div>`, "gx-pcard");
+}
+
+/* ── 다른 셀리더 셀 통계 (진장 · 코치 · 수퍼) — 같은 그림판 ── */
+function renderOtherStats() {
+  const D = state.stOtherData; if (!D) return;
+  const from = statsFrom(state.st.per), to = todayStr(), inP = (d) => !!d && d >= from && d <= to;
+  const reps = D.reps.filter(r => inP(r.date)).sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  let ok = 0, all = 0; reps.forEach(r => { const k = repCount(r); ok += k.ok; all += k.all; });
+  const meets = D.items.filter(x => !x.p && inP(x.d));
+  const kinds = {}; meets.forEach(x => { kinds[x.k || "만남"] = (kinds[x.k || "만남"] || 0) + 1; });
+  const krows = [{ label: "셀모임", n: reps.length, cell: true }, ...Object.entries(kinds).map(([label, n]) => ({ label, n })).sort((a, b) => b.n - a.n)];
+  const ktot = krows.reduce((n, k) => n + k.n, 0);
+  const months = {}; reps.forEach(r => { const m = ymOf(r.date); (months[m] = months[m] || { c: 0, m: 0 }).c++; });
+  meets.forEach(x => { const m = ymOf(x.d); (months[m] = months[m] || { c: 0, m: 0 }).m++; });
+  const mk = Object.keys(months).sort().slice(-12), mmax = Math.max(1, ...mk.map(k => months[k].c + months[k].m));
+  const r = all ? Math.round(ok / all * 100) : null;
+  $("st-tiles").innerHTML = `<div class="gx-kpis" style="margin-top:14px">
+      ${gxKpi({ l: "셀모임", v: reps.length, u: "회", hero: 1, d: "셀 보고 기준" })}
+      ${gxKpi({ l: "평균 출석률", v: r == null ? "—" : r, u: r == null ? "" : "%", ic: "check", tone: "sage", d: `체크한 ${all}명 중 ${ok}명` })}
+      ${gxKpi({ l: "평균 출석", v: reps.length ? Math.round(ok / reps.length * 10) / 10 : "—", u: reps.length ? "명" : "", ic: "users", d: "모임마다" })}
+      ${gxKpi({ l: "만남 · 1:1 등", v: D.off ? "—" : meets.length, u: D.off ? "" : "회", ic: "coffee", d: D.off ? "공유 꺼짐" : "공유한 날짜 · 종류만" })}
+    </div>`;
+  const kc = (k, i) => k.cell ? "var(--c-cell)" : ["var(--c-one)", "var(--c-train)", "var(--c-etc)", "var(--gx-blue)", "var(--gx-mocha2)"][i % 5];
+  $("st-kinds").innerHTML = `<div class="gx-row gx-r2">
+    ${gxCard("어떤 모임이었나", `<span class="x">${D.off ? "만남 공유가 꺼져 셀모임만" : "공유한 날짜 · 종류로만"}</span>`, ktot ? `
+      <div class="gx-dwrap">${gxDonut(krows.slice(0, 6).map((k, i) => ({ v: k.n, c: kc(k, i) })), ktot, "모임", 180, 26)}</div>
+      <div class="gx-klist">${krows.map((k, i) => `<div class="kbar"><i style="background:${kc(k, i)}"></i><span>${esc(k.label)}</span><b>${k.n}회</b><small>${gxPct(k.n, ktot) || 0}%</small></div>`).join("")}</div>`
+      : `<p class="gx-empty">이 기간에는 기록이 없어요.</p>`)}
+    ${gxCard("달마다", gxLeg([["var(--c-cell)", "셀모임"], ["var(--c-one)", "만남"]]), mk.length ? `
+      <div class="vbars gx-stack gx-mon" style="--h:190px">${mk.map(k => { const o = months[k];
+        return `<div class="vb" title="${k} 셀모임 ${o.c} · 만남 ${o.m}"><b class="gx-top">${o.c + o.m}</b><span class="col" style="height:${Math.max(14, Math.round(190 * (o.c + o.m) / mmax))}px"><i class="m" style="flex:${o.m}"></i><i class="c" style="flex:${o.c}"></i></span><span class="lb">${Number(k.slice(5))}월</span></div>`; }).join("")}</div>`
+      : `<p class="gx-empty">기록이 없어요</p>`)}
+  </div>`;
+}
+
+/* ── 훈련 현황 — 고리 카드 · 성장 계단 · 사람별 체크 칸
+   41단계: 39단계에서 눌러서 체크한 값(영혼 카드 침례 · 명부 카드 '수료한 훈련')도 같이 셉니다. ── */
+async function openTrainBoard() {
+  show("s-loading"); markSide("train");
+  await loadOrg(); await loadSouls();
+  const [all] = await Promise.all([loadAllTrainings(), ensureDirectory().catch(() => {})]);
+  const latest = {};
+  all.forEach(t => {
+    const k = t.soulId + "|" + t.courseId, cur = latest[k];
+    if (!cur || String(t.startDate || "") > String(cur.startDate || "")) latest[k] = t;
+  });
+  const souls = state.souls;
+  /* 영혼 → 명부 카드 (soulIds) — 명부에서 '수료'로 체크한 과정 */
+  const doneOf = {}; (state.dir || []).forEach(m => { const ids = new Set([...(m.soulIds || []), ...souls.filter(s => s.memberId === m.id).map(s => s.id)]);
+    ids.forEach(id => { (doneOf[id] = doneOf[id] || new Set()); (m.trainingsDone || []).forEach(t => doneOf[id].add(t)); }); });
+  const chk = (s, c) => !!doneOf[s.id] && doneOf[s.id].has(c.name);
+  const stOf = (s, c) => { const t = latest[s.id + "|" + c.id]; return t ? (t.status === "done" || chk(s, c) ? "done" : t.status) : chk(s, c) ? "done" : ""; };
+  const bapY = (s) => s.bap === "y" || (s.bap !== "n" && !!s.baptizedAt);
+  const N = souls.length, bapN = souls.filter(bapY).length;
+  const sum = state.courses.map(c => {
+    const st = souls.map(s => stOf(s, c));
+    return { c, done: st.filter(x => x === "done").length, ing: st.filter(x => x === "ongoing").length,
+      plan: st.filter(x => x === "planned").length, drop: st.filter(x => x === "dropped").length, none: st.filter(x => !x).length };
+  });
+  const tones = ["var(--gx-gold)", "var(--gx-lav)", "var(--gx-blue)", "var(--gx-cor)", "var(--gx-mocha)"], icn = ["cap", "star", "cap", "star", "cap"];
+  const ringCard = (l, done, ing, rest, col, ic, ingLabel) => `<div class="gx-card gx-tc">${gxRing(gxPct(done, N) || 0, col, 108, 12, (gxPct(done, N) || 0) + "%")}
+      <div class="b"><div class="t"><b>${esc(l)}</b>${gxIco(ic)}</div>
+        <div class="cs"><span class="chip ok">${ingLabel ? "받음" : "수료"} ${done}</span>${ing ? `<span class="chip warn">수강 중 ${ing}</span>` : ""}<span class="chip">아직 ${rest}</span></div>
+        <div class="gx-bar2"><i style="width:${N ? done / N * 100 : 0}%;background:${col}"></i><i style="width:${N ? ing / N * 100 : 0}%;background:${col};opacity:.35"></i></div></div></div>`;
+  const interns = souls.filter(s => s.intern && !isLeaderCard(s)).length;
+  const steps = [["영혼", N, "var(--gx-mocha2)"], ["침례", bapN, "var(--gx-sage)"],
+    ...sum.slice(0, 3).map((x, i) => [x.c.name, x.done, tones[i]]), ["인턴", interns, "var(--brand)"]];
+  const smax = Math.max(1, ...steps.map(s => s[1]));
+  const c1 = sum[0], c2 = sum[1];
+  const waitN = c1 && c2 ? souls.filter(s => stOf(s, c1.c) === "done" && stOf(s, c2.c) !== "done").length : 0;
+  const lastC = sum.length ? sum[Math.min(sum.length, 3) - 1] : null;
+  const recom = lastC ? souls.filter(s => stOf(s, lastC.c) === "done" && !s.intern && !isLeaderCard(s)) : [];
+  $("train-sum").innerHTML = !N ? `<p class="muted" style="margin-top:14px">영혼을 먼저 등록해 주세요.</p>` : `
+    <div class="gx-tcs">${ringCard("침례", bapN, 0, N - bapN, "var(--gx-sage)", "drop", true)}
+      ${sum.map((x, i) => ringCard(x.c.name, x.done, x.ing, N - x.done - x.ing, tones[i % 5], icn[i % 5])).join("")}</div>
+    ${!state.courses.length ? `<p class="muted" style="margin-top:14px">훈련 과정을 먼저 등록해 주세요.</p>` : ""}
+    <div class="gx-row gx-r2t">
+      ${gxCard("성장 계단", `<span class="x">단계마다 몇 명</span>`, `<div class="gx-steps">${steps.map(([l, n, c]) =>
+        `<div class="st"><span class="blk" style="height:${44 + Math.round(n / smax * 140)}px;background:${c}">${n}</span><span class="lb">${esc(l)}</span></div>`).join("")}</div>
+        ${waitN ? gxCall("cap", "gold", `${esc(c1.c.name)}을 마친 <b>${waitN}명</b>이 ${esc(c2.c.name)}을 기다려요`) : ""}
+        ${recom.length ? gxCall("star", "lav", `${esc(lastC.c.name)}을 마친 <b>${recom.slice(0, 3).map(s => esc(s.name)).join(" · ")}</b>${recom.length > 3 ? ` 외 ${recom.length - 3}명` : ""} — 인턴으로 세워 볼 만해요`) : ""}`)}
+      ${gxCard("사람별 · 한눈에", gxLeg([["var(--gx-sage)", "마침"], ["var(--gx-gold)", "수강 · 예정"]]), `<div class="only-wide"><div class="matrix gx-mx" id="train-matrix"></div></div>
+        <div class="only-phone"><div class="list" id="train-list" style="margin-top:4px"></div></div>`, "gx-mxcard")}
+    </div>`;
+  if (!N) { show("s-train"); return; }
+  const CK = { done: "✓", ongoing: "수강", planned: "예정", dropped: "포기" };
+  const cell = (s, c) => {
+    const st = stOf(s, c), t = latest[s.id + "|" + c.id];
+    if (!st) return `<td><span class="ck n">·</span></td>`;
+    const total = (c.sessions || 1), ok = t ? doneSessions(t) : 0;
+    const label = st === "ongoing" && total > 1 ? `${ok}/${total}` : CK[st];
+    return `<td title="${esc(c.name)} ${TSTAT[st] || ""}"><span class="ck ${st}">${label}</span></td>`;
+  };
+  const bapCell = (s) => bapY(s) ? `<td title="${s.baptizedAt ? fmtDate(s.baptizedAt, true) : "받음"}"><span class="ck done">✓</span></td>` : `<td><span class="ck n">·</span></td>`;
+  $("train-matrix").innerHTML = N ? `
+    <table><thead><tr><th style="text-align:left">이름</th><th>침례</th>
+      ${state.courses.map(c => `<th>${esc(c.name)}${(c.sessions || 1) > 1 ? `<br><span style="font-weight:400">${c.sessions}회</span>` : ""}</th>`).join("")}
+    </tr></thead><tbody>
+      ${souls.map(s => `<tr><td class="nm">${avatar(s, 28)}<span>${esc(s.name)}</span></td>${bapCell(s)}${state.courses.map(c => cell(s, c)).join("")}</tr>`).join("")}
+    </tbody></table>` : "";
+  $("train-list").innerHTML = souls.map(s => {
+    const st = state.courses.map(c => ({ c, st: stOf(s, c) }));
+    const done = st.filter(x => x.st === "done").length;
+    const ing = st.find(x => x.st === "ongoing"), plan = st.find(x => x.st === "planned");
+    const extra = ing ? ` · ${esc(ing.c.name)} 수강 중` : plan ? ` · ${esc(plan.c.name)} 예정` : "";
+    return `<div class="row" data-gosoul3="${s.id}" style="cursor:pointer">
+      ${avatar(s)}
+      <div class="grow"><p class="nm">${esc(s.name)}</p>
+        <p class="sub">${bapY(s) ? `침례 ${s.baptizedAt ? fmtDate(s.baptizedAt, true) : "받음"}` : "침례 아직"}</p>
+        <p class="sub2">수료 ${done}개${extra}</p></div>
+      <span class="ck-row">${bapY(s) ? `<span class="ck done">✓</span>` : `<span class="ck n">·</span>`}${st.map(x => `<span class="ck ${x.st || "n"}" title="${esc(x.c.name)}">${x.st === "done" ? "✓" : x.st ? "·" : "·"}</span>`).join("")}</span>
+    </div>`;
+  }).join("") || `<p class="muted">영혼을 먼저 등록해 주세요.</p>`;
+  show("s-train");
+}
+
+/* ── 교회 명부 › 통계 · 그래프 — 큰 숫자 · 연령대 막대 · 출석률 도넛 · 수료 막대 · 셀별 비교 · 생일 D-day ── */
+function dirStatsHTML(scope, cells, cellOfM, LM) {
+  const by = state.bdate || {}, N = scope.length;
+  const ages = scope.map(m => ageOf(by[m.id])).filter(a => a !== null);
+  const avgAge = ages.length ? Math.round(ages.reduce((a, b) => a + b, 0) / ages.length * 10) / 10 : null;
+  const AB = [["20대 이하", a => a < 30], ["30대", a => a >= 30 && a < 40], ["40대", a => a >= 40 && a < 50], ["50대", a => a >= 50 && a < 60], ["60대 이상", a => a >= 60]];
+  const ab = AB.map(([l, f]) => ({ l, n: ages.filter(f).length })), abMax = Math.max(...ab.map(x => x.n));
+  const at = scope.map(m => ({ m, st: attStats(m.id, cellOfM(m)) }));
+  let okS = 0, nS = 0; at.forEach(x => { okS += x.st.ok; nS += x.st.n; });
+  const rate = nS ? Math.round(okS / nS * 100) : null;
+  const RB = [["75% 이상", "var(--gx-sage)", r => r >= 75], ["50~74%", "var(--gx-goldl)", r => r >= 50 && r < 75], ["25~49%", "var(--gx-cor)", r => r >= 25 && r < 50], ["25% 미만", "var(--brand)", r => r < 25]];
+  const rated = at.filter(x => x.st.rate !== null), noRec = N - rated.length;
+  const rb = RB.map(([l, c, f]) => ({ l, c, n: rated.filter(x => f(x.st.rate)).length }));
+  const has = (m, t) => (m.trainingsDone || []).includes(t);
+  const both = scope.filter(m => has(m, "새로운 삶") && has(m, "제자의 삶")).length;
+  const nl = scope.filter(m => has(m, "새로운 삶")).length, dl = scope.filter(m => has(m, "제자의 삶")).length;
+  const onlyN = nl - both, onlyD = dl - both, none = N - both - onlyN - onlyD;
+  const pct = (x) => N ? Math.round(x / N * 100) : 0;
+  const interns = scope.filter(m => m.intern).length;
+  const streak = at.filter(x => x.st.streak >= 2).length;
+  const now = new Date(), mo = now.getMonth() + 1, mo2 = mo % 12 + 1;
+  const dday = (md) => { const [mm, dd] = String(md).split("-").map(Number); let t = new Date(now.getFullYear(), mm - 1, dd);
+    const t0 = new Date(now.getFullYear(), now.getMonth(), now.getDate()); if (t < t0) t = new Date(now.getFullYear() + 1, mm - 1, dd); return Math.round((t - t0) / 864e5); };
+  const bd = (mm) => scope.filter(m => m.birthMD && Number(String(m.birthMD).slice(0, 2)) === mm)
+    .sort((a, b) => String(a.birthMD).localeCompare(String(b.birthMD)));
+  const bdHTML = (mm) => { const l = bd(mm); return l.length ? `<div class="gx-bd">${l.map(m => { const d = dday(m.birthMD);
+      return `<div class="gx-p">${avatar(m, 36)}<span class="g"><b>${esc(m.name)}</b><small>${Number(String(m.birthMD).slice(0, 2))}월 ${Number(String(m.birthMD).slice(3, 5))}일${m.lunar ? " (음력)" : ""}</small></span><span class="chip ${d <= 7 ? "rose" : "gold"}">${d === 0 ? "오늘" : "D-" + d}</span></div>`; }).join("")}</div>`
+    : `<p class="gx-empty" style="padding:8px 0">없어요</p>`; };
+  const perCell = state.dirCell === "all" ? cells.map(c => {
+    const ms = scope.filter(m => cellOfM(m) === c.id); if (!ms.length) return null;
+    const ag = ms.map(m => ageOf(by[m.id])).filter(a => a !== null);
+    let o = 0, n = 0; ms.forEach(m => { const st = attStats(m.id, c.id); o += st.ok; n += st.n; });
+    return { c, n: ms.length, age: ag.length ? Math.round(ag.reduce((a, b) => a + b, 0) / ag.length) : null, rate: n ? Math.round(o / n * 100) : null };
+  }).filter(Boolean) : [];
+  const nMax = Math.max(1, ...perCell.map(x => x.n));
+  const a20 = ab[0].n, a30 = ab[1].n;
+  const pills = ab.map(x => ({ l: x.l, v: x.n, top: x.n, cls: "ab" + (x.n ? "" : " dim"), c: !x.n ? "var(--track)" : x.n === abMax ? "var(--gx-mocha)" : "var(--gx-goldl)", title: `${x.l} ${x.n}명` }));
+  return `<div class="dst gx-dst">
+    <div class="dst-kpi gx-kpis">
+      ${gxKpi({ l: "인원", v: N, u: "명", hero: 1, d: state.dirCell === "all" ? `셀 ${cells.length}개 · 셀당 ${cells.length ? Math.round(N / cells.length * 10) / 10 : 0}명` : esc(cellNameOf(state.dirCell) || "셀 없음") })}
+      ${gxKpi({ l: "평균 나이 (만)", v: avgAge === null ? "—" : avgAge, u: avgAge === null ? "" : "세", ic: "cake", d: `20대 이하 ${a20} · 30대 ${a30} · ${ages.length}명 기준` })}
+      ${gxKpi({ l: "평균 출석률", v: rate === null ? "—" : rate, u: rate === null ? "" : "%", ic: "check", tone: "sage", t: streak ? `연속 결석 ${streak}` : "", dn: 1, d: "최근 3개월 셀 보고" })}
+      ${gxKpi({ l: "새로운 삶 수료", v: pct(nl), u: "%", ic: "cap", d: `${nl}명 · 제자의 삶 ${pct(dl)}% · 인턴 ${interns}명` })}
+    </div>
+    <div class="gx-row gx-r3e">
+      ${gxCard("연령대", `<span class="x">만 나이 · 모름 ${N - ages.length}명</span>`, gxPills(pills, 140, "agebars") + (ages.length ? "" : `<p class="gx-t2" style="margin-top:12px">생년월일(잠긴 칸)을 볼 수 있는 분에게만 나이가 잡혀요</p>`))}
+      ${gxCard("출석률 분포", `<span class="x">최근 3개월 · ${rated.length}명</span>`, `<div class="gx-dside">${gxDonut(rb.map(x => ({ v: x.n, c: x.c })), rate === null ? "—" : rate + "%", "평균", 150, 22)}
+        <div class="gx-klist">${rb.map(x => `<div class="kbar"><i style="background:${x.c}"></i><span>${x.l}</span><b>${x.n}</b></div>`).join("")}<div class="kbar"><i style="background:var(--track)"></i><span>기록 없음</span><b>${noRec}</b></div></div></div>`)}
+      ${gxCard("수료 현황", `<span class="x">${N}명 중</span>`, [["둘 다 마침", both, "var(--gx-lav)"], ["새로운 삶만", onlyN, "var(--gx-gold)"], ["제자의 삶만", onlyD, "var(--gx-blue)"], ["아직", none, "var(--line3)"]].map(([l, n, c]) =>
+        `<div class="dst-tr"><div class="t"><span>${l}</span><b>${n}명 <small>${pct(n)}%</small></b></div><div class="gx-bar2"><i style="width:${pct(n)}%;background:${c}"></i></div></div>`).join(""))}
+    </div>
+    <div class="gx-row ${perCell.length ? "gx-r2b" : ""}">
+      ${perCell.length ? gxCard("셀별 비교", gxLeg([["var(--gx-mocha)", "인원"], ["var(--gx-sage)", "출석률 (최근 3개월)"]]), perCell.map(x => `<div class="ctab">
+          <span class="nm"><b>${esc(x.c.name)}</b><small>${esc(cellLeadName(x.c))}${x.age === null ? "" : ` · 평균 ${x.age}세`}</small></span>
+          <span class="bars"><span class="br"><i style="width:${Math.max(3, x.n / nMax * 80)}%;background:var(--gx-mocha)"></i><b>${x.n}명</b></span>
+            <span class="br"><i style="width:${x.rate === null ? 0 : Math.max(3, x.rate * .8)}%;background:${gxRateTone(x.rate)}"></i><b>${x.rate === null ? "보고 없음" : x.rate + "%"}</b></span></span></div>`).join("")) : ""}
+      ${gxCard("생일", `<span class="chip gold">${mo}월 ${bd(mo).length}명</span>`, `<p class="gx-t2">이번 달 · ${mo}월</p>${bdHTML(mo)}<p class="gx-t2" style="margin-top:14px">다음 달 · ${mo2}월</p>${bdHTML(mo2)}`)}
+    </div>
+    <p class="hint">나이는 노션 명단(잠긴 칸)의 생년월일로 세요 — 그걸 볼 수 있는 분(수퍼 · 진장 · 코치 · 그 셀 셀리더)에게만 나이가 잡혀요.</p>
+  </div>`;
+}
