@@ -1838,6 +1838,68 @@
     font-size:12px;display:flex;align-items:center;justify-content:center;font-family:sans-serif}
   .fontpick .fp-rec{display:inline-flex;align-items:center;height:20px;padding:0 8px;margin-left:4px;border-radius:10px;vertical-align:middle;background:var(--gx-gold-s);color:var(--gx-gold);font-size:calc(11px*var(--fs,1));font-family:"Ssuk",sans-serif}
   @media (max-width:520px){ .fontpick{grid-template-columns:repeat(2,minmax(0,1fr))} .fontpick button{min-height:104px} }
+  /* ═══════════ 43단계 — 셀 칩 밑줄 · 넓은 화면 · 관리 바로 가기 · 훈련 표 ═══════════ */
+  /* 두 줄 칩(셀 이름 + 셀리더) — 밑줄이 이름을 긋지 않게: 밑줄 대신 와인 테두리 */
+  /* 두 줄 칩은 규격 '보통'(44) 높이로 — 40단계의 36 고정이 두 줄을 잘라서 */
+  .seg button:has(small){height:auto !important;min-height:var(--h-m) !important;padding:4px var(--sp-3) !important;flex-direction:column;gap:0 !important;line-height:1.2}
+  .seg button.on:has(small)::after{display:none}
+  .seg button.on:has(small){box-shadow:inset 0 0 0 1.5px var(--brand)}
+  .seg button.on small{color:var(--sub-tx)}
+  .cseg{display:flex;flex-wrap:wrap;margin:0 0 12px;max-width:100%}
+  .cseg button small{display:block;font-size:calc(10.5px*var(--fs,1));color:var(--dim);font-weight:400;line-height:1.2}
+  .cseg button{flex-direction:column;line-height:1.25}
+  @media (min-width:1280px){ #s-train,#s-health,#s-stats,#s-interns,#s-reports,#s-dir{max-width:1640px} }
+  /* 왼쪽 메뉴 — 메뉴 목록만 스크롤, 아래 이름 · 밝기는 늘 보이게 (관리 묶음이 늘어서) */
+  @media (min-width:880px){
+    #sidebar{overflow:hidden !important}
+    #sidebar #side-nav{flex:1 1 auto;min-height:0;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.18) transparent;margin-right:-6px;padding-right:6px}
+    #sidebar .who,#sidebar .side-theme{flex-shrink:0}
+  }
+  @media (min-width:880px) and (max-height:980px){ #sidebar #side-nav button{height:38px !important} #sidebar .side-g{margin-top:10px} }
+  /* 관리 바로 가기 (더보기 맨 위 · 왼쪽 메뉴 '관리') */
+  .adm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;margin:0 0 18px}
+  .adm-grid button{display:flex;align-items:center;gap:12px;min-height:64px;padding:10px 14px;border-radius:14px;border:1px solid var(--line);background:var(--surface);color:var(--text);font:inherit;text-align:left;cursor:pointer}
+  .adm-grid button .gx-ico{width:40px;height:40px}
+  .adm-grid button b{display:block;font-size:calc(14px*var(--fs,1));font-weight:600}
+  .adm-grid button small{display:block;font-size:calc(11.5px*var(--fs,1));color:var(--dim);margin-top:2px;line-height:1.35}
+  /* 훈련 — 표는 카드 폭에 맞추고, 넘치면 안에서 옆으로 (이름 칸은 고정) */
+  .gx-mxwrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -4px;padding:0 4px}
+  .gx-mx table{width:100%;min-width:max-content}
+  .gx-mx th{font-size:calc(11.5px*var(--fs,1));font-weight:500;color:var(--dim);white-space:normal;word-break:keep-all;min-width:56px;max-width:84px;line-height:1.3;vertical-align:bottom}
+  .gx-mx td.nm,.gx-mx th:first-child{position:sticky;left:0;z-index:1;background:var(--surface2)}
+  .gx-mx th:first-child{background:var(--surface)}
+  .gx-mx td.cl{font-size:calc(11px*var(--fs,1));color:var(--dim);white-space:nowrap}
+  .gx-cmp .row3{display:grid;grid-template-columns:minmax(80px,120px) minmax(0,1fr);gap:12px;align-items:center;padding:8px 0;border-top:1px solid var(--line2)}
+  .gx-cmp .row3:first-child{border-top:none}
+  .gx-cmp .bars{display:flex;flex-direction:column;gap:4px}
+  .gx-cmp .br{display:flex;align-items:center;gap:8px;font-size:calc(11px*var(--fs,1));color:var(--dim)}
+  .gx-cmp .br i{display:block;height:8px;border-radius:4px;min-width:3px}
+  .gx-cmp .br span{white-space:nowrap}
+  .gx-next{display:flex;flex-direction:column;gap:0}
+  .gx-next .gx-call{margin-top:10px}
+  .gx-next .gx-call:first-child{margin-top:0}
+  /* 셀 건강 — 전체 한눈에 표 */
+  .hl-all .hr{display:grid;grid-template-columns:minmax(120px,170px) 56px minmax(0,1fr) auto;gap:14px;align-items:center;padding:10px 4px;border-top:1px solid var(--line2);cursor:pointer;background:none;border-left:0;border-right:0;border-bottom:0;width:100%;color:var(--text);font:inherit;text-align:left}
+  .hl-all .hr:first-of-type{border-top:none}
+  .hl-all .hr:hover{background:var(--surface2)}
+  .hl-all .hr .nm b{display:block;font-size:calc(14px*var(--fs,1))}.hl-all .hr .nm small{color:var(--dim);font-size:calc(12px*var(--fs,1))}
+  .hl-all .hr .rt{position:relative;width:56px;height:56px;display:flex;align-items:center;justify-content:center}
+  .hl-all .hr .rt svg{position:absolute;inset:0;width:56px;height:56px}
+  .hl-all .hr .rt b{position:relative;font-size:calc(12px*var(--fs,1))}
+  .hl-all .hr .mid{display:flex;flex-direction:column;gap:6px;min-width:0}
+  .hl-all .hr .mini{display:flex;align-items:flex-end;gap:4px;height:34px}
+  .hl-all .hr .mini i{flex:1;max-width:16px;border-radius:4px;background:var(--gx-sage)}
+  .hl-all .hr .mini i.none{background:none;box-shadow:inset 0 0 0 1.5px var(--line3)}
+  .hl-all .hr .tx{font-size:calc(12px*var(--fs,1));color:var(--dim)}
+  .hl-all .hr .ch{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;max-width:260px}
+  @media (max-width:720px){ .hl-all .hr{grid-template-columns:minmax(0,1fr) 56px} .hl-all .hr .mid,.hl-all .hr .ch{grid-column:1/-1;justify-content:flex-start;max-width:none} }
+  .ro-chip{background:var(--blue-bg,rgba(91,127,166,.14));color:var(--gx-blue)}
+  /* 인턴 화면 — 셀 줄을 눌러 바로 정하기 */
+  .itc.go{cursor:pointer;border-radius:12px}
+  .itc.go:hover{background:var(--surface2)}
+  .itc .chip.btnish{cursor:pointer;border:1px dashed currentColor}
+  /* 셀리더 명단 — 링크 보내기 */
+  .ld-share{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap}
 </style>
 <script>
   /* 27단계 — 화면 밝기: 다크(기본) · 라이트 · 기기 설정 따르기. 깜빡임 없게 그리기 전에 정해요. */
@@ -2075,6 +2137,7 @@
         <div class="seg" id="hl-sort" style="margin:0 0 0 auto">
           <button type="button" data-hs="seq">순서대로</button><button type="button" data-hs="low">자주 빠지는 순</button></div>
       </div>
+      <div class="seg cseg" id="hl-cells" role="tablist" aria-label="어느 셀"></div>
       <div id="hl-body"></div>
       <p class="err" id="hl-err"></p>
       <div style="height:24px"></div>
@@ -2127,11 +2190,11 @@
   <section class="screen" id="s-leaders" hidden>
     <div class="topbar">
       <button class="icon-btn" id="ld-back" aria-label="뒤로"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5m6-6-6 6 6 6"/></svg></button>
-      <h2 style="font-size:calc(17px*var(--fs,1));font-weight:600">셀리더 명단</h2>
+      <h2 style="font-size:calc(17px*var(--fs,1));font-weight:600">셀리더 명단 · 초대</h2>
       <button class="btn-sm" id="btn-ld-org">조직 구성</button>
     </div>
     <div class="scroll pad">
-      <p class="hint" style="margin:0 2px 12px;max-width:760px">셀마다 셀리더와 가입 상태예요. 이메일 칸에 그분의 <b>구글 이메일</b>을 넣고 아래 [초대 보내기]를 누르면,
+      <p class="hint" style="margin:0 2px 12px;max-width:760px">셀마다 셀리더와 가입 상태예요. 이메일 칸에 그분의 <b>구글 이메일</b>을 넣고 아래 [조용히 등록]을 누르면,
         그분이 그 구글 계정으로 로그인할 때 바로 그 셀 셀리더로 들어와요. 셀원 목양 카드도 그때 생기고 노션 명단으로 채워져요.</p>
       <div class="tiles" id="ld-sum"></div>
       <div class="invpref"><span>초대 안내 메일</span><div class="seg mini" role="group" aria-label="초대 안내 메일 기본값">
@@ -2190,7 +2253,7 @@
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg></summary>
             <div class="drawer-in">
               <button class="btn-ghost" id="btn-home-org" hidden>조직 구성</button>
-              <button class="btn-ghost" id="btn-home-leaders" hidden>셀리더 명단</button>
+              <button class="btn-ghost" id="btn-home-leaders" hidden>셀리더 명단 · 초대</button>
               <button class="btn-ghost" id="btn-home-orgchart">조직도</button>
               <button class="btn-ghost" id="btn-home-import" hidden>보고서 가져오기</button>
               <button class="btn-ghost" id="btn-manage" hidden>리더 관리</button>
@@ -2683,6 +2746,8 @@
       <span style="width:44px"></span>
     </div>
     <div class="scroll pad">
+      <div class="seg cseg" id="trn-cells" role="tablist" aria-label="어느 셀"></div>
+      <p class="hint" id="trn-sub" style="margin:2px 2px 12px"></p>
       <div id="train-sum"></div>
     </div>
   </section>
@@ -2757,6 +2822,7 @@
         </div>
       </div>
 
+      <div id="more-admin"></div>
       <div class="wide">
         <div>
           <h3 class="sec-title">보기</h3>
@@ -3039,7 +3105,7 @@
   <div class="seg mini tr-cells" id="tr-cells"></div>
   <div class="tr-list" id="tr-list"></div>
   <p class="err" id="tr-err"></p>
-  <div class="dlg-btns"><button class="btn-ghost" id="tr-cancel">닫기</button><button class="btn" id="tr-save" disabled>저장</button></div>
+  <div class="dlg-btns"><button class="btn-ghost" id="ti-cancel">닫기</button><button class="btn" id="ti-save" disabled>저장</button></div>
 </dialog>
 
 <!-- 명부 등록 · 고치기 -->
@@ -3221,7 +3287,7 @@
   <h3>자기 셀도 맡기</h3>
   <p class="muted" style="margin-bottom:12px" id="ld-sub"></p>
   <div class="field"><label for="ld-cell">맡을 셀</label><select id="ld-cell"></select></div>
-  <p class="err" id="ld-err"></p>
+  <p class="err" id="dl-err"></p>
   <div class="dlg-btns">
     <button class="btn-ghost" id="ld-cancel">취소</button>
     <button class="btn" id="ld-save">저장</button>
