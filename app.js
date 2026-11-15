@@ -26,7 +26,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
 const APP_NAME = "목자의 삶";
-const APP_VERSION = "47.0 (2026-11-15)";
+const APP_VERSION = "48.0 (2026-11-15)";
 /* 35단계 — 버전 표시: v35.0 · 2026.11.12 업데이트 */
 const verNo = () => APP_VERSION.split(" ")[0];
 const verDate = () => (APP_VERSION.match(/\((.*)\)/) || [])[1] || "";
@@ -87,7 +87,7 @@ const SCREENS = ["s-interns","s-help","s-orgchart","s-loading","s-login","s-veri
                  "s-home","s-souls","s-cal","s-meet","s-meeting","s-log","s-soul",
                  "s-edit","s-train","s-search","s-mine","s-usage","s-more","s-manage",
                  "s-photos","s-stats","s-inbox","s-dir","s-cellmgr","s-org","s-consent","s-share",
-                 "s-reports","s-report","s-import","s-leaders","s-health","s-board","s-post"];
+                 "s-reports","s-report","s-import","s-leaders","s-health","s-board","s-post","s-logs"];
 /* 46단계 — 화면을 바꿀 때 자료가 금방 오면(저장본 · 이미 받은 것) '불러오는 중' 화면을 아예 안 보여요.
    0.18초가 넘을 때만 보여 주고, 그때도 왼쪽 메뉴는 그대로 둬요 (화면이 깜빡이지 않게) */
 let loadT = 0, curScreen = "";
@@ -103,6 +103,7 @@ const show = (id) => {
 };
 const showNow = (id, keepSide) => {
   curScreen = id;
+  if (typeof sessScreen === "function") sessScreen(id);
   SCREENS.forEach(s => $(s).hidden = (s !== id));
   if (id !== "s-loading" && typeof bump === "function") bump(id.replace(/^s-/, ""), "screen");
   const sb = $("sidebar");
@@ -896,6 +897,7 @@ async function openHome(opts) {
   $("btn-home-cellmgr").hidden = !isManager();
   $("btn-home-org").hidden = !isSupU(me);
   $("btn-home-import").hidden = !isSupU(me);
+  $("btn-home-logs").hidden = !isOwnerMe();   // 48단계 — 로그는 소유자만
   $("btn-home-leaders").hidden = !isSupU(me);
   renderAdminNav();   // 43단계 — 관리 화면을 왼쪽 메뉴 · 더보기에서 바로
   $("drawer-sub").textContent = [
@@ -909,10 +911,14 @@ async function openHome(opts) {
   homeBackground();
   /* 기기 알림을 눌러 앱이 새로 열렸으면 바로 소식함으로 */
   if (state.openInboxOnStart) { state.openInboxOnStart = false; openInbox(); }
+  else if (state.openPostOnStart) { const p = state.openPostOnStart; state.openPostOnStart = ""; openPost(p); }
+  startSession();   // 48단계 — 접속 기록
 }
 /* 홈이 뜬 뒤 — 명부 정리 · 인계 요청 · 기록(곧 만날 사람 · 1:1). 그 사이 다른 화면으로 가도 괜찮게 */
 async function homeBackground() {
   const onHome = () => !$("s-home").hidden;
+  /* 48단계 — 소유자에게만 '로그' (소유자를 확인한 뒤 관리 메뉴를 다시 그려요) */
+  if (isSupU(state.me)) loadOwner().then(() => { $("btn-home-logs").hidden = !isOwnerMe(); renderAdminNav(); }).catch(() => {});
   try {
     await Promise.all([ensureDirectory(), loadHandovers(), loadBoard().catch(() => {})]);
     if (onHome()) { renderHomeHand(); renderRooms(); }
@@ -4207,6 +4213,7 @@ async function flushUsage() {
   if (P.mins) d.mins = increment(P.mins);
   if (P.loadMs) { d.loadSum = increment(P.loadMs); d.loadN = increment(1); }
   ["screens", "acts", "hours", "errs"].forEach(k => { if (Object.keys(P[k]).length) d[k] = inc(P[k]); });
+  saveSession();   // 48단계 — 접속 기록도 같은 때에
   try {
     /* 더하기(increment)로 올려서 — 먼저 읽을 필요가 없어요 (읽기 한도 아낌) */
     await setDoc(doc(db, "usage", `${uid()}_${todayStr()}`), d, { merge: true });
@@ -4221,14 +4228,15 @@ setInterval(flushUsage, 60000);
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) { if (!usage.loaded) usage.hiddenBoot = true; usage.hiddenAt = Date.now(); flushUsage(); return; }
   /* 30분 넘게 덮어 뒀다가 다시 열면 '한 번 더 연 것'으로 */
-  if (usage.hiddenAt && Date.now() - usage.hiddenAt > 30 * 60000) { usage.opens++; usage.dirty = true; }
+  if (usage.hiddenAt && Date.now() - usage.hiddenAt > 30 * 60000) { usage.opens++; usage.dirty = true; state.sess = null; startSession(); }
   usage.lastAct = Date.now();
 });
 window.addEventListener("pagehide", flushUsage);
 
 /* ── 수퍼 관리자용 화면 (33단계 — 개발 개선을 위한 사용 현황) ── */
-const SCREEN_NAME = { interns:"인턴 · 후보", home:"홈", souls:"영혼들", cal:"캘린더", meet:"셀모임", more:"더보기",
-  soul:"영혼 카드", log:"만남 기록", meeting:"셀모임 입력", train:"훈련 현황",
+const SCREEN_NAME = { interns:"인턴 · 후보", home:"홈", souls:"영혼들", cal:"캘린더", meet:"셀 보고", more:"더보기",
+  board:"게시판", post:"게시글", logs:"로그",
+  soul:"영혼 카드", log:"만남 기록", meeting:"셀 보고 쓰기", train:"훈련 현황",
   search:"기록 검색", manage:"리더 관리", usage:"사용 현황", edit:"영혼 수정",
   dir:"교회 명부", cellmgr:"셀 관리", org:"조직 구성", inbox:"소식", photos:"사진 모아보기", stats:"활동 통계", mine:"내 카드",
   help:"도우미", orgchart:"조직도", health:"셀 건강", reports:"셀 보고 모아보기", report:"셀 보고 보기", import:"보고서 가져오기",
@@ -5258,6 +5266,12 @@ async function backfillThumbs() {
    올릴 때마다 version.json 도 같이 올립니다. 앱은 열 때 · 다시 볼 때 · 10분마다
    그 파일만 살짝 확인해서(아주 작은 파일), 지금 버전보다 새것이면 위에 알림을 띄웁니다. */
 const CHANGELOG = [
+  { v:"48.0", d:"2026-11-15", items:[
+    "알림 설정 새로 — 쪽지 · 셀 보고 댓글 · 모임 · 기록 댓글 · 게시판 글 댓글 · 셀 보고 쓸 때 · 게시판 새 글(모두 · 공지만 · 끄기) · 일정 미리(10분 ~ 하루 전)",
+    "앱이 닫혀 있어도 알림 — 폰 · 컴퓨터마다 [이 기기에서 받기] (아이폰은 홈 화면 앱) · [시험 알림]",
+    "잠금 화면에는 기본으로 내용 없이 ('새 쪽지가 왔어요') · 조용한 시간(밤 10시 ~ 아침 7시)에는 아침에 모아서",
+    "로그(소유자만) — 접속 기록(들어온 · 나간 시각 · 머문 시간 · 본 화면 순서) · 활동 · 오류, 사람 · 기간 · 찾기 · CSV",
+    "접속 기록은 180일이 지나면 저절로 지워져요 · 적은 글 내용 · 위치는 남기지 않아요" ] },
   { v:"47.0", d:"2026-11-15", items:[
     "셀 보고 댓글 · 반응 — 셀 보고 모아보기에서 보고마다 🙏 기도할게요 · 👏 수고했어요 · 댓글 (같은 진 셀리더 · 코치 · 진장)",
     "내 셀 보고에 댓글이 달리면 소식으로 · 홈 카드 · 셀 보고 화면에 '셀 보고 댓글 n'",
@@ -5639,7 +5653,7 @@ $("cmt-send").onclick = async () => {
     const where_ = t.kind === "meeting" ? { kind:"meeting", id:t.id } : { kind:"record", soulId:t.soulId, recId:t.recId };
     for (const u of to) {
       if (!u || !(state.members||[]).some(m=>m.id===u)) continue;   // 같은 진 사람에게만
-      try { await addDoc(collection(db,"notices"), { to:u, from:uid(), fromName:state.me.name||"",
+      try { await addNotice({ to:u, from:uid(), fromName:state.me.name||"",
         kind:"comment", target:where_, title:t.title, snippet:body.slice(0,80),
         atMs:Date.now(), at:serverTimestamp(), read:false }); } catch {}
     }
@@ -5703,6 +5717,7 @@ $("th-send").onclick = async () => {
     const row = { from:uid(), to, fromName:state.me.name||"", toName:memberName(to), body,
       atMs:Date.now(), at:serverTimestamp(), read:false };
     const ref = await addDoc(collection(db,"messages"), row);
+    pushNotify("dm", ref.id);   // 48단계 — 앱이 닫혀 있어도 (받는 사람이 켰을 때만)
     (state.msgs = state.msgs || []).push({ id:ref.id, ...row });
     $("th-body").value = ""; $("th-pick-wrap").hidden = true;
     $("th-title").textContent = `${memberName(to)} 님과 쪽지`;
@@ -5806,7 +5821,9 @@ $("btn-bell").onclick = () => openInbox();
 
 /* ════════ 알림 설정 · 안 읽은 수 ════════
    새 소식은 앱이 열려 있는 동안 실시간으로 받습니다(읽지 않은 것만 지켜봄 — 읽기 횟수가 적어요). */
-const notifyPrefs = () => ({ comment:true, dm:true, device:false, plan:true, ...((state.me && state.me.notifyPrefs) || {}) });
+/* 48단계 — 알림 설정 (서버 함수의 DEF 와 같아야 해요) */
+const notifyPrefs = () => ({ comment:true, dm:true, repcmt:true, postcmt:true, board:"notice", calMin:60, nudge:true,
+  device:false, preview:false, quiet:true, plan:true, ...((state.me && state.me.notifyPrefs) || {}) });
 function startLive() {
   if (state.liveOn || !state.me) return;
   state.liveOn = true;
@@ -5840,10 +5857,13 @@ function renderBadges() {
 }
 function alertNew(kind, r) {
   const P = notifyPrefs();
-  if ((kind === "notice" && !P.comment) || (kind === "dm" && !P.dm)) return;
+  const nk = kind === "dm" ? "dm" : r.kind === "repcmt" ? "repcmt" : r.kind === "postcmt" ? "postcmt" : "comment";
+  if (P[nk] === false) return;
   const title = kind === "dm" ? `${r.fromName||""} 님의 쪽지`
     : r.kind === "ticket" ? `${r.fromName||"관리자"} — 문의에 답이 왔어요`
-    : (r.kind === "handover" || r.kind === "report") ? `${r.fromName||""} 님 — ${r.title||"셀 관리"}` : `${r.fromName||""} 님이 댓글을 남겼어요`;
+    : (r.kind === "handover" || r.kind === "report") ? `${r.fromName||""} 님 — ${r.title||"셀 관리"}`
+    : r.kind === "repcmt" ? `${r.fromName||""} 님이 셀 보고에 댓글을 남겼어요` : r.kind === "postcmt" ? `${r.fromName||""} 님이 게시판 글에 댓글을 남겼어요`
+    : `${r.fromName||""} 님이 댓글을 남겼어요`;
   const body = kind === "dm" ? (r.body||"").slice(0,80) : `${r.title||""} — ${r.snippet||""}`;
   toast(`${title} · ${body.slice(0,40)}`);
   if (P.device && document.hidden && "Notification" in window && Notification.permission === "granted") {
@@ -5855,31 +5875,13 @@ function alertNew(kind, r) {
 }
 if (navigator.serviceWorker) navigator.serviceWorker.addEventListener("message", (ev) => {
   if (ev.data && ev.data.type === "open-inbox" && state.me) openInbox();
+  if (ev.data && ev.data.type === "open-post" && state.me && ev.data.id) openPost(ev.data.id);
 });
 if (location.hash === "#inbox") state.openInboxOnStart = true;
+if (/^#post-[A-Za-z0-9_-]+$/.test(location.hash)) state.openPostOnStart = location.hash.slice(6);
 const dlgNt = $("dlg-notify");
-$("btn-notify-set").onclick = () => {
-  const P = notifyPrefs();
-  $("nt-comment").checked = P.comment; $("nt-dm").checked = P.dm; $("nt-device").checked = P.device;
-  $("nt-plan").checked = P.plan !== false;
-  $("nt-err").textContent = "";
-  if (!("Notification" in window)) { $("nt-device").disabled = true;
-    $("nt-device-hint").textContent = "이 브라우저는 기기 알림을 지원하지 않아요. 아이폰은 홈 화면에 추가한 앱에서만 돼요."; }
-  dlgNt.showModal();
-};
-$("nt-cancel").onclick = () => dlgNt.close();
-$("nt-save").onclick = async () => {
-  const p = { comment:$("nt-comment").checked, dm:$("nt-dm").checked, device:$("nt-device").checked, plan:$("nt-plan").checked };
-  if (p.device && "Notification" in window && Notification.permission !== "granted") {
-    try { const r = await Notification.requestPermission();
-      if (r !== "granted") { p.device = false; $("nt-err").textContent = "기기 알림이 허용되지 않았어요. 브라우저 설정에서 허용한 뒤 다시 켜주세요."; } }
-    catch { p.device = false; }
-  }
-  try { await updateDoc(doc(db,"users",state.me.id), { notifyPrefs: p }); state.me.notifyPrefs = p;
-        planAlarms();
-        if (!$("nt-err").textContent) { dlgNt.close(); toast("알림 설정을 저장했어요."); } }
-  catch (e) { $("nt-err").textContent = msgOf(e); }
-};
+$("btn-notify-set").onclick = () => openNotifySet();
+/* 48단계 — 알림 설정은 맨 아래 48단계 묶음 (openNotifySet) */
 
 /* ════════ 코치가 자기 셀도 맡기 (셀리더 + 코치) ════════ */
 const dlgLead=$("dlg-lead");
@@ -6656,7 +6658,7 @@ async function makeHandover(h) {
   const r = { id: ref.id, ...row };
   state.handovers = [r, ...(state.handovers||[])];
   if (h.fromUid !== uid()) {
-    try { await addDoc(collection(db,"notices"), { to: h.fromUid, from: uid(), fromName: state.me.name || "",
+    try { await addNotice({ to: h.fromUid, from: uid(), fromName: state.me.name || "",
       kind: "handover", target: { kind: "handover", id: ref.id, fromUid: h.fromUid }, title: handTitle(r),
       snippet: `목양 카드를 ${userName(h.toUid)} 님에게 넘겨주세요 — 앱을 열면 홈 맨 위에 떠요.`,
       atMs: Date.now(), at: serverTimestamp(), read: false }); } catch {}
@@ -6763,7 +6765,7 @@ $("hr-go").onclick = async () => {
     h.status = "done";
     for (const to of new Set([h.by, h.toUid])) {
       if (!to || to === uid()) continue;
-      try { await addDoc(collection(db,"notices"), { to, from: uid(), fromName: state.me.name || "", kind: "handover",
+      try { await addNotice({ to, from: uid(), fromName: state.me.name || "", kind: "handover",
         target: { kind: "handover", id: h.id }, title: handTitle(h), snippet: `목양 카드 ${n}장을 ${userName(h.toUid)} 님에게 넘겼어요.`,
         atMs: Date.now(), at: serverTimestamp(), read: false }); } catch {}
     }
@@ -7018,7 +7020,7 @@ async function forceHandover(h) {
     }
     await updateDoc(doc(db,"handovers",h.id), { status: "forced", doneAt: serverTimestamp(), doneBy: uid() });
     h.status = "forced";
-    try { await addDoc(collection(db,"notices"), { to: h.toUid, from: uid(), fromName: state.me.name || "", kind: "handover",
+    try { await addNotice({ to: h.toUid, from: uid(), fromName: state.me.name || "", kind: "handover",
       target: { kind: "handover", id: h.id }, title: handTitle(h), snippet: `목양 카드 ${n}장이 넘어왔어요.`,
       atMs: Date.now(), at: serverTimestamp(), read: false }); } catch {}
     await log("인계 바로 넘김", handTitle(h), `${n}장`);
@@ -7569,7 +7571,7 @@ function overseers(cellId, jinId) {
 }
 async function sendNotices(toList, payload) {
   for (const to of toList) {
-    try { await addDoc(collection(db, "notices"), { to, from: uid(), fromName: state.me.name || "",
+    try { await addNotice({ to, from: uid(), fromName: state.me.name || "",
       ...payload, atMs: Date.now(), at: serverTimestamp(), read: false }); } catch {}
   }
 }
@@ -7674,10 +7676,12 @@ function upcomingPlans() {
 }
 function planAlarms() {
   (state.alarmT || []).forEach(clearTimeout); state.alarmT = [];
-  if (notifyPrefs().plan === false) return;
+  const CM = Number(notifyPrefs().calMin) || 0;
+  syncPushQueue().catch(e => console.warn("알림 예약", e));   // 48단계 — 앱이 닫혀 있어도 (서버가 5분마다)
+  if (notifyPrefs().plan === false || !CM) return;
   const now = Date.now();
   upcomingPlans().forEach(e => {
-    const fire = e.at.getTime() - 60 * 60 * 1000, wait = fire - now;
+    const fire = e.at.getTime() - CM * 60 * 1000, wait = fire - now;
     if (wait < -10 * 60 * 1000 || wait > 24 * 60 * 60 * 1000) return;   // 지났거나 하루보다 멀면
     state.alarmT.push(setTimeout(() => remindPlan(e), Math.max(wait, 0)));
   });
@@ -7686,7 +7690,8 @@ function remindPlan(e) {
   const seen = (() => { try { return JSON.parse(localStorage.getItem("mokja-reminded") || "{}"); } catch { return {}; } })();
   const id = e.key + "@" + e.at.getTime(); if (seen[id]) return;
   seen[id] = 1; try { localStorage.setItem("mokja-reminded", JSON.stringify(seen)); } catch {}
-  const title = `1시간 뒤 — ${e.title}`, body = `${fmtTime(`${pad2(e.at.getHours())}:${pad2(e.at.getMinutes())}`)}${e.place ? " · " + e.place : ""}`;
+  const CM = Number(notifyPrefs().calMin) || 60;
+  const title = `${CM >= 1440 ? "내일" : CM >= 60 ? CM / 60 + "시간 뒤" : CM + "분 뒤"} — ${e.title}`, body = `${fmtTime(`${pad2(e.at.getHours())}:${pad2(e.at.getMinutes())}`)}${e.place ? " · " + e.place : ""}`;
   toast(`${title} · ${body}`);
   if (notifyPrefs().device && "Notification" in window && Notification.permission === "granted") {
     (navigator.serviceWorker ? navigator.serviceWorker.getRegistration() : Promise.resolve(null))
@@ -8231,6 +8236,7 @@ function openImport() {
   show("s-import");
 }
 $("btn-home-import").onclick = () => openImport();
+$("btn-home-logs").onclick = () => openLogs();
 $("imp-back").onclick = () => openHome();
 $("imp-file").onchange = async () => {
   const f = $("imp-file").files[0]; $("imp-err").textContent = "";
@@ -10062,6 +10068,7 @@ function helpFaq() {
     ["인턴 후보는 누가 보나요?", `그 셀 셀리더 · 그 셀 코치 · 진장 · 소유자만. 후보 본인과 다른 셀리더에게는 보이지 않고, 명부에도 넘어가지 않아요.`],
     ["초대 메일 없이 등록만 하고 싶어요", `이제 기본이 조용히 등록이에요. 셀리더 명단(왼쪽 메뉴 '관리' › 셀리더 명단 · 초대)에서 이메일을 넣고 ${kb("", "조용히 등록")} → 알릴 때 그 카드의 ${kb("", "링크 보내기")}를 누르면 안내 글이 복사돼요(폰은 카톡 · 문자 고르기).`],
     ["셀리더 이메일을 잘못 넣었어요 · 바뀌었어요", `가입 전이면 셀리더 명단의 그 카드에서 ${kb("", "고치기")} → 이메일을 고치고 ${kb("", "저장")}. 새 이메일로 같은 자리가 다시 걸리고 옛 등록은 지워져요(아무것도 보내지 않음). 이미 가입한 분은 이메일이 곧 로그인하는 구글 계정이라, 다른 구글 계정으로 옮기려면 수퍼 관리자에게 문의해 주세요.`],
+    ["앱을 닫아도 알림이 오게 하려면?", `더보기 › 알림 설정 › [이 기기에서 받기]를 폰 · 컴퓨터마다 한 번씩 눌러요. 아이폰은 사파리 › 공유 › '홈 화면에 추가'한 앱에서만 돼요. [시험 알림]으로 확인해 보세요. 잠금 화면에는 기본으로 내용이 보이지 않고, 밤 10시 ~ 아침 7시에는 모았다가 아침에 와요.`],
     ["게시판에는 무엇을 올려요?", `공지 · 나눔 · 자료를 올려요. '교회 전체' 또는 '우리 진만' 볼 수 있게 고를 수 있고, 링크 5개 · 사진 4장까지 넣을 수 있어요. 영혼의 개인 이야기 · 기도 내용은 여러 사람이 보는 게시판 말고 영혼 카드에 적어 주세요. 공지는 수퍼 관리자 · 진장 · 교역자가 써요.`],
     ["셀 보고는 어디서 써요?", `홈 맨 위 '이번 주 셀 보고' 카드의 [셀 보고 쓰기]를 누르면 돼요. 어느 화면에서든 컴퓨터는 왼쪽 메뉴 맨 위 [＋ 기록 쓰기], 폰은 아래 가운데 ＋ 를 누르고 '셀 보고'를 골라도 돼요. 모임이 없던 주는 카드의 '이번 주는 모임이 없었어요'를 눌러 두세요.`],
     ["한 사람이 여러 직책을 맡아요 (겸직)", `모든 직책을 겸할 수 있어요. 조직 구성에서 그 자리에 이미 가입한 분을 고르면 원래 직책은 그대로 남고 새 직책이 더해져요 — 담당 교역자 · 수퍼 관리자도 마찬가지(수퍼는 소유자만 세워요). 겸직한 분은 맡은 모든 직책의 화면을 함께 쓰고, 교역자로 맡은 진에서는 '교역자에게 보이기'로 공유된 것만 봐요.`],
@@ -10861,7 +10868,7 @@ async function tkReply() {
                    : { replies, updatedAtMs: Date.now(), unreadSuper: true, unreadMe: false };
     await updateDoc(doc(db, "tickets", t.id), up); Object.assign(t, up);
     if (sup && t.uid !== uid()) {
-      try { await addDoc(collection(db, "notices"), { from: uid(), to: t.uid, fromName: `관리자 ${state.me.name || ""}`.trim(), kind: "ticket",
+      try { await addNotice({ from: uid(), to: t.uid, fromName: `관리자 ${state.me.name || ""}`.trim(), kind: "ticket",
         title: t.title, snippet: text.slice(0, 80), target: { kind: "ticket", id: t.id }, read: false, atMs: Date.now(), at: serverTimestamp() }); } catch {}
     }
     bump("ticketReply"); renderTickets();
@@ -10872,7 +10879,7 @@ async function tkSetStatus(st) {
   try { await updateDoc(doc(db, "tickets", t.id), { status: st, updatedAtMs: Date.now(), unreadMe: t.uid !== uid() ? true : t.unreadMe });
     t.status = st; if (t.uid !== uid()) t.unreadMe = true;
     if (t.uid !== uid() && ["doing", "done", "hold"].includes(st)) {
-      try { await addDoc(collection(db, "notices"), { from: uid(), to: t.uid, fromName: `관리자 ${state.me.name || ""}`.trim(), kind: "ticket",
+      try { await addNotice({ from: uid(), to: t.uid, fromName: `관리자 ${state.me.name || ""}`.trim(), kind: "ticket",
         title: t.title, snippet: `상태: ${TK_ST[st][0]}`, target: { kind: "ticket", id: t.id }, read: false, atMs: Date.now(), at: serverTimestamp() }); } catch {}
     }
     renderTickets();
@@ -11600,7 +11607,8 @@ const ADM = [
   { k: "manage", t: "리더 관리", s: "역할 · 계정 · 맡은 셀", ic: "manage", btn: "btn-manage" },
   { k: "orgchart", t: "조직도", s: "진 · 코치 · 셀 한눈에", ic: "orgchart", btn: "btn-home-orgchart" },
   { k: "usage", t: "사용 현황", s: "누가 얼마나 쓰나 · 문의 · 제안", ic: "usage", btn: "btn-go-usage" },
-  { k: "import", t: "보고서 가져오기", s: "노션 셀 보고 옮기기", ic: "imp", btn: "btn-home-import" }];
+  { k: "import", t: "보고서 가져오기", s: "노션 셀 보고 옮기기", ic: "imp", btn: "btn-home-import" },
+  { k: "logs", t: "로그", s: "접속 기록 · 활동 · 오류 (소유자만)", ic: "usage", btn: "btn-home-logs" }];
 function admVisible() {
   return ADM.filter(a => { const b = document.getElementById(a.btn); return b && !b.hidden && (a.k !== "orgchart" || ["super", "jinjang", "coach", "pastor"].includes(state.me.role)); });
 }
@@ -12307,7 +12315,7 @@ document.addEventListener("click", async (ev) => {
       for (const u of to) {
         const m = (state.members || []).find(x => x.id === u);
         if (!u || !m || m.jinId !== state.me.jinId) continue;   // 같은 진 사람에게만 (규칙과 같게)
-        try { await addDoc(collection(db, "notices"), { to: u, from: uid(), fromName: state.me.name || "", kind: T.nkind, target: T.ntarget,
+        try { await addNotice({ to: u, from: uid(), fromName: state.me.name || "", kind: T.nkind, target: T.ntarget,
           title: T.title, snippet: body.slice(0, 80), atMs: Date.now(), at: serverTimestamp(), read: false }); } catch {}
       }
       paintTalk(id); bump("comment");
@@ -12514,6 +12522,7 @@ $("pe-save").onclick = async () => {
         links: BD.links, th, imgN: keep.length, pinned: false, hidden: false, cmtN: 0, atMs: Date.now(), at: serverTimestamp() };
       const ref = await addDoc(collection(db, "board"), row);
       await Promise.all(keep.map((m, i) => setDoc(doc(db, "board", ref.id, "imgs", String(i)), { d: m.d })));
+      pushNotify("post", ref.id);
       state.board = [{ id: ref.id, ...row }, ...(state.board || [])];
       $("dlg-post").close(); toast("올렸어요."); bump("post"); openPost(ref.id);
     }
@@ -12523,3 +12532,228 @@ $("pe-save").onclick = async () => {
 
 document.addEventListener("click", (ev) => { const b = ev.target.closest("[data-reptalk]"); if (b) openReportById(b.dataset.reptalk); });
 $("btn-m-repcmt").onclick = () => { if (state.meeting && state.meeting.id) openReportById(state.meeting.id); };
+
+
+/* ════════ 48단계 — 알림 · 접속 기록 · 로그 ════════ */
+/* ── 소식을 남기면 서버에 '알려 주세요' (받는 사람이 켠 알림만 · 서버가 직접 확인) ── */
+async function addNotice(row) {
+  const ref = await addDoc(collection(db, "notices"), row);
+  pushNotify("notice", ref.id);
+  return ref;
+}
+async function pushCfg() {
+  if (state.pushCfg) return state.pushCfg;
+  const [g, p] = await Promise.all([getDoc(doc(db, "config", "gcal")).catch(() => null), getDoc(doc(db, "config", "push")).catch(() => null)]);
+  state.pushCfg = { url: (g && g.exists() && g.data().url) || "", vapid: (p && p.exists() && p.data().vapid) || "" };
+  return state.pushCfg;
+}
+async function srvCall(action, body) {
+  const c = await pushCfg(); if (!c.url) throw new Error("서버 주소가 아직 없어요 (캘린더 › 실시간 서버 연결 설정).");
+  const t = await auth.currentUser.getIdToken();
+  const r = await fetch(c.url, { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + t }, body: JSON.stringify({ action, ...body }) });
+  const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(`알림 서버 ${r.status}${j.error ? " · " + j.error : ""}`); return j;
+}
+function pushNotify(kind, id) {
+  pushCfg().then(c => { if (c.url && c.vapid) return srvCall("notify", { kind, id }); }).catch(e => console.warn("알림 보내기", e.message));
+}
+/* ── 이 기기에서 받기 (앱이 닫혀 있어도) ── */
+const MSG_URL = "https://www.gstatic.com/firebasejs/11.0.2/firebase-messaging.js";
+const tokKey = (t) => { let h = 0; for (let i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) | 0; return "d" + (h >>> 0).toString(36); };
+async function pushEnable() {
+  const c = await pushCfg();
+  if (!c.vapid || !c.url) throw new Error("관리자가 아직 알림 열쇠(웹 푸시 인증서)를 넣지 않았어요.");
+  if (!("Notification" in window) || !navigator.serviceWorker) throw new Error("이 브라우저는 알림을 받을 수 없어요. 아이폰은 홈 화면에 추가한 앱에서 돼요.");
+  const M = await import(MSG_URL);
+  if (!(await M.isSupported())) throw new Error("이 기기 · 브라우저는 닫혀 있을 때 알림을 못 받아요. 아이폰은 홈 화면에 추가한 앱(iOS 16.4+)에서 돼요.");
+  const perm = await Notification.requestPermission();
+  if (perm !== "granted") throw new Error("알림이 허용되지 않았어요. 브라우저 · 기기 설정에서 허용한 뒤 다시 눌러 주세요.");
+  const reg = await navigator.serviceWorker.ready;
+  const t = await M.getToken(M.getMessaging(fb), { vapidKey: c.vapid, serviceWorkerRegistration: reg });
+  if (!t) throw new Error("기기 등록을 못 했어요. 잠시 뒤 다시 눌러 주세요.");
+  const k = tokKey(t), ref = doc(db, "pushTokens", uid()), cur = ((await getDoc(ref).catch(() => null)) || { data: () => null }).data() || {};
+  const tokens = { ...(cur.tokens || {}), [k]: { t, d: deviceKind(), at: Date.now() } };
+  const keys = Object.keys(tokens).sort((a, b) => tokens[b].at - tokens[a].at).slice(0, 8);
+  await setDoc(ref, { tokens: Object.fromEntries(keys.map(x => [x, tokens[x]])), at: Date.now() });
+  lsSet("mokja-push-key", k); syncPushQueue().catch(() => {});
+  return k;
+}
+async function pushDisable() {
+  const k = lsGet("mokja-push-key"); if (!k) return;
+  const ref = doc(db, "pushTokens", uid()), cur = ((await getDoc(ref).catch(() => null)) || { data: () => null }).data() || {};
+  const tokens = { ...(cur.tokens || {}) }; delete tokens[k];
+  await setDoc(ref, { tokens, at: Date.now() });
+  try { const M = await import(MSG_URL); await M.deleteToken(M.getMessaging(fb)); } catch {}
+  lsSet("mokja-push-key", null);
+}
+/* ── 알림 설정 창 ── */
+function openNotifySet() {
+  const P = notifyPrefs(), on = !!lsGet("mokja-push-key");
+  const chk = (id, v) => { $(id).checked = !!v; };
+  chk("nt-dm", P.dm); chk("nt-repcmt", P.repcmt); chk("nt-comment", P.comment); chk("nt-postcmt", P.postcmt); chk("nt-nudge", P.nudge);
+  chk("nt-device", P.device); chk("nt-preview", P.preview); chk("nt-quiet", P.quiet !== false);
+  $("nt-board").innerHTML = [["all", "새 글 모두"], ["notice", "공지만"], ["off", "끄기"]].map(([k, l]) => `<button type="button" data-ntb="${k}" class="${P.board === k ? "on" : ""}">${l}</button>`).join("");
+  $("nt-cal").innerHTML = [[10, "10분 전"], [30, "30분 전"], [60, "1시간 전"], [1440, "하루 전"], [0, "끄기"]].map(([k, l]) => `<button type="button" data-ntc="${k}" class="${Number(P.calMin) === k ? "on" : ""}">${l}</button>`).join("");
+  $("nt-push-st").textContent = on ? "이 기기는 받고 있어요" : "이 기기는 아직 안 받아요";
+  $("nt-push-st").className = "chip " + (on ? "ok" : "");
+  $("nt-push-on").hidden = on; $("nt-push-off").hidden = !on; $("nt-push-test").hidden = !on;
+  $("nt-err").textContent = "";
+  $("nt-admin").hidden = !isSupU(state.me);
+  if (isSupU(state.me)) pushCfg().then(c => { $("nt-vapid").value = c.vapid || ""; $("nt-srv").textContent = c.url ? "서버 주소: " + c.url : "서버 주소가 아직 없어요 — 캘린더 › 실시간 서버 연결 설정에서 넣어요."; });
+  dlgNt.showModal();
+}
+$("dlg-notify").addEventListener("click", (ev) => {
+  const b = ev.target.closest("[data-ntb]"); if (b) { $("nt-board").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); return; }
+  const c = ev.target.closest("[data-ntc]"); if (c) { $("nt-cal").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === c)); return; }
+});
+$("nt-cancel").onclick = () => dlgNt.close();
+$("nt-push-on").onclick = async () => {
+  $("nt-err").textContent = "이 기기를 등록하는 중…"; $("nt-push-on").disabled = true;
+  try { await pushEnable(); $("nt-err").textContent = ""; toast("이 기기에서 알림을 받아요."); openNotifySet(); }
+  catch (e) { $("nt-err").textContent = msgOf(e); } finally { $("nt-push-on").disabled = false; }
+};
+$("nt-push-off").onclick = async () => { try { await pushDisable(); toast("이 기기는 이제 알림을 안 받아요."); openNotifySet(); } catch (e) { $("nt-err").textContent = msgOf(e); } };
+$("nt-push-test").onclick = async () => {
+  $("nt-err").textContent = "보내는 중…";
+  try { const r = await srvCall("notify", { kind: "test" }); $("nt-err").textContent = r.sent ? "보냈어요 — 알림이 오는지 봐 주세요." : "등록된 기기가 없어요. [이 기기에서 받기]를 먼저 눌러 주세요."; }
+  catch (e) { $("nt-err").textContent = msgOf(e); }
+};
+$("nt-vapid-save").onclick = async () => {
+  const v = $("nt-vapid").value.trim();
+  if (v && !/^[A-Za-z0-9_-]{60,200}$/.test(v)) { $("nt-err").textContent = "웹 푸시 인증서(공개 키)는 B로 시작하는 긴 글자예요."; return; }
+  try { await setDoc(doc(db, "config", "push"), { vapid: v }); state.pushCfg = null; toast("저장했어요."); }
+  catch (e) { $("nt-err").textContent = msgOf(e); }
+};
+$("nt-save").onclick = async () => {
+  const p = { dm: $("nt-dm").checked, repcmt: $("nt-repcmt").checked, comment: $("nt-comment").checked, postcmt: $("nt-postcmt").checked,
+    nudge: $("nt-nudge").checked, device: $("nt-device").checked, preview: $("nt-preview").checked, quiet: $("nt-quiet").checked,
+    board: ($("nt-board").querySelector(".on") || {}).dataset?.ntb || "notice", calMin: Number(($("nt-cal").querySelector(".on") || {}).dataset?.ntc ?? 60) };
+  p.plan = p.calMin > 0; $("nt-err").textContent = "";
+  if (p.device && "Notification" in window && Notification.permission !== "granted") {
+    try { const r = await Notification.requestPermission(); if (r !== "granted") { p.device = false; $("nt-err").textContent = "기기 알림이 허용되지 않았어요. 브라우저 설정에서 허용한 뒤 다시 켜 주세요."; } }
+    catch { p.device = false; }
+  }
+  try { await updateDoc(doc(db, "users", state.me.id), { notifyPrefs: p }); state.me.notifyPrefs = p; planAlarms();
+        if (!$("nt-err").textContent) { dlgNt.close(); toast("알림 설정을 저장했어요."); } }
+  catch (e) { $("nt-err").textContent = msgOf(e); }
+};
+
+/* ── 서버에 맡기는 예약 알림 (일정 미리 · 셀 보고 쓸 때) — 내 기기가 하나라도 등록돼 있을 때만 ── */
+async function syncPushQueue() {
+  if (!state.me || !canLead()) return;
+  const T = ((await getDoc(doc(db, "pushTokens", uid())).catch(() => null)) || { data: () => null }).data();
+  const has = T && Object.keys(T.tokens || {}).length;
+  const P = notifyPrefs(), now = Date.now(), want = {};
+  if (has) {
+    const CM = Number(P.calMin) || 0;
+    if (CM) upcomingPlans().forEach(e => {
+      const at = e.at.getTime() - CM * 60000; if (at < now || at > now + 14 * 86400000) return;
+      const hm = `${pad2(e.at.getHours())}:${pad2(e.at.getMinutes())}`;
+      const k = `${uid()}_p${tokKey(e.key + "@" + e.at.getTime())}`;
+      want[k] = { uid: uid(), at, kind: "plan", title: P.preview ? `곧 — ${String(e.title || "").slice(0, 60)}` : "곧 일정이 있어요",
+        body: `${fmtTime(hm)}${P.preview && e.place ? " · " + String(e.place).slice(0, 40) : ""}`, due: "", cellId: "" };
+    });
+    if (P.nudge !== false) ledCells().forEach(c => {
+      const p = reportPlan(c.id); if (!p.due || ["done", "saved", "skip", "first"].includes(p.st)) return;
+      const at = dOf(addDays(p.due, 1)).getTime() + 20 * 3600000; if (at < now) return;
+      want[`${uid()}_n${c.id}`] = { uid: uid(), at, kind: "nudge", title: "셀 보고를 써 주세요", body: `${fmtDate(p.due)}(${wdOf(p.due)}) 셀모임 이야기를 남겨 주세요`, due: p.due, cellId: c.id };
+    });
+  }
+  const mine = pack(await getDocs(query(collection(db, "pushQueue"), where("uid", "==", uid()))));
+  for (const m of mine) if (!want[m.id] && m.kind !== "queued") await deleteDoc(doc(db, "pushQueue", m.id)).catch(() => {});
+  for (const [k, v] of Object.entries(want)) {
+    const o = mine.find(m => m.id === k);
+    if (!o || o.at !== v.at || o.title !== v.title || o.body !== v.body) await setDoc(doc(db, "pushQueue", k), v).catch(e => console.warn("알림 예약", e.message));
+  }
+}
+
+/* ── 접속 기록 — 들어온 시각 · 나간 시각 · 머문 시간 · 본 화면 순서 (글 내용은 남기지 않아요) ── */
+function startSession() {
+  if (!state.me || state.sess) return;
+  const t = Date.now(); state.sess = { id: `${uid()}_${t}`, start: t, screens: [], dirty: true };
+  if (curScreen && !NO_APP.includes(curScreen)) state.sess.screens.push(curScreen.replace(/^s-/, ""));
+}
+function sessScreen(id) {
+  const S = state.sess; if (!S || ["s-loading"].includes(id)) return;
+  const k = id.replace(/^s-/, ""); if (S.screens[S.screens.length - 1] === k) return;
+  if (S.screens.length < 60) S.screens.push(k); S.dirty = true;
+}
+function saveSession() {
+  const S = state.sess; if (!S || !state.me) return;
+  const E = envInfo(), end = Date.now();
+  setDoc(doc(db, "sessions", S.id), { uid: uid(), name: (state.me.name || "").slice(0, 40), role: state.me.role || "", start: S.start, end,
+    dur: Math.round((end - S.start) / 1000), device: deviceKind(), ver: verNo(), os: E.os || "", br: E.br || "", pwa: !!E.pwa, screens: S.screens.slice(0, 60) })
+    .then(() => { S.dirty = false; }).catch(() => {});
+}
+
+/* ── 로그 (소유자만) — 접속 기록 · 활동 · 오류 ── */
+const LG = { tab: "sess", days: 30, who: "", q: "" };
+async function openLogs() {
+  if (!isOwnerMe()) { toast("로그는 소유자만 볼 수 있어요."); return; }
+  show("s-loading"); markSide("adm-logs");
+  await loadOrg(); await flushUsage();
+  await loadLogs(); renderLogs(); show("s-logs");
+}
+async function loadLogs(force) {
+  const from = Date.now() - LG.days * 86400000, fromD = plusDays(-(LG.days - 1)), key = LG.days;
+  if (!force && LG.key === key) return;
+  const [ss, au, us] = await Promise.all([
+    getDocs(query(collection(db, "sessions"), where("start", ">=", from))).then(pack).catch(e => { toast(msgOf(e)); return []; }),
+    getDocs(collection(db, "audit")).then(pack).catch(() => []),
+    getDocs(query(collection(db, "usage"), where("date", ">=", fromD))).then(pack).catch(() => [])]);
+  LG.sess = ss.sort((a, b) => b.start - a.start); LG.audit = au.filter(a => ((a.at && a.at.seconds) || 0) * 1000 >= from).sort((a, b) => ((b.at && b.at.seconds) || 0) - ((a.at && a.at.seconds) || 0));
+  LG.usage = us; LG.key = key;
+  /* 오래된 접속 기록은 정리 (180일) */
+  getDocs(query(collection(db, "sessions"), where("start", "<", Date.now() - 180 * 86400000))).then(q => q.docs.slice(0, 300).forEach(d => deleteDoc(d.ref).catch(() => {}))).catch(() => {});
+}
+const tHM = (ms) => { const d = new Date(ms); return `${d.getMonth() + 1}/${d.getDate()} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`; };
+const durTx = (s) => s < 60 ? `${s}초` : minTxt(Math.round(s / 60));
+function renderLogs() {
+  $("lg-tabs").innerHTML = [["sess", "접속 기록"], ["act", "활동"], ["err", "오류"]].map(([k, l]) => `<button type="button" data-lgt="${k}" class="${LG.tab === k ? "on" : ""}">${l}</button>`).join("");
+  $("lg-days").innerHTML = [[7, "7일"], [30, "30일"], [90, "90일"], [180, "180일"]].map(([d, l]) => `<button type="button" data-lgd="${d}" class="${LG.days === d ? "on" : ""}">${l}</button>`).join("");
+  const people = [...new Map((LG.sess || []).map(s => [s.uid, s.name])).entries()].sort((a, b) => String(a[1]).localeCompare(String(b[1]), "ko"));
+  $("lg-who").innerHTML = `<option value="">모든 사람</option>` + people.map(([u, n]) => `<option value="${esc(u)}"${LG.who === u ? " selected" : ""}>${esc(n || "—")}</option>`).join("");
+  $("lg-who").hidden = LG.tab === "err";
+  const q = LG.q.trim(), has = (t) => !q || String(t || "").includes(q);
+  let html = "";
+  if (LG.tab === "sess") {
+    const rows = (LG.sess || []).filter(s => (!LG.who || s.uid === LG.who) && has([s.name, s.device, s.ver, (s.screens || []).map(k => SCREEN_NAME[k] || k).join(" ")].join(" ")));
+    const by = {}; rows.forEach(s => { const p = by[s.uid] = by[s.uid] || { name: s.name, role: s.role, n: 0, dur: 0, last: 0, dev: s.device }; p.n++; p.dur += s.dur || 0; if (s.start > p.last) { p.last = s.start; p.dev = s.device; } });
+    const P = Object.values(by).sort((a, b) => b.last - a.last);
+    html = `<div class="card"><h3 class="lg-h">사람별 <span class="muted">${LG.days}일</span></h3>
+      <div class="lg-tw"><table class="lg-t"><thead><tr><th>이름</th><th>마지막 접속</th><th>접속</th><th>모두 머문 시간</th><th>한 번 평균</th><th>기기</th></tr></thead><tbody>
+      ${P.map(p => `<tr><td><b>${esc(p.name || "—")}</b><small>${esc(ROLE[p.role] || "")}</small></td><td>${tHM(p.last)}</td><td class="n">${p.n}번</td><td class="n">${durTx(p.dur)}</td><td class="n">${durTx(Math.round(p.dur / p.n))}</td><td>${esc(p.dev || "")}</td></tr>`).join("") || `<tr><td colspan="6" class="muted">기록이 없어요.</td></tr>`}
+      </tbody></table></div></div>
+      <div class="card" style="margin-top:12px"><h3 class="lg-h">접속마다 <span class="muted">${rows.length}번 · 최근 순</span></h3>
+      <div class="lg-list">${rows.slice(0, 300).map(s => `<div class="lg-r"><span class="lg-tm">${tHM(s.start)} ~ ${pad2(new Date(s.end).getHours())}:${pad2(new Date(s.end).getMinutes())}</span>
+        <b>${esc(s.name || "—")}</b><span class="chip">${durTx(s.dur || 0)}</span><span class="muted">${esc(s.device || "")}${s.pwa ? " · 앱" : ""} · v${esc(s.ver || "")}</span>
+        <p class="lg-flow">${(s.screens || []).map(k => esc(SCREEN_NAME[k] || k)).join(" → ") || "—"}</p></div>`).join("") || `<p class="muted">기록이 없어요. (48단계부터 쌓여요)</p>`}</div></div>`;
+  } else if (LG.tab === "act") {
+    const rows = (LG.audit || []).filter(a => (!LG.who || a.by === LG.who) && has([a.byName, a.action, a.target, a.detail].join(" ")));
+    html = `<div class="card"><h3 class="lg-h">누가 무엇을 바꿨나 <span class="muted">${rows.length}건</span></h3><div class="lg-list">
+      ${rows.slice(0, 400).map(a => `<div class="lg-r"><span class="lg-tm">${a.at && a.at.seconds ? tHM(a.at.seconds * 1000) : ""}</span><b>${esc(a.byName || "—")}</b>
+        <span>${esc(a.action || "")}</span><span class="muted">${esc([a.target, a.detail].filter(Boolean).join(" · "))}</span></div>`).join("") || `<p class="muted">기록이 없어요.</p>`}</div></div>`;
+  } else {
+    const errs = {}; (LG.usage || []).forEach(r => Object.entries(r.errs || {}).forEach(([k, v]) => {
+      const e = errs[k] = errs[k] || { n: 0, users: new Set(), last: "", vers: new Set() }; e.n += v; e.users.add(r.name || r.uid); if (r.date > e.last) e.last = r.date; if (r.ver) e.vers.add(r.ver); }));
+    const L = Object.entries(errs).filter(([k]) => has(k)).sort((a, b) => b[1].n - a[1].n);
+    html = `<div class="card"><h3 class="lg-h">같은 오류끼리 <span class="muted">${L.length}가지 · ${LG.days}일</span></h3><div class="lg-list">
+      ${L.slice(0, 100).map(([k, e]) => `<div class="lg-r"><span class="chip warn">${e.n}번</span><b class="lg-err">${esc(k)}</b>
+        <span class="muted">${e.users.size}명 · 마지막 ${fmtDate(e.last)} · ${[...e.vers].sort().slice(-3).map(v => "v" + esc(v)).join(" ")}</span></div>`).join("") || `<p class="muted">기록된 오류가 없어요.</p>`}</div></div>`;
+  }
+  $("lg-body").innerHTML = html;
+}
+$("lg-tabs").addEventListener("click", (ev) => { const b = ev.target.closest("[data-lgt]"); if (!b) return; LG.tab = b.dataset.lgt; renderLogs(); });
+$("lg-days").addEventListener("click", async (ev) => { const b = ev.target.closest("[data-lgd]"); if (!b) return; LG.days = Number(b.dataset.lgd); $("lg-body").innerHTML = `<p class="muted">불러오는 중…</p>`; await loadLogs(true); renderLogs(); });
+$("lg-who").addEventListener("change", () => { LG.who = $("lg-who").value; renderLogs(); });
+$("lg-q").addEventListener("input", () => { LG.q = $("lg-q").value; renderLogs(); });
+$("lg-back").onclick = () => openHome();
+$("lg-csv").onclick = () => {
+  const esc2 = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  let rows = [];
+  if (LG.tab === "sess") rows = [["이름", "역할", "들어온 시각", "나간 시각", "머문 초", "기기", "앱", "버전", "본 화면"], ...(LG.sess || []).filter(s => !LG.who || s.uid === LG.who)
+    .map(s => [s.name, ROLE[s.role] || s.role, new Date(s.start).toLocaleString("ko-KR"), new Date(s.end).toLocaleString("ko-KR"), s.dur, s.device, s.pwa ? "앱" : "", s.ver, (s.screens || []).map(k => SCREEN_NAME[k] || k).join(" > ")])];
+  else if (LG.tab === "act") rows = [["시각", "누가", "무엇을", "대상", "자세히"], ...(LG.audit || []).filter(a => !LG.who || a.by === LG.who).map(a => [a.at && a.at.seconds ? new Date(a.at.seconds * 1000).toLocaleString("ko-KR") : "", a.byName, a.action, a.target, a.detail])];
+  else { const errs = {}; (LG.usage || []).forEach(r => Object.entries(r.errs || {}).forEach(([k, v]) => { errs[k] = (errs[k] || 0) + v; })); rows = [["오류", "횟수"], ...Object.entries(errs)]; }
+  const blob = new Blob(["﻿" + rows.map(r => r.map(esc2).join(",")).join("\n")], { type: "text/csv" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `목자의삶-로그-${LG.tab}-${todayStr()}.csv`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+};

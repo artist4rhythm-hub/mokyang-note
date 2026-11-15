@@ -3,7 +3,7 @@
    - Firebase 통신은 절대 캐시하지 않음 (항상 최신 데이터)
    - 파일을 새로 올리면 CACHE 이름을 바꿔 새 버전을 받게 함 */
 
-const CACHE = "mokja-v47-0";
+const CACHE = "mokja-v48-0";
 const SHELL = [
   "./",
   "./index.html",
@@ -70,15 +70,27 @@ self.addEventListener("fetch", (ev) => {
   }));
 });
 
+/* 48단계 — 앱이 닫혀 있어도 오는 알림 (서버 함수가 보낸 것)
+   잠금 화면 글은 서버가 정해요 — 받는 사람이 '내용 보이기'를 켜지 않았으면 내용 없이. */
+self.addEventListener("push", (ev) => {
+  let p = {}; try { p = ev.data ? ev.data.json() : {}; } catch { p = {}; }
+  const d = p.data || p.notification || p || {};
+  const url = typeof d.url === "string" && d.url.startsWith("./") ? d.url : "./";
+  ev.waitUntil(self.registration.showNotification(d.title || "목자의 삶", {
+    body: d.body || "", tag: d.tag || "mokja", icon: "./icons/icon-192.png", badge: "./icons/favicon-48.png", data: { url }
+  }));
+});
+
 /* 앱이 열려 있을 때 새 소식을 기기 알림으로 띄웁니다 (페이지가 부탁하면).
    알림을 누르면 열려 있는 앱 창으로 돌아갑니다. */
 self.addEventListener("notificationclick", (ev) => {
   ev.notification.close();
   ev.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(list => {
+      const url = (ev.notification.data && ev.notification.data.url) || "./#inbox";
       const c = list.find(x => x.url.startsWith(self.registration.scope));
-      if (c) { c.postMessage({ type: "open-inbox" }); return c.focus(); }
-      return self.clients.openWindow("./#inbox");
+      if (c) { c.postMessage({ type: url.includes("#post-") ? "open-post" : url === "./" ? "open-home" : "open-inbox", id: url.split("#post-")[1] || "" }); return c.focus(); }
+      return self.clients.openWindow(url);
     })
   );
 });
