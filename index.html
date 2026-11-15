@@ -2020,6 +2020,71 @@
     #s-login{background:linear-gradient(180deg,rgba(15,15,15,.94) 0%,rgba(15,15,15,.86) 55%,rgba(15,15,15,.35) 100%),url("./img/login-dark.webp") 80% bottom / cover no-repeat,var(--bg)}
     :root[data-theme="light"] #s-login{background:linear-gradient(180deg,rgba(245,243,242,.96) 0%,rgba(245,243,242,.86) 50%,rgba(245,243,242,.2) 100%),url("./img/login-phone.webp") center bottom / cover no-repeat,var(--bg)}
   }
+
+  /* ════════ 47단계 — 셀 보고 댓글 · 게시판 · 기간 ════════ */
+  .range-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .range-row input{width:auto;height:var(--h-s,36px);min-width:150px}
+  #hl-per{margin:0}
+  .rep-tools{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:10px}
+  .rep-tools input{flex:1;min-width:180px;max-width:320px;height:var(--h-s,36px)}
+  .talk-rx{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:12px}
+  .talk-rx .pchip.on{border-color:var(--action);background:var(--rose-bg);color:var(--rose-tx)}
+  .talk-who{font-size:calc(12px*var(--fs,1))}
+  .talk-h{font-size:calc(14px*var(--fs,1));font-weight:600;margin:4px 0 8px}
+  .talk-list .cmt{margin-top:8px}
+  .talk-list .btn-sm{height:28px !important;min-height:28px !important;font-size:calc(11px*var(--fs,1))}
+  .talk-in{display:flex;gap:8px;align-items:flex-end;margin-top:12px}
+  .talk-in textarea{flex:1;min-height:var(--h-m,44px);height:var(--h-m,44px);padding-top:11px;resize:none}
+  .talk-send{height:var(--h-m,44px) !important;min-height:var(--h-m,44px) !important;flex-shrink:0}
+  .rp-talk{padding:0 !important;color:var(--rose-tx) !important;font-size:calc(12px*var(--fs,1))}
+  /* 게시판 */
+  .bd-hero{height:120px;flex-shrink:0;background:linear-gradient(90deg,var(--bg) 0%,rgba(15,15,15,.55) 45%,rgba(15,15,15,.1) 100%),url("./img/board-header.webp") right center / cover no-repeat}
+  :root[data-theme="light"] .bd-hero{background:linear-gradient(90deg,var(--bg) 0%,rgba(245,243,242,.55) 45%,rgba(245,243,242,.05) 100%),url("./img/board-header.webp") right center / cover no-repeat}
+  .bd-wrap{max-width:860px}
+  .bd-new{background:var(--action) !important;border-color:var(--action) !important;color:#fff !important;font-weight:600}
+  .bd-list{display:grid;gap:8px;margin-top:12px}
+  .post-row{display:flex;align-items:center;gap:12px;width:100%;min-height:76px;padding:12px 16px;border-radius:14px;border:1px solid var(--line);
+    background:var(--surface);color:var(--text);font:inherit;text-align:left;cursor:pointer}
+  .post-row.pin{border-color:var(--ok-line)}.post-row.hid{opacity:.6}
+  .pr-l{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+  .pr-k{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .pr-t{font-size:calc(15px*var(--fs,1));font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pr-s{font-size:calc(12px*var(--fs,1));color:var(--dim)}
+  .pr-th{position:relative;width:64px;height:64px;border-radius:12px;overflow:hidden;flex-shrink:0;background:var(--surface2)}
+  .pr-th img{width:100%;height:100%;object-fit:cover;display:block}
+  .pr-th i{position:absolute;right:4px;bottom:4px;font-style:normal;font-size:11px;padding:1px 6px;border-radius:8px;background:rgba(0,0,0,.6);color:#fff}
+  .pt-acts{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-bottom:8px}
+  .pt-acts:empty{display:none}
+  .post{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:20px}
+  .post-t{font-size:calc(21px*var(--fs,1));font-weight:600;margin:10px 0 4px;line-height:1.35}
+  .post-m{font-size:calc(12px*var(--fs,1))}
+  .post-b{margin-top:14px;line-height:1.75;font-size:calc(15px*var(--fs,1));word-break:break-word}
+  .post-b a{color:var(--rose-tx)}
+  .lcards{display:grid;gap:8px;margin-top:14px}
+  .lcard{display:flex;align-items:center;gap:12px;min-height:64px;padding:8px 12px 8px 8px;border-radius:12px;border:1px solid var(--line);
+    background:var(--surface2);color:var(--text);text-decoration:none}
+  .lcard img{width:88px;height:50px;object-fit:cover;border-radius:8px;flex-shrink:0}
+  .lcard .lic{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:var(--surface);flex-shrink:0;margin-left:4px}
+  .lcard .ltx{min-width:0;display:flex;flex-direction:column}
+  .lcard .ltx b{font-size:calc(14px*var(--fs,1));font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .lcard .ltx span{font-size:calc(12px*var(--fs,1));color:var(--dim)}
+  .post-imgs{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:14px}
+  .pimg{padding:0;border:none;border-radius:12px;overflow:hidden;background:var(--surface2);cursor:zoom-in;aspect-ratio:4/3}
+  .pimg img{width:100%;height:100%;object-fit:cover;display:block}
+  #pt-talk:empty{display:none}
+  #pt-talk{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:16px 20px}
+  /* 글쓰기 */
+  #dlg-post{width:min(94vw,600px)}
+  .pe-urlrow{display:flex;gap:8px}.pe-urlrow input{flex:1}
+  .pe-l{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:calc(12px*var(--fs,1))}
+  .pe-l span{color:var(--dim);flex-shrink:0}.pe-l b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:400}
+  .pe-imgs{display:flex;flex-wrap:wrap;gap:8px}
+  .pe-i{position:relative;width:80px;height:80px;border-radius:12px;overflow:hidden}
+  .pe-i img{width:100%;height:100%;object-fit:cover}
+  .pe-i button{position:absolute;top:4px;right:4px;width:24px;height:24px;border-radius:12px;border:none;background:rgba(0,0,0,.6);color:#fff;cursor:pointer}
+  .pe-add{width:80px;height:80px;border-radius:12px;border:1px dashed var(--line3);display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:2px;font-size:calc(13px*var(--fs,1));color:var(--sub-tx);cursor:pointer}
+  .pe-add small{font-size:11px;color:var(--dim)}
 </style>
 <script>
   /* 27단계 — 화면 밝기: 다크(기본) · 라이트 · 기기 설정 따르기. 깜빡임 없게 그리기 전에 정해요. */
@@ -2254,6 +2319,7 @@
     <div class="scroll pad">
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
         <p class="hint" id="hl-sub" style="margin:0 2px">최근 8주 셀모임 기록으로 셈해요.</p>
+        <div class="seg" id="hl-per" role="tablist" aria-label="기간"></div>
         <div class="seg" id="hl-sort" style="margin:0 0 0 auto">
           <button type="button" data-hs="seq">순서대로</button><button type="button" data-hs="low">자주 빠지는 순</button></div>
       </div>
@@ -2272,11 +2338,45 @@
     </div>
     <div class="pad">
       <p class="hint" id="rep-sub" style="margin:0 2px"></p>
+      <div class="rep-tools">
+        <div class="seg" id="rep-per" role="tablist" aria-label="기간"></div>
+        <input type="search" id="rep-q" placeholder="이름 · 셀 · 주제로 찾기" aria-label="셀 보고 찾기">
+      </div>
+      <div class="range-row" id="rep-range" hidden>
+        <input type="month" id="rep-from" aria-label="시작 달"><span class="muted">~</span><input type="month" id="rep-to" aria-label="끝 달">
+        <button type="button" class="btn-sm" id="rep-range-go">보기</button></div>
       <div class="seg" id="rep-chips" style="margin-top:10px"></div>
     </div>
     <div class="scroll pad" style="padding-top:10px"><div class="rep-wrap" id="rep-wrap">
       <aside class="rep-side" id="rep-side"></aside>
       <div class="rep-main"><div id="rep-list"></div></div></div><div style="height:24px"></div></div>
+  </section>
+  <!-- 47단계 — 전체 게시판 -->
+  <section class="screen" id="s-board" hidden>
+    <div class="topbar">
+      <button class="icon-btn" id="bd-back" aria-label="뒤로"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5m6-6-6 6 6 6"/></svg></button>
+      <h2 style="font-size:calc(17px*var(--fs,1));font-weight:600">게시판</h2>
+      <button type="button" class="btn-sm bd-new" id="bd-new">＋ 글쓰기</button>
+    </div>
+    <div class="bd-hero" aria-hidden="true"></div>
+    <div class="scroll pad bd-wrap">
+      <div class="seg" id="bd-cats" role="tablist" aria-label="분류"></div>
+      <div class="bd-list" id="bd-list"></div>
+      <div style="height:24px"></div>
+    </div>
+    <nav class="tabbar" data-nav="board"></nav>
+  </section>
+  <section class="screen" id="s-post" hidden>
+    <div class="topbar">
+      <button class="icon-btn" id="pt-back" aria-label="뒤로"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5m6-6-6 6 6 6"/></svg></button>
+      <h2 style="font-size:calc(17px*var(--fs,1));font-weight:600">게시판</h2>
+      <span style="width:44px"></span>
+    </div>
+    <div class="scroll pad" style="max-width:720px">
+      <div class="pt-acts" id="pt-acts"></div>
+      <div id="pt-body"></div>
+      <div style="height:24px"></div>
+    </div>
   </section>
   <section class="screen" id="s-report" hidden>
     <div class="topbar">
@@ -2522,6 +2622,7 @@
           <span class="hint" id="m-note-count"></span></div>
         <div class="rte" id="m-note-rte"></div></div>
       <button type="button" class="btn-ghost" id="btn-m-cmt" style="margin-top:10px;height:44px;font-size:calc(13px*var(--fs,1));max-width:320px" hidden>댓글</button>
+      <button type="button" class="btn-ghost" id="btn-m-repcmt" style="margin-top:10px;height:44px;font-size:calc(13px*var(--fs,1));max-width:320px" hidden>셀 보고 댓글</button>
       <div class="rp-box" id="m-report" hidden></div>
       <p class="err" id="meeting-err"></p>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -2844,9 +2945,14 @@
         <button type="button" data-per="1">1개월</button>
         <button type="button" data-per="3">3개월</button>
         <button type="button" data-per="6">6개월</button>
+        <button type="button" data-per="12">1년</button>
         <button type="button" data-per="y">올해</button>
         <button type="button" data-per="all">전체</button>
+        <button type="button" data-per="custom">직접</button>
       </div>
+      <div class="range-row" id="st-range" hidden>
+        <input type="date" id="st-from" aria-label="시작일"><span class="muted">~</span><input type="date" id="st-to" aria-label="끝일">
+        <button type="button" class="btn-sm" id="st-range-go">보기</button></div>
       <div class="seg" style="margin:10px 0 0" id="st-cells"></div>
       <div class="picks" style="margin-top:10px" id="st-opts">
         <button type="button" data-opt="cell">셀모임 포함</button>
@@ -3203,6 +3309,22 @@
 </div>
 
 <!-- 명부 카드 보기 -->
+<!-- 47단계 — 게시판 글쓰기 -->
+<dialog id="dlg-post" aria-labelledby="pe-title-h">
+  <h3 id="pe-title-h" style="margin:0">새 글</h3>
+  <div class="field" style="margin-top:14px"><label>분류</label><div class="seg" id="pe-cat"></div></div>
+  <div class="field" id="pe-scope-wrap"><label>누가 보나요</label><div class="seg" id="pe-scope"></div></div>
+  <div class="field"><label for="pe-title">제목</label><input id="pe-title" maxlength="120" placeholder="예) 이번 주 셀 나눔 자료"></div>
+  <div class="field"><label for="pe-body">내용</label><textarea id="pe-body" rows="5" maxlength="5000" placeholder="함께 나눌 내용을 적어 주세요"></textarea>
+    <p class="hint">영혼의 개인 이야기 · 기도 내용은 여기 말고 영혼 카드에 적어 주세요 (게시판은 여러 사람이 봐요).</p></div>
+  <div class="field"><label for="pe-url">링크 <span class="muted" style="font-weight:400">— 5개까지</span></label>
+    <div class="pe-urlrow"><input id="pe-url" inputmode="url" placeholder="https://"><button type="button" class="btn-sm" id="pe-url-add">더하기</button></div>
+    <div id="pe-links"></div></div>
+  <div class="field"><label>사진 <span class="muted" style="font-weight:400">— 4장까지 · 기기에서 줄여 올려요 (위치 정보 없이)</span></label>
+    <div class="pe-imgs" id="pe-imgs"></div></div>
+  <p class="err" id="pe-err"></p>
+  <div class="dlg-btns"><button type="button" class="btn-ghost" id="pe-cancel">취소</button><button type="button" class="btn" id="pe-save">올리기</button></div>
+</dialog>
 <!-- 46단계 — ＋ 기록 쓰기 -->
 <dialog id="dlg-add" class="sheet-dlg" aria-labelledby="add-title">
   <div class="sheet-grab"></div>

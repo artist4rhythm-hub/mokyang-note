@@ -26,7 +26,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
 const APP_NAME = "목자의 삶";
-const APP_VERSION = "46.0 (2026-11-15)";
+const APP_VERSION = "47.0 (2026-11-15)";
 /* 35단계 — 버전 표시: v35.0 · 2026.11.12 업데이트 */
 const verNo = () => APP_VERSION.split(" ")[0];
 const verDate = () => (APP_VERSION.match(/\((.*)\)/) || [])[1] || "";
@@ -87,7 +87,7 @@ const SCREENS = ["s-interns","s-help","s-orgchart","s-loading","s-login","s-veri
                  "s-home","s-souls","s-cal","s-meet","s-meeting","s-log","s-soul",
                  "s-edit","s-train","s-search","s-mine","s-usage","s-more","s-manage",
                  "s-photos","s-stats","s-inbox","s-dir","s-cellmgr","s-org","s-consent","s-share",
-                 "s-reports","s-report","s-import","s-leaders","s-health"];
+                 "s-reports","s-report","s-import","s-leaders","s-health","s-board","s-post"];
 /* 46단계 — 화면을 바꿀 때 자료가 금방 오면(저장본 · 이미 받은 것) '불러오는 중' 화면을 아예 안 보여요.
    0.18초가 넘을 때만 보여 주고, 그때도 왼쪽 메뉴는 그대로 둬요 (화면이 깜빡이지 않게) */
 let loadT = 0, curScreen = "";
@@ -418,8 +418,9 @@ const NAV_LEAD = [["home","홈"],["souls","영혼들"],["add","기록"],["cal","
 ICON.inbox = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16.5V11a6 6 0 1 1 12 0v5.5l1.5 2H4.5z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/></svg>`;
 ICON.dir = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3.5" width="14" height="17" rx="2"/><circle cx="12" cy="10" r="2.6"/><path d="M8.5 16.5a3.5 3.5 0 0 1 7 0"/></svg>`;
 ICON.health = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 12h4l2-4.5 4 9 2-4.5h5"/></svg>`;
-const SIDE = [["home","홈"],["inbox","소식"],["souls","영혼들"],["dir","교회 명부"],["cal","캘린더"],["meet","셀 보고"],
+const SIDE = [["home","홈"],["inbox","소식"],["board","게시판"],["souls","영혼들"],["dir","교회 명부"],["cal","캘린더"],["meet","셀 보고"],
   ["health","셀 건강"],["train","훈련 현황"],["stats","활동 통계"],["photos","사진 모아보기"],["interns","인턴 · 후보"],["help","도우미"],["more","더보기"]];
+ICON.board = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="14" rx="2.5"/><path d="M7.5 9h5M7.5 12.5h9M7.5 16h6"/><circle cx="16.5" cy="9" r="1.2" fill="currentColor"/></svg>`;
 ICON.interns = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7.5" r="3.2"/><path d="M5.5 20v-1.2A4.8 4.8 0 0 1 10.3 14h3.4a4.8 4.8 0 0 1 4.8 4.8V20"/><path d="m16.8 3.8.8 1.6 1.7.2-1.3 1.2.3 1.7-1.5-.8-1.5.8.3-1.7-1.3-1.2 1.7-.2z" fill="currentColor" stroke-width="1"/></svg>`;
 ICON.help = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.1-2.4 3.7M12 16.9v.1"/></svg>`;
 /* 36단계 — 전시실 · 관리 서랍 아이콘 (선 아이콘, 글자색을 따라가요) */
@@ -479,6 +480,7 @@ document.addEventListener("click", (ev) => {
   else if (t === "more") openMore();
   else if (t === "help") openHelp("");
   else if (t === "interns") openInterns();
+  else if (t === "board") openBoard();
   else if (t === "train") openTrainBoard();
   else if (t === "stats") openStats();
   else if (t === "photos") openPhotos();
@@ -912,7 +914,7 @@ async function openHome(opts) {
 async function homeBackground() {
   const onHome = () => !$("s-home").hidden;
   try {
-    await Promise.all([ensureDirectory(), loadHandovers()]);
+    await Promise.all([ensureDirectory(), loadHandovers(), loadBoard().catch(() => {})]);
     if (onHome()) { renderHomeHand(); renderRooms(); }
     if (canLead()) syncMyReports().catch(e => console.warn("보고 사본", e));
     if (canLead()) fillFromNotion().catch(e => console.warn("명단 채우기", e));
@@ -1210,6 +1212,7 @@ function renderRooms() {
       + room("usage","사용 현황", "보기", "누가 · 언제 · 무엇을")
       + room("tickets","문의 · 제안", tkSuperNew(), tkSuperNew() ? "새 문의" : "받은 함", tkSuperNew() > 0);
   }
+  html += room("board", "게시판", boardNewN() ? `새 글 ${boardNewN()}` : "보기", "공지 · 나눔 · 자료", boardNewN() > 0);   // 47단계
   $("home-rooms").innerHTML = html;
   renderHomeDash();   // 41단계 — 위 '한눈에 보기'도 같은 숫자로 새로
 }
@@ -1239,7 +1242,7 @@ $("s-home").addEventListener("click", async (ev) => {
     const k = rm.dataset.room;
     ({ souls:openSouls, meet:openMeet, cal:openCal, health:openHealth, dir:openDir, train:openTrainBoard,
        stats:openStats, photos:openPhotos, org:openOrg, orgchart:openOrgChart, interns:openInterns, cellmgr:openCellMgr, usage:openUsage,
-       reports:()=>openReports(""), leaders:openLeaders, tickets:()=>openTickets("all") }[k] || (()=>{}))();
+       reports:()=>openReports(""), leaders:openLeaders, tickets:()=>openTickets("all"), board:()=>openBoard() }[k] || (()=>{}))();
     return;
   }
   const more = ev.target.closest("[data-cmore]");
@@ -3537,6 +3540,10 @@ function openMeeting(id, opts) {
   /* 저장된 모임이면 댓글 — 이 모임을 볼 수 있는 사람(셀리더 · 담당 코치 · 진장)이 같이 봅니다 */
   $("btn-m-cmt").hidden = !m;
   $("btn-m-cmt").textContent = "댓글";
+  /* 47단계 — 보고한 모임이면 같은 진이 단 셀 보고 댓글로 */
+  $("btn-m-repcmt").hidden = !(m && m.reportedAt && m.leaderUid === uid());
+  if (m && m.reportedAt && m.leaderUid === uid()) repTalkCount(m.id).then(n => { if (n && state.meeting && state.meeting.id === m.id)
+    $("btn-m-repcmt").textContent = `셀 보고 댓글 ${n.c}${n.r ? ` · 반응 ${n.r}` : ""}`; });
   state.meeting.reasonKinds = { ...(state.meeting.reasonKinds||{}) };
   renderReportBox();
   if (m) loadComments(meetTarget(m)).then(rows => {
@@ -4235,7 +4242,10 @@ const ACT_NAME = { recordCreate:"기록 남김", planCreate:"만남 예약", mee
   memoFormat:"메모 꾸미기 사용", installApp:"홈 화면 앱 설치", welcomeOff:"처음 안내 닫음",
   faithSet:"신앙 · 훈련 체크", ticket_ask:"사용 문의 보냄", ticket_idea:"기능 제안 보냄", ticket_bug:"오류 알림 보냄", ticketReply:"문의 답 · 덧붙임" };
 const actName = (k) => ACT_NAME[k] || (k.startsWith("help_") ? `도우미 · ${(HELP.find(t => t.id === k.slice(5)) || {}).t || k.slice(5)}` : k);
-const US_PERIOD = [[7, "7일"], [30, "30일"], [90, "90일"]];
+const US_PERIOD = [[7, "7일"], [30, "30일"], [90, "90일"], [180, "6개월"], [365, "1년"], [0, "직접"]];
+/* 47단계 — 사용 현황 기간: 정해진 날수 또는 직접 고른 시작~끝 */
+const usRange = (U) => { const to = U.days ? todayStr() : (U.to || todayStr()), from = U.days ? plusDays(-(U.days - 1)) : (U.from || plusDays(-29));
+  return { from, to, key: `${from}_${to}`, n: Math.max(1, Math.round((new Date(to + "T00:00") - new Date(from + "T00:00")) / 86400000) + 1) }; };
 const US_ROLE = [["all", "모두"], ["leader", "셀리더"], ["upline", "코치 · 진장 · 교역자"], ["super", "수퍼"]];
 const usRoleOk = (r, f) => f === "all" || (f === "leader" ? r === "leader" : f === "upline" ? ["coach", "jinjang", "pastor"].includes(r) : r === "super");
 const sumMap = (rows, k) => rows.reduce((o, r) => mergeCount(o, r[k]), {});
@@ -4250,24 +4260,25 @@ async function openUsage(force) {
   await flushUsage();
   await loadOrg();
   if (force) U.cache = {};
-  if (!U.cache[U.days]) {
+  const RG = usRange(U);
+  if (!U.cache[RG.key]) {
     try {
       /* 기간 안의 칸만 — 기간 × 사람 수만큼 읽어요 (한 번 읽으면 [새로 읽기] 전까지 다시 안 읽어요) */
       const [u, a] = await Promise.all([
-        getDocs(query(collection(db, "usage"), where("date", ">=", plusDays(-(U.days - 1))))),
+        getDocs(query(collection(db, "usage"), where("date", ">=", RG.from), where("date", "<=", RG.to))),
         U.audit ? Promise.resolve(null) : getDocs(collection(db, "audit"))
       ]);
-      U.cache[U.days] = pack(u);
+      U.cache[RG.key] = pack(u);
       if (a) U.audit = pack(a).sort((x, y) => (y.at && y.at.seconds || 0) - (x.at && x.at.seconds || 0)).slice(0, 60);
-    } catch (e) { toast(msgOf(e)); U.cache[U.days] = []; }
+    } catch (e) { toast(msgOf(e)); U.cache[RG.key] = []; }
   }
   renderUsage(); show("s-usage");
 }
 function renderUsage() {
-  const U = state.us, days = U.days, curVer = APP_VERSION.split(" ")[0];
-  const rows = (U.cache[days] || []).filter(r => usRoleOk(r.role, U.role));
+  const U = state.us, RG = usRange(U), days = RG.n, curVer = APP_VERSION.split(" ")[0];
+  const rows = (U.cache[RG.key] || []).filter(r => usRoleOk(r.role, U.role));
   const accts = state.members.filter(m => m.active !== false && usRoleOk(m.role, U.role));
-  const dayList = []; for (let i = days - 1; i >= 0; i--) dayList.push(plusDays(-i));
+  const dayList = []; for (let d = RG.from; d <= RG.to && dayList.length < 800; d = addDays(d, 1)) dayList.push(d);
   const byDay = Object.fromEntries(dayList.map(d => [d, { users: new Set(), mins: 0, opens: 0 }]));
   const people = {};
   rows.forEach(r => {
@@ -4298,17 +4309,21 @@ function renderUsage() {
 
   /* 날마다 */
   const metric = U.metric || "users";
-  const val = (d) => metric === "users" ? byDay[d].users.size : metric === "mins" ? byDay[d].mins : byDay[d].opens;
-  const peak = Math.max(1, ...dayList.map(val));
-  const step = days <= 7 ? 1 : days <= 30 ? 7 : 15;
+  /* 47단계 — 기간이 길면(120일 넘게) 한 주씩 묶어서 막대 하나 */
+  const bk = days > 120 ? 7 : 1, groups = [];
+  for (let g = 0; g < dayList.length; g += bk) groups.push(dayList.slice(g, g + bk));
+  const gval = (G) => metric === "users" ? new Set(G.flatMap(d => [...byDay[d].users])).size
+    : G.reduce((n, d) => n + (metric === "mins" ? byDay[d].mins : byDay[d].opens), 0);
+  const peak = Math.max(1, ...groups.map(gval));
+  const step = groups.length <= 7 ? 1 : groups.length <= 31 ? 7 : groups.length <= 92 ? 15 : 8;
   const mUnit = metric === "users" ? "명" : metric === "mins" ? "분" : "번";
-  const bw = 1000 / dayList.length;
-  const chart = `<svg class="us-svg" viewBox="0 0 1000 170" preserveAspectRatio="none" role="img" aria-label="날마다 ${mUnit}">
+  const bw = 1000 / groups.length;
+  const chart = `<svg class="us-svg" viewBox="0 0 1000 170" preserveAspectRatio="none" role="img" aria-label="${bk > 1 ? "주마다" : "날마다"} ${mUnit}">
       ${[0.5, 1].map(f => `<line x1="0" x2="1000" y1="${165 - f * 150}" y2="${165 - f * 150}" class="gl"/>`).join("")}
-      ${dayList.map((d, i) => { const v = val(d), h = v ? Math.max(v / peak * 150, 3) : 0, wk = new Date(d + "T00:00").getDay();
-        return `<rect x="${(i * bw + bw * 0.14).toFixed(1)}" y="${(165 - h).toFixed(1)}" width="${(bw * 0.72).toFixed(1)}" height="${h.toFixed(1)}" class="${wk === 0 ? "sun" : ""}${d === today ? " now" : ""}"><title>${fmtDate(d)} · ${nf(v)}${mUnit}</title></rect>`; }).join("")}
+      ${groups.map((G, i) => { const d = G[0], v = gval(G), h = v ? Math.max(v / peak * 150, 3) : 0, wk = new Date(d + "T00:00").getDay();
+        return `<rect x="${(i * bw + bw * 0.14).toFixed(1)}" y="${(165 - h).toFixed(1)}" width="${(bw * 0.72).toFixed(1)}" height="${h.toFixed(1)}" class="${bk === 1 && wk === 0 ? "sun" : ""}${G.includes(today) ? " now" : ""}"><title>${fmtDate(d)}${bk > 1 ? " 주" : ""} · ${nf(v)}${mUnit}</title></rect>`; }).join("")}
     </svg>
-    <div class="us-x">${dayList.map((d, i) => (dayList.length - 1 - i) % step === 0 ? `<span style="left:${((i + 0.5) * bw / 10).toFixed(2)}%">${Number(d.slice(5, 7))}/${Number(d.slice(8))}</span>` : "").join("")}</div>`;
+    <div class="us-x">${groups.map((G, i) => (groups.length - 1 - i) % step === 0 ? `<span style="left:${((i + 0.5) * bw / 10).toFixed(2)}%">${Number(G[0].slice(5, 7))}/${Number(G[0].slice(8))}</span>` : "").join("")}</div>`;
 
   /* 요일 × 시간 */
   const HM = Array.from({ length: 7 }, () => Array(24).fill(0));
@@ -4355,13 +4370,14 @@ function renderUsage() {
 
   $("us-body").innerHTML = `
     <div class="us-bar">
-      <div class="seg" id="us-days">${US_PERIOD.map(([d, l]) => `<button type="button" data-usd="${d}" class="${d === days ? "on" : ""}">${l}</button>`).join("")}</div>
+      <div class="seg" id="us-days">${US_PERIOD.map(([d, l]) => `<button type="button" data-usd="${d}" class="${d === U.days ? "on" : ""}">${l}</button>`).join("")}</div>
       <div class="seg" id="us-role">${US_ROLE.map(([k, l]) => `<button type="button" data-usr="${k}" class="${k === U.role ? "on" : ""}">${l}</button>`).join("")}</div>
       <span class="sp"></span>
       <button type="button" class="btn-sm" id="us-refresh">새로 읽기</button>
       <button type="button" class="btn-sm" id="us-csv">CSV 내려받기</button>
     </div>
-    ${firstDay && firstDay > plusDays(-(days - 1)) ? `<p class="us-note" style="margin-top:10px">기록은 ${fmtDate(firstDay)}부터 있어요. 사용 시간 · 버전 · 오류 · 기기 환경은 33단계부터 쌓여요.</p>` : ""}
+    ${!U.days ? `<div class="range-row" style="margin-top:10px"><input type="date" id="us-from" value="${RG.from}" aria-label="시작일"><span class="muted">~</span><input type="date" id="us-to" value="${RG.to}" aria-label="끝일"><button type="button" class="btn-sm" id="us-range-go">보기</button></div>` : ""}
+    ${firstDay && firstDay > RG.from ? `<p class="us-note" style="margin-top:10px">기록은 ${fmtDate(firstDay)}부터 있어요. 사용 시간 · 버전 · 오류 · 기기 환경은 33단계부터 쌓여요.</p>` : ""}
     <div class="us-kpis">
       ${K("souls", "쓰는 사람", `${P.length}<small>/${accts.length}명</small>`, `${days}일 동안 한 번이라도 · ${pct(P.length, accts.length)}%`)}
       ${K("home", "오늘 · 이번 주", `${todayN}<small> · ${w7N}명</small>`, "오늘 연 사람 · 최근 7일")}
@@ -4419,18 +4435,22 @@ $("usage-back").onclick = () => openMore();
 $("btn-go-usage").onclick = () => openUsage();
 $("us-body").addEventListener("click", (e) => {
   const U = state.us; if (!U) return;
-  const d = e.target.closest("[data-usd]"); if (d) { U.days = +d.dataset.usd; openUsage(); return; }
+  const d = e.target.closest("[data-usd]"); if (d) { U.days = +d.dataset.usd; if (!U.days) { U.from = U.from || plusDays(-29); U.to = U.to || todayStr(); } openUsage(); return; }
+  if (e.target.closest("#us-range-go")) { const f = $("us-from").value, t = $("us-to").value;
+    if (!f || !t || f > t) { toast("시작일이 끝일보다 앞이어야 해요."); return; }
+    if ((new Date(t) - new Date(f)) / 86400000 > 731) { toast("2년까지 볼 수 있어요."); return; }
+    U.from = f; U.to = t; openUsage(); return; }
   const r = e.target.closest("[data-usr]"); if (r) { U.role = r.dataset.usr; renderUsage(); return; }
   const m = e.target.closest("[data-usm]"); if (m) { U.metric = m.dataset.usm; renderUsage(); return; }
   if (e.target.closest("#us-refresh")) { U.audit = null; openUsage(true); return; }
   if (e.target.closest("#us-csv")) {
-    const rows = (U.cache[U.days] || []).filter(x => usRoleOk(x.role, U.role)).sort((a, b) => a.date.localeCompare(b.date) || (a.name || "").localeCompare(b.name || "", "ko"));
+    const rows = (U.cache[usRange(U).key] || []).filter(x => usRoleOk(x.role, U.role)).sort((a, b) => a.date.localeCompare(b.date) || (a.name || "").localeCompare(b.name || "", "ko"));
     const H = ["날짜", "이름", "역할", "연 횟수", "사용 분", "화면 연 횟수", "한 일", "오류", "기기", "운영체제", "브라우저", "홈 화면 앱", "버전"];
     const sum = (o) => Object.values(o || {}).reduce((n, v) => n + v, 0);
     const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
     const csv = "﻿" + [H, ...rows.map(x => [x.date, x.name, ROLE[x.role] || x.role, x.opens || 0, x.mins ?? "", sum(x.screens), sum(x.acts), sum(x.errs), x.device || "", x.os || "", x.br || "", x.pwa ? "예" : x.ver ? "아니오" : "", x.ver || ""])].map(r => r.map(q).join(",")).join("\n");
     const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-    a.download = `목자의삶-사용현황-${todayStr()}-${U.days}일.csv`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    a.download = `목자의삶-사용현황-${usRange(U).from}~${usRange(U).to}.csv`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
     bump("exportCsv");
   }
 });
@@ -5000,13 +5020,27 @@ async function openStats() {
 }
 function statsFrom(per) {
   if (per === "all") return "0000-00-00";
+  if (per === "custom") return (state.st && state.st.from) || plusDays(-90);   // 47단계 — 직접 고른 기간
   const d = new Date();
   if (per === "y") return `${d.getFullYear()}-01-01`;
   d.setMonth(d.getMonth() - Number(per)); return ymd(d);
 }
 /* 41단계 — renderStats 는 맨 아래 41단계 묶음으로 옮겼어요 */
+const statsTo = () => (state.st && state.st.per === "custom" && state.st.to) || todayStr();
 $("st-period").addEventListener("click",(ev)=>{
-  const b = ev.target.closest("[data-per]"); if (!b) return; state.st.per = b.dataset.per; renderStats(); });
+  const b = ev.target.closest("[data-per]"); if (!b) return; state.st.per = b.dataset.per;
+  if (b.dataset.per === "custom") { state.st.from = state.st.from || plusDays(-90); state.st.to = state.st.to || todayStr(); }
+  syncStRange(); renderStats(); });
+function syncStRange() {
+  const on = state.st && state.st.per === "custom";
+  $("st-range").hidden = !on;
+  if (on) { $("st-from").value = state.st.from; $("st-to").value = state.st.to; }
+}
+$("st-range-go").onclick = () => {
+  const f = $("st-from").value, t = $("st-to").value;
+  if (!f || !t || f > t) { toast("시작일이 끝일보다 앞이어야 해요."); return; }
+  state.st.from = f; state.st.to = t; renderStats();
+};
 $("st-cells").addEventListener("click",(ev)=>{
   const b = ev.target.closest("[data-stc]"); if (!b) return; state.st.cell = b.dataset.stc; renderStats(); });
 $("st-opts").addEventListener("click",(ev)=>{
@@ -5224,6 +5258,14 @@ async function backfillThumbs() {
    올릴 때마다 version.json 도 같이 올립니다. 앱은 열 때 · 다시 볼 때 · 10분마다
    그 파일만 살짝 확인해서(아주 작은 파일), 지금 버전보다 새것이면 위에 알림을 띄웁니다. */
 const CHANGELOG = [
+  { v:"47.0", d:"2026-11-15", items:[
+    "셀 보고 댓글 · 반응 — 셀 보고 모아보기에서 보고마다 🙏 기도할게요 · 👏 수고했어요 · 댓글 (같은 진 셀리더 · 코치 · 진장)",
+    "내 셀 보고에 댓글이 달리면 소식으로 · 홈 카드 · 셀 보고 화면에 '셀 보고 댓글 n'",
+    "전체 게시판 — 공지 · 나눔 · 자료, 교회 전체 또는 우리 진만, 링크 5개 · 사진 4장, 댓글, 맨 위 고정 · 숨기기",
+    "셀 건강 기간 — 4주 · 8주 · 12주 · 6개월 · 1년",
+    "활동 통계 — 1년 · 직접 고른 기간",
+    "셀 보고 모아보기 — 3개월 · 6개월 · 1년 · 직접 고른 달 + 이름 · 셀 · 주제로 찾기",
+    "사용 현황 — 6개월 · 1년 · 직접 고른 기간 (길면 한 주씩 묶어서)" ] },
   { v:"46.0", d:"2026-11-15", items:[
     "홈 맨 위 '이번 주 셀 보고' — 아직 안 씀 · 저장만 함 · 보고함이 한눈에, 큰 [셀 보고 쓰기] 한 번이면 바로",
     "어디서나 ＋ 기록 쓰기 — 컴퓨터는 왼쪽 메뉴 맨 위, 폰은 아래 가운데 (셀 보고 · 1:1 만남 · 다른 모임 · 관심 기록)",
@@ -5698,6 +5740,10 @@ function renderInbox() {
             ? `${esc(n.fromName||"관리자")} — <b>${esc(n.title||"")}</b> 문의에 답이 왔어요`
             : n.kind==="handover"
             ? `${esc(n.fromName||"")} 님 — <b>${esc(n.title||"")}</b>`
+            : n.kind==="repcmt"
+            ? `${esc(n.fromName||"")} 님이 <b>${esc(n.title||"")}</b> 셀 보고에 댓글을 남겼어요`
+            : n.kind==="postcmt"
+            ? `${esc(n.fromName||"")} 님이 게시판 <b>${esc(n.title||"")}</b>에 댓글을 남겼어요`
             : `${esc(n.fromName||"")} 님이 <b>${esc(n.title||"")}</b>에 댓글을 남겼어요`}</p>
           <p class="sub" style="white-space:normal;margin-top:4px">“${esc(n.snippet||"")}” · ${fmtAgo(n.atMs)}</p></div>
       </div>`).join("") || `<img class="empty-art" src="./img/empty-alerts.webp" alt="" loading="lazy"><p class="muted" style="text-align:center">아직 소식이 없어요. 내 셀모임이나 '코치 공유' 기록에 댓글이 달리거나, 셀 담당이 바뀌어 카드를 넘길 일이 생기면 여기 모여요.</p>`;
@@ -5738,6 +5784,8 @@ async function goToNotice(n) {
   const t = n.target || {};
   if (t.kind === "handover") { if (isManager() && state.me.id !== t.fromUid) openCellMgr(); else openHome(); return; }
   if (t.kind === "ticket") { state.tk.mine = null; state.tk.from = "mine"; state.tk.view = "one"; state.tk.one = t.id; openHelp("tickets"); return; }
+  if (t.kind === "report") { await openReportById(t.id); return; }
+  if (t.kind === "post") { await openPost(t.id); return; }
   if (t.kind === "meeting") {
     await loadMeetings(true);
     const m = state.meetings.find(x=>x.id===t.id);
@@ -7401,8 +7449,13 @@ function ownCells() {
   state.meetings.filter(m => m.leaderUid === uid()).forEach(m => ids.add(m.cellId));
   return state.cells.filter(c => ids.has(c.id));
 }
+/* 47단계 — 셀 건강 기간: 4주 · 8주 · 12주 · 6개월 · 1년 (홈 그래프는 늘 8주) */
+const HL_P = [[4, "4주"], [8, "8주"], [12, "12주"], [26, "6개월"], [52, "1년"]];
+const hlW = () => state.hlWeeks || Number(lsGet("mokja-hlw")) || 8;
+const hlLab = () => (HL_P.find(x => x[0] === hlW()) || [0, hlW() + "주"])[1];
+const hlFew = (n) => n < Math.max(2, Math.ceil(hlW() / 2));
 function cellHealth(cellId) {
-  const ms = cellMeetings(cellId).filter(m => { const n = daysSince(m.date); return n !== null && n >= 0 && n < 56; });
+  const ms = cellMeetings(cellId).filter(m => { const n = daysSince(m.date); return n !== null && n >= 0 && n < hlW() * 7; });
   const people = state.souls.filter(s => s.cellId === cellId && !isLeaderCard(s));
   const came = ms.map(m => Object.values(m.attendance || {}).filter(v => v && v !== "absent").length);
   const marked = ms.map(m => Object.values(m.attendance || {}).filter(Boolean).length);
@@ -7412,10 +7465,10 @@ function cellHealth(cellId) {
   const interns = people.filter(s => s.intern);
   const care = people.filter(s => careStreak(attKey(s), attCell(s)).n >= CARE_AT).length;
   const notes = [];
-  if (ms.length < 4) notes.push(["warn", "모임이 뜸해요"]);
+  if (hlFew(ms.length)) notes.push(["warn", "모임이 뜸해요"]);
   if (interns.length && avg !== null && avg >= 10) notes.push(["ok", "분가를 준비해 볼 때"]);
   else if (!interns.length && avg !== null && avg >= 8) notes.push(["warn", "인턴을 세울 때"]);
-  if (rate !== null && rate >= 75 && ms.length >= 6) notes.push(["ok", "꾸준해요"]);
+  if (rate !== null && rate >= 75 && ms.length >= Math.ceil(hlW() * 0.75)) notes.push(["ok", "꾸준해요"]);
   if (care) notes.push(["warn", `연달아 결석 ${care}명`]);
   return { ms: ms.length, avg, rate, visitors, people, interns, care, notes };
 }
@@ -7433,7 +7486,11 @@ $("hl-body").addEventListener("change", async (ev) => {
   catch (e) { cb.checked = !cb.checked; $("hl-err").textContent = msgOf(e); }
   finally { cb.disabled = false; }
 });
-$("hl-close").onclick = () => openHome();
+$("hl-close").onclick = () => { state.hlOn = false; openHome(); };
+$("hl-per").addEventListener("click", (ev) => {
+  const b = ev.target.closest("[data-hlw]"); if (!b) return;
+  state.hlWeeks = Number(b.dataset.hlw); lsSet("mokja-hlw", String(state.hlWeeks)); renderHealth();
+});
 
 /* ════════ 민감 메모 ════════
    기록과 따로 둡니다(souls/{id}/alerts). 검색 · 캘린더 · 통계 어디에도 섞이지 않고,
@@ -8038,7 +8095,7 @@ async function loadReports(f) {
     const base = [where("jinId", "==", j)];
     if (!isSupU(me) && (me.role === "pastor" || j !== me.jinId)) base.push(where("share", "==", "pastor"));   // 내 진 밖은 공유된 것만
     if (f.cellId) qs.push(query(col, ...base, where("cellId", "==", f.cellId)));
-    else recentYms(REP_MONTHS).forEach(ym => qs.push(query(col, ...base, where("ym", "==", ym))));
+    else (f.yms || recentYms(f.months || REP_MONTHS)).forEach(ym => qs.push(query(col, ...base, where("ym", "==", ym))));
   }
   const rs = await Promise.all(qs.map(q => getDocs(q)));
   const seen = {};
@@ -8052,7 +8109,8 @@ async function openReports(cellId) {
   show("s-loading");
   await loadOrg();
   if (canLead() || ["coach","jinjang","pastor"].includes(me.role)) { await loadMeetings(); await loadSouls(); }
-  state.repF = { cellId: cellId === undefined ? ((state.repF && state.repF.cellId) || "") : cellId }; state.repCalYm = "";
+  const pf = state.repF || {};
+  state.repF = { cellId: cellId === undefined ? (pf.cellId || "") : cellId, months: pf.months || REP_MONTHS, yms: pf.yms || null, q: pf.q || "" }; state.repCalYm = "";
   if (canLead()) syncMyReports().catch(() => {});
   renderRepChips();
   $("rep-list").innerHTML = `<p class="muted">불러오는 중…</p>`;
@@ -8068,12 +8126,18 @@ function repCells() {
 }
 function renderRepChips() {
   const f = state.repF || {}, cells = repCells();
-  $("rep-chips").innerHTML = `<button type="button" data-repc="" class="${!f.cellId ? "on" : ""}">최근 ${REP_MONTHS}달 · 모든 셀</button>`
+  /* 47단계 — 기간 고르기 · 찾기 */
+  const RP = [[3, "3개월"], [6, "6개월"], [12, "1년"], [0, "직접"]];
+  $("rep-per").innerHTML = RP.map(([m, l]) => `<button type="button" data-repm="${m}" class="${(f.yms ? 0 : (f.months || REP_MONTHS)) === m ? "on" : ""}">${l}</button>`).join("");
+  $("rep-range").hidden = !f.yms;
+  $("rep-chips").innerHTML = `<button type="button" data-repc="" class="${!f.cellId ? "on" : ""}">${f.yms ? "고른 기간" : `최근 ${f.months || REP_MONTHS}달`} · 모든 셀</button>`
     + cells.map(c => `<button type="button" data-repc="${c.id}" class="${f.cellId === c.id ? "on" : ""}">${cellChipIn(c)}</button>`).join("");
 }
 function renderRepList() {
   renderRepSide();
-  const rows = state.reps || [], f = state.repF || {};
+  const f = state.repF || {}, q = (f.q || "").trim();
+  const rows = (state.reps || []).filter(r => !q || [r.cellName || cellNameOf(r.cellId), r.leaderName, r.topic, r.place, ...Object.values(r.names || {})]
+    .some(v => String(v || "").includes(q)));
   const byMonth = {};
   rows.forEach(r => { (byMonth[ymOf(r.date)] = byMonth[ymOf(r.date)] || []).push(r); });
   const months = Object.keys(byMonth).sort().reverse();
@@ -8109,6 +8173,7 @@ $("rep-list").addEventListener("click", (ev) => {
 $("rep-back").onclick = () => openHome();
 async function openReport(id) {
   const r = (state.reps || []).find(x => x.id === id); if (!r) return;
+  state.repBack = "";
   state.rep = r;
   $("rep1-title").textContent = `${fmtDate(r.date)} · ${r.cellName || cellNameOf(r.cellId) || "셀"}`;
   const grp = { present: [], online: [], absent: [] };
@@ -8125,8 +8190,10 @@ async function openReport(id) {
       <h3 style="font-size:calc(14px*var(--fs,1));font-weight:600">출석 ${c.ok} / ${c.all}</h3>
       ${["present", "online", "absent"].map(k => grp[k].length ? `<p style="margin-top:8px"><span class="chip${k === "absent" ? " warn" : ""}">${ATT[k]} ${grp[k].length}</span> ${grp[k].map(esc).join(" · ")}</p>` : "").join("")}
     </div>
-    <div id="rep1-people" style="margin-top:10px">${(r.peopleIds || []).length ? `<p class="muted">나눔 불러오는 중…</p>` : ""}</div>`;
+    <div id="rep1-people" style="margin-top:10px">${(r.peopleIds || []).length ? `<p class="muted">나눔 불러오는 중…</p>` : ""}</div>
+    <div class="card" style="margin-top:10px" id="rep1-talk" data-talkbox="1"></div>`;
   show("s-report");
+  mountTalk("rep1-talk", repTalk(r));   // 47단계 — 같은 진이 함께 보는 댓글 · 반응
   const ids = r.peopleIds || [];
   if (!ids.length) return;
   const got = await Promise.all(ids.map(k => getDoc(doc(db, "reports", r.id, "people", k))
@@ -8140,7 +8207,12 @@ async function openReport(id) {
       ${p.pray ? `<p style="margin-top:6px;white-space:pre-wrap"><span class="muted">기도 </span>${esc(p.pray)}</p>` : ""}
     </div>`).join("")}</div>` : "";
 }
-$("rep1-back").onclick = () => { show("s-reports"); };
+$("rep1-back").onclick = () => {
+  const b = state.repBack; state.repBack = "";
+  if (b && b !== "s-reports" && b !== "s-report") { if (b === "s-home") openHome(); else show(b); return; }
+  if (!($("rep-list").innerHTML || "").trim()) { openReports(""); return; }
+  show("s-reports");
+};
 
 /* ════════════════════════════════════════════════════════════
    22단계 · 보고서 가져오기 (수퍼) — 노션에서 정리한 파일(.json)을 한 번에 넣습니다
@@ -9990,6 +10062,7 @@ function helpFaq() {
     ["인턴 후보는 누가 보나요?", `그 셀 셀리더 · 그 셀 코치 · 진장 · 소유자만. 후보 본인과 다른 셀리더에게는 보이지 않고, 명부에도 넘어가지 않아요.`],
     ["초대 메일 없이 등록만 하고 싶어요", `이제 기본이 조용히 등록이에요. 셀리더 명단(왼쪽 메뉴 '관리' › 셀리더 명단 · 초대)에서 이메일을 넣고 ${kb("", "조용히 등록")} → 알릴 때 그 카드의 ${kb("", "링크 보내기")}를 누르면 안내 글이 복사돼요(폰은 카톡 · 문자 고르기).`],
     ["셀리더 이메일을 잘못 넣었어요 · 바뀌었어요", `가입 전이면 셀리더 명단의 그 카드에서 ${kb("", "고치기")} → 이메일을 고치고 ${kb("", "저장")}. 새 이메일로 같은 자리가 다시 걸리고 옛 등록은 지워져요(아무것도 보내지 않음). 이미 가입한 분은 이메일이 곧 로그인하는 구글 계정이라, 다른 구글 계정으로 옮기려면 수퍼 관리자에게 문의해 주세요.`],
+    ["게시판에는 무엇을 올려요?", `공지 · 나눔 · 자료를 올려요. '교회 전체' 또는 '우리 진만' 볼 수 있게 고를 수 있고, 링크 5개 · 사진 4장까지 넣을 수 있어요. 영혼의 개인 이야기 · 기도 내용은 여러 사람이 보는 게시판 말고 영혼 카드에 적어 주세요. 공지는 수퍼 관리자 · 진장 · 교역자가 써요.`],
     ["셀 보고는 어디서 써요?", `홈 맨 위 '이번 주 셀 보고' 카드의 [셀 보고 쓰기]를 누르면 돼요. 어느 화면에서든 컴퓨터는 왼쪽 메뉴 맨 위 [＋ 기록 쓰기], 폰은 아래 가운데 ＋ 를 누르고 '셀 보고'를 골라도 돼요. 모임이 없던 주는 카드의 '이번 주는 모임이 없었어요'를 눌러 두세요.`],
     ["한 사람이 여러 직책을 맡아요 (겸직)", `모든 직책을 겸할 수 있어요. 조직 구성에서 그 자리에 이미 가입한 분을 고르면 원래 직책은 그대로 남고 새 직책이 더해져요 — 담당 교역자 · 수퍼 관리자도 마찬가지(수퍼는 소유자만 세워요). 겸직한 분은 맡은 모든 직책의 화면을 함께 쓰고, 교역자로 맡은 진에서는 '교역자에게 보이기'로 공유된 것만 봐요.`],
     ["관리 화면은 어디 있어요?", `컴퓨터는 왼쪽 메뉴 아래 '관리' 묶음, 폰은 더보기 맨 위 '관리 바로 가기'예요 — 셀리더 명단 · 초대, 조직 구성, 셀 관리, 리더 관리, 조직도, 사용 현황.`],
@@ -11220,14 +11293,15 @@ document.addEventListener("click", (ev) => {
 /* ── 셀 건강 — 셀 하나 = 카드 하나 (41단계 그림판)
    [반원 출석률 + 숫자 4칸] [주마다 온 사람 — 쌓인 막대] / 사람별 8주 칸 + 고리 / 인턴 ── */
 function healthCard(c, h, mine, ext) {
-  const ms = (ext ? ext.meetings : cellMeetings(c.id)).filter(m => { const n = daysSince(m.date); return n !== null && n >= 0 && n < 56; })
+  const ms = (ext ? ext.meetings : cellMeetings(c.id)).filter(m => { const n = daysSince(m.date); return n !== null && n >= 0 && n < hlW() * 7; })
     .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  const msD = ms.slice(-12);   // 사람별 칸은 최근 12번 모임까지 (기간이 길어도 한 줄에)
   let P = 0, O = 0, A = 0;
   ms.forEach(m => Object.values(m.attendance || {}).forEach(v => { if (v === "present") P++; else if (v === "online") O++; else if (v === "absent") A++; }));
   const gauge = gxGauge([{ v: P, c: "var(--gx-sage)" }, { v: O, c: "var(--gx-blue)" }, { v: A, stp: 1 }],
     h.rate == null ? "—" : h.rate + "%", h.rate == null ? "기록 없음" : "출석 + 온라인", 300, 34);
   /* 주마다 — 온 사람 (출석 + 온라인), 모임 없는 주는 점선 */
-  const W = gxWeeks([c.id], 8, ext ? ext.meetings : null), N = Math.max(1, ext ? ext.people.length : h.people.length, ...W.map(w => w.marked));
+  const W = gxWeeks([c.id], Math.min(hlW(), 12), ext ? ext.meetings : null), N = Math.max(1, ext ? ext.people.length : h.people.length, ...W.map(w => w.marked));
   const H = 190;
   const bars = `<div class="vbars gx-stack" style="--h:${H}px">${W.map(w => { const hh = Math.round(H * w.came / N);
     return `<div class="vb${w.ms.length ? "" : " none"}${w.marked && w.came / w.marked < .5 ? " low" : ""}" title="${esc(w.lab)} ${w.ms.length ? `출석 ${w.p} · 온라인 ${w.o} · 결석 ${w.a}` : "모임 없음"}">
@@ -11239,8 +11313,8 @@ function healthCard(c, h, mine, ext) {
   const call = x1 == null ? "" : gxCall("chart", x0 != null && x1 < x0 ? "wine" : "sage",
     `최근 4주 평균 <b>${x1}명</b>${x0 != null ? ` · 그 전보다 ${x1 >= x0 ? "+" : ""}${Math.round((x1 - x0) * 10) / 10}명` : ""}${skip ? ` · 모임 없는 주 ${skip}번` : ""}`);
   const ppl = (ext ? ext.people : h.people.map(s => ({ key: attKey(s), o: s }))).map(({ key: k, o: s }) => {
-    const cells = ms.map(m => (m.attendance || {})[k] || "");
-    const okn = cells.filter(v => v && v !== "absent").length, rec = cells.filter(Boolean).length;
+    const all = ms.map(m => (m.attendance || {})[k] || ""), cells = msD.map(m => (m.attendance || {})[k] || "");
+    const okn = all.filter(v => v && v !== "absent").length, rec = all.filter(Boolean).length;
     const r = rec ? Math.round(okn / rec * 100) : null, tone = r == null ? "" : r >= 75 ? "good" : r >= 50 ? "mid" : "low";
     return { s, cells, r, tone };
   });
@@ -11252,20 +11326,20 @@ function healthCard(c, h, mine, ext) {
       <span class="who">${esc(cellLeadName(c) ? cellLeadName(c) + " 셀리더" : leaderLabel(c.id))}</span>${ext ? `<span class="chip ro-chip">열람만</span>` : ""}
       <span class="notes">${h.notes.map(([k, t]) => `<span class="chip ${k}">${esc(t)}</span>`).join("") || `<span class="chip">기록이 더 쌓이면 보여요</span>`}</span></div>
     <div class="hc-top">
-      <div class="hc-sum"><p class="gx-t">8주 출석률</p>${gauge}
+      <div class="hc-sum"><p class="gx-t">${hlLab()} 출석률</p>${gauge}
         <div class="hc-kpi">
-          <div><p>8주 셀모임</p><b>${h.ms}<em>회</em></b></div>
+          <div><p>${hlLab()} 셀모임</p><b>${h.ms}<em>회</em></b></div>
           <div class="sage"><p>평균 출석</p><b>${h.avg === null ? "—" : h.avg + "<em>명</em>"}</b></div>
           <div class="gold"><p>새 방문자</p><b>${h.visitors}<em>명</em></b></div>
           <div class="${h.care ? "wine" : ""}"><p>연달아 결석</p><b>${h.care}<em>명</em></b></div>
         </div></div>
-      <div class="hc-chart"><div class="gx-h"><h3>주마다 누가 왔나</h3>${gxLeg([["var(--gx-sage)", "출석"], ["var(--gx-blue)", "온라인"], ["dash", "모임 없음"]])}</div>
-        ${ms.length ? bars + call : `<p class="gx-empty" style="padding:60px 0">최근 8주 셀모임 기록이 없어요</p>`}</div>
+      <div class="hc-chart"><div class="gx-h"><h3>주마다 누가 왔나${hlW() > 12 ? " · 최근 12주" : ""}</h3>${gxLeg([["var(--gx-sage)", "출석"], ["var(--gx-blue)", "온라인"], ["dash", "모임 없음"]])}</div>
+        ${ms.length ? bars + call : `<p class="gx-empty" style="padding:60px 0">최근 ${hlLab()} 셀모임 기록이 없어요</p>`}</div>
     </div>
-    ${ppl.length && ms.length ? `<p class="hc-sec">사람별 출석 <span>최근 8주 · 칸 하나 = 모임 하나 · ${state.hlSort === "low" ? "자주 빠지는 사람이 위에" : "셀리더가 정한 순서"}</span></p>
+    ${ppl.length && ms.length ? `<p class="hc-sec">사람별 출석 <span>칸은 최근 ${msD.length}번 모임 · 고리는 ${hlLab()} 출석률 · ${state.hlSort === "low" ? "자주 빠지는 사람이 위에" : "셀리더가 정한 순서"}</span></p>
       <div class="hppl">${ppl.map(p => `<div class="hp ${p.tone}">
         ${avatar(p.s, 36)}<span class="nm" title="${esc(p.s.name)}">${esc(p.s.name)}</span>
-        <span class="dd">${p.cells.map((v, i) => `<i class="${v || "nr"}" title="${esc(md(ms[i].date))} ${v ? ATT[v] : "기록 없음"}"></i>`).join("")}</span>
+        <span class="dd">${p.cells.map((v, i) => `<i class="${v || "nr"}" title="${esc(md(msD[i].date))} ${v ? ATT[v] : "기록 없음"}"></i>`).join("")}</span>
         <span class="rt">${gxRing(p.r, gxRateTone(p.r), 48, 5)}<b>${p.r == null ? "—" : p.r + "%"}</b></span></div>`).join("")}</div>
       ${gxLeg([["var(--gx-sage)", "출석"], ["var(--gx-blue)", "온라인"], ["var(--brand)", "결석"], ["dash", "기록 없음"]])}` : ""}
     <p class="hc-sec">인턴 (예비 셀리더) ${h.interns.length}명 <span>${canTick ? "눌러서 세우거나 빼요 · 순서는 '순서 · 인턴'에서" : ext && canPipe(c.id) ? "진장 · 코치 · 소유자는 정할 수 있어요" : ""}</span></p>
@@ -11281,7 +11355,7 @@ function renderStats() {
     (u) => `${cellNameOf(u.cellId) || ""} ${u.name} 님 셀 — 셀모임 · 출석은 셀 보고에서, 만남은 횟수 · 종류만 (누구와 · 내용은 안 보여요).`);
   ["st-cells", "st-opts", "st-people"].forEach(id => { $(id).hidden = stOther(); });
   if (stOther()) { $("st-period").querySelectorAll("[data-per]").forEach(b => b.classList.toggle("on", b.dataset.per === state.st.per)); renderOtherStats(); return; }
-  const S = state.st, from = statsFrom(S.per), to = todayStr();
+  const S = state.st, from = statsFrom(S.per), to = statsTo(); syncStRange();
   const inP = (d) => !!d && d >= from && d <= to;
   $("st-period").querySelectorAll("[data-per]").forEach(b => b.classList.toggle("on", b.dataset.per === S.per));
   const ids = [...new Set(state.souls.map(cellOfSoul).filter(Boolean))];
@@ -11386,7 +11460,7 @@ function renderStats() {
 /* ── 다른 셀리더 셀 통계 (진장 · 코치 · 수퍼) — 같은 그림판 ── */
 function renderOtherStats() {
   const D = state.stOtherData; if (!D) return;
-  const from = statsFrom(state.st.per), to = todayStr(), inP = (d) => !!d && d >= from && d <= to;
+  const from = statsFrom(state.st.per), to = statsTo(), inP = (d) => !!d && d >= from && d <= to;
   const reps = D.reps.filter(r => inP(r.date)).sort((a, b) => String(a.date).localeCompare(String(b.date)));
   let ok = 0, all = 0; reps.forEach(r => { const k = repCount(r); ok += k.ok; all += k.all; });
   const meets = D.items.filter(x => !x.p && inP(x.d));
@@ -11579,7 +11653,7 @@ function hlScopeCells() {
 function hlFromReps(c, reps) {
   const ms = reps.filter(r => r.cellId === c.id).map(r => ({ id: r.id, cellId: c.id, date: r.date, attendance: { ...(r.att || {}) }, visitors: r.visitors || "",
     lead: [r.leaderMemberId, r.leaderUid ? "u_" + r.leaderUid : ""].filter(Boolean), names: r.names || {} }));
-  const in56 = ms.filter(m => { const n = daysSince(m.date); return n !== null && n >= 0 && n < 56; });
+  const in56 = ms.filter(m => { const n = daysSince(m.date); return n !== null && n >= 0 && n < hlW() * 7; });
   const leadKeys = new Set(ms.flatMap(m => m.lead)), names = {};
   ms.forEach(m => Object.assign(names, m.names));
   in56.forEach(m => m.lead.forEach(k => delete m.attendance[k]));
@@ -11595,16 +11669,17 @@ function hlFromReps(c, reps) {
   const care = people.filter(p => { let n = 0; for (const m of desc) { const v = m.attendance[p.key]; if (!v) continue; if (v === "absent") n++; else break; } return n >= CARE_AT; }).length;
   const interns = people.filter(p => p.o.intern).map(p => p.o);
   const notes = [];
-  if (in56.length < 4) notes.push(["warn", "모임이 뜸해요"]);
+  if (hlFew(in56.length)) notes.push(["warn", "모임이 뜸해요"]);
   if (interns.length && avg !== null && avg >= 10) notes.push(["ok", "분가를 준비해 볼 때"]);
   else if (!interns.length && avg !== null && avg >= 8) notes.push(["warn", "인턴을 세울 때"]);
-  if (rate !== null && rate >= 75 && in56.length >= 6) notes.push(["ok", "꾸준해요"]);
+  if (rate !== null && rate >= 75 && in56.length >= Math.ceil(hlW() * 0.75)) notes.push(["ok", "꾸준해요"]);
   if (care) notes.push(["warn", `연달아 결석 ${care}명`]);
   return { h: { ms: in56.length, avg, rate, visitors, people: [], interns, care, notes }, ext: { meetings: in56, people, ro: true } };
 }
 async function hlReps(force) {
-  if (!force && state.hlRepAt && Date.now() - state.hlRepAt < 120000) return state.hlReps;
-  try { state.hlReps = await loadReports({}); state.hlRepAt = Date.now(); } catch (e) { state.hlReps = []; $("hl-err").textContent = msgOf(e); }
+  const months = Math.max(REP_MONTHS, Math.ceil(hlW() * 7 / 30) + 1);
+  if (!force && state.hlRepAt && state.hlRepM >= months && Date.now() - state.hlRepAt < 120000) return state.hlReps;
+  try { state.hlReps = await loadReports({ months }); state.hlRepAt = Date.now(); state.hlRepM = months; } catch (e) { state.hlReps = []; $("hl-err").textContent = msgOf(e); }
   return state.hlReps;
 }
 async function openHealth() {
@@ -11616,7 +11691,8 @@ async function openHealth() {
   await renderHealth(); $("hl-err").textContent = ""; markSide("health"); show("s-health");
 }
 async function renderHealth() {
-  state.hlSort = state.hlSort || "seq";
+  state.hlSort = state.hlSort || "seq"; state.hlOn = true;
+  $("hl-per").innerHTML = HL_P.map(([w, l]) => `<button type="button" data-hlw="${w}" class="${w === hlW() ? "on" : ""}">${l}</button>`).join("");
   document.querySelectorAll("#hl-sort [data-hs]").forEach(b => b.classList.toggle("on", b.dataset.hs === state.hlSort));
   const { mine, all } = hlScopeCells(), own = new Set(ownCells().map(c => c.id)), mineIds = new Set(mine.map(c => c.id));
   const others = all.filter(c => !mineIds.has(c.id));
@@ -11630,7 +11706,7 @@ async function renderHealth() {
   $("hl-sort").hidden = state.hlCell === "all";
   const V = state.hlCell;
   if (V === "mine") {
-    $("hl-sub").textContent = "최근 8주 셀모임 기록으로 셈해요.";
+    $("hl-sub").textContent = `최근 ${hlLab()} 셀모임 기록으로 셈해요.`;
     $("hl-body").innerHTML = mine.map(c => healthCard(c, cellHealth(c.id), own.has(c.id))).join("") || `<p class="muted">볼 수 있는 셀이 없어요.</p>`;
     return;
   }
@@ -11638,18 +11714,18 @@ async function renderHealth() {
   const reps = await hlReps();
   if (state.hlCell !== V) return;
   if (V === "all") {
-    $("hl-sub").textContent = "셀마다 최근 8주 — 셀 보고 기준 · 줄을 누르면 그 셀";
+    $("hl-sub").textContent = `셀마다 최근 ${hlLab()} — 셀 보고 기준 · 줄을 누르면 그 셀`;
     const rows = all.map(c => {
       const R = mineIds.has(c.id) ? { h: cellHealth(c.id), ext: null } : hlFromReps(c, reps);
-      const W = mineIds.has(c.id) ? gxWeeks([c.id], 8) : gxWeeks([c.id], 8, R.ext.meetings);
+      const W = mineIds.has(c.id) ? gxWeeks([c.id], Math.min(hlW(), 12)) : gxWeeks([c.id], Math.min(hlW(), 12), R.ext.meetings);
       return { c, ...R, W };
     }).sort((a, b) => (b.h.rate ?? -1) - (a.h.rate ?? -1));
     const mx = Math.max(1, ...rows.flatMap(r => r.W.map(w => w.came)));
     const rated = rows.filter(r => r.h.rate != null), avgR = rated.length ? Math.round(rated.reduce((n, r) => n + r.h.rate, 0) / rated.length) : null;
     $("hl-body").innerHTML = `<div class="gx-kpis">
         ${gxKpi({ l: "셀", v: all.length, u: "곳", hero: 1, d: `보고가 있는 셀 ${rows.filter(r => r.h.ms).length}곳` })}
-        ${gxKpi({ l: "평균 출석률", v: avgR ?? "—", u: avgR == null ? "" : "%", ic: "check", tone: "sage", d: "셀마다 8주 출석률의 평균" })}
-        ${gxKpi({ l: "모임이 뜸한 셀", v: rows.filter(r => r.h.ms < 4).length, u: "곳", ic: "alert", tone: "wine", d: "8주에 4번 안 됨" })}
+        ${gxKpi({ l: "평균 출석률", v: avgR ?? "—", u: avgR == null ? "" : "%", ic: "check", tone: "sage", d: `셀마다 ${hlLab()} 출석률의 평균` })}
+        ${gxKpi({ l: "모임이 뜸한 셀", v: rows.filter(r => hlFew(r.h.ms)).length, u: "곳", ic: "alert", tone: "wine", d: `${hlLab()}에 ${Math.max(2, Math.ceil(hlW() / 2))}번 안 됨` })}
         ${gxKpi({ l: "연달아 결석", v: rows.reduce((n, r) => n + (r.h.care || 0), 0), u: "명", ic: "heart", tone: "wine", d: `${CARE_AT}번 넘게 · 모든 셀 합계` })}
       </div>
       <div class="gx-card hl-all"><div class="gx-h"><h3>셀마다</h3>${gxLeg([["var(--gx-sage)", "주마다 온 사람"], ["dash", "모임 없음"]])}</div>
@@ -11951,6 +12027,11 @@ function renderHomeReport() {
         <i class="dot" style="background:#E8B473"></i><div class="grow" data-gosoul="${x.id}"><p class="nm">${esc(x.t)}</p><p class="sub">${esc(x.sub)}</p></div>
         <button type="button" class="btn-sm" data-carelog="${x.id}">관심 기록</button></div>`).join("")}</div>` : "";
     box.innerHTML = cards + sugH;
+    /* 47단계 — 보고한 이번 주 셀 보고에 달린 댓글 · 반응 */
+    cells.forEach(c => { const p = reportPlan(c.id); if (!p.cur || !p.cur.reportedAt) return;
+      repTalkCount(p.cur.id).then(n => { if (!n || !(n.c + n.r)) return;
+        const f = document.querySelector(`[data-rpcell="${c.id}"] .rp-foot`);
+        if (f && !f.querySelector(".rp-talk")) f.insertAdjacentHTML("beforeend", `<button type="button" class="link rp-talk" data-reptalk="${p.cur.id}">댓글 ${n.c}${n.r ? ` · 반응 ${n.r}` : ""} ›</button>`); }); });
     return;
   }
   /* 진장 · 코치 · 교역자 — 맡은 셀 가운데 이번 주 보고가 온 셀 */
@@ -12132,3 +12213,313 @@ if ($("more-cache")) {
     setTimeout(() => location.reload(), 900);
   };
 }
+
+/* 47단계 — 셀 보고 모아보기: 기간(3개월 · 6개월 · 1년 · 직접 고른 달) · 이름 · 셀 · 주제로 찾기 */
+const ymRange = (a, b) => { const out = []; let [y, m] = a.split("-").map(Number); const [y2, m2] = b.split("-").map(Number);
+  while ((y < y2 || (y === y2 && m <= m2)) && out.length < 36) { out.push(`${y}-${pad2(m)}`); m++; if (m > 12) { m = 1; y++; } } return out; };
+async function reloadReps() {
+  renderRepChips(); $("rep-list").innerHTML = `<p class="muted">불러오는 중…</p>`;
+  try { state.reps = await loadReports(state.repF); renderRepList(); }
+  catch (e) { $("rep-list").innerHTML = `<p class="err">${esc(msgOf(e))}</p>`; }
+}
+$("rep-per").addEventListener("click", (ev) => {
+  const b = ev.target.closest("[data-repm]"); if (!b) return;
+  const m = Number(b.dataset.repm), f = state.repF;
+  if (m) { f.months = m; f.yms = null; reloadReps(); return; }
+  const to = todayStr().slice(0, 7), from = recentYms(6).slice(-1)[0] || to;
+  $("rep-from").value = $("rep-from").value || from; $("rep-to").value = $("rep-to").value || to;
+  f.yms = ymRange($("rep-from").value, $("rep-to").value); reloadReps();
+});
+$("rep-range-go").onclick = () => {
+  const a = $("rep-from").value, b = $("rep-to").value;
+  if (!a || !b || a > b) { toast("시작 달이 끝 달보다 앞이어야 해요."); return; }
+  state.repF.yms = ymRange(a, b); reloadReps();
+};
+$("rep-q").addEventListener("input", () => { state.repF.q = $("rep-q").value; renderRepList(); });
+
+
+/* ════════ 47단계 — 함께 보기: 셀 보고 댓글 · 반응 / 전체 게시판 ════════ */
+/* ── 댓글 칸 (셀 보고 · 게시글 같이 씀) ──
+   t = { key, col: 댓글 컬렉션, reacts: 반응 컬렉션(없으면 반응 없음), owner, title, nkind, ntarget, onCount }
+   알림은 같은 진 사람에게만 가요 (보안 규칙이 진 밖으로 보내는 것을 막아요). */
+const TALK = {};
+async function mountTalk(boxId, t) {
+  TALK[boxId] = { ...t, rows: [], rx: [] };
+  const box = $(boxId); if (!box) return;
+  box.innerHTML = `<div class="talk"><p class="muted">댓글 불러오는 중…</p></div>`;
+  try {
+    const [c, r] = await Promise.all([getDocs(t.col), t.reacts ? getDocs(t.reacts) : Promise.resolve(null)]);
+    TALK[boxId].rows = pack(c).sort((a, b) => (a.atMs || 0) - (b.atMs || 0));
+    TALK[boxId].rx = r ? pack(r) : [];
+  } catch (e) { box.innerHTML = `<div class="talk"><p class="err">${esc(msgOf(e))}</p></div>`; return; }
+  paintTalk(boxId);
+}
+function paintTalk(boxId) {
+  const T = TALK[boxId], box = $(boxId); if (!T || !box) return;
+  const mineRx = T.rx.find(x => x.id === uid()) || {};
+  const nP = T.rx.filter(x => x.pray).length, nC = T.rx.filter(x => x.clap).length;
+  const canDelAll = T.owner === uid() || isSupU(state.me);
+  box.innerHTML = `<div class="talk">
+    ${T.reacts ? `<div class="talk-rx">
+      <button type="button" class="pchip${mineRx.pray ? " on" : ""}" data-trx="pray" aria-pressed="${!!mineRx.pray}">🙏 기도할게요${nP ? ` <b>${nP}</b>` : ""}</button>
+      <button type="button" class="pchip${mineRx.clap ? " on" : ""}" data-trx="clap" aria-pressed="${!!mineRx.clap}">👏 수고했어요${nC ? ` <b>${nC}</b>` : ""}</button>
+      ${nP + nC ? `<span class="muted talk-who">${esc(T.rx.filter(x => x.pray || x.clap).map(x => x.byName).filter(Boolean).slice(0, 6).join(", "))}</span>` : ""}
+    </div>` : ""}
+    <h3 class="talk-h">댓글 ${T.rows.length || ""}</h3>
+    <div class="talk-list">${T.rows.map(c => `<div class="cmt">
+        <p class="h"><span><b style="color:var(--text)">${esc(c.byName || "")}</b> · ${fmtAgo(c.atMs)}</span>
+          ${c.by === uid() || canDelAll ? `<button type="button" class="btn-sm danger" data-tdel="${c.id}">${c.by === uid() ? "지우기" : "숨기기"}</button>` : ""}</p>
+        <p class="b">${esc(c.body)}</p></div>`).join("") || `<p class="muted">아직 댓글이 없어요. 격려 한마디 남겨 보세요.</p>`}</div>
+    <div class="talk-in"><textarea rows="1" maxlength="2000" placeholder="댓글 쓰기 — 같은 진 셀리더 · 코치 · 진장이 함께 봐요" data-tbody></textarea>
+      <button type="button" class="btn-sm talk-send" data-tsend>보내기</button></div>
+    <p class="err" data-terr></p></div>`;
+  if (T.onCount) T.onCount(T.rows.length);
+}
+document.addEventListener("click", async (ev) => {
+  const host = ev.target.closest("[data-talkbox]"); if (!host) return;
+  const id = host.id, T = TALK[id]; if (!T) return;
+  const err = (m) => { const e = host.querySelector("[data-terr]"); if (e) e.textContent = m; };
+  const rx = ev.target.closest("[data-trx]");
+  if (rx) {
+    const k = rx.dataset.trx, cur = T.rx.find(x => x.id === uid()) || { id: uid(), pray: false, clap: false };
+    const next = { pray: !!cur.pray, clap: !!cur.clap, byName: state.me.name || "", atMs: Date.now() }; next[k] = !next[k];
+    try { await setDoc(doc(T.reacts, uid()), next); T.rx = T.rx.filter(x => x.id !== uid()).concat([{ id: uid(), ...next }]); paintTalk(id); bump("react"); }
+    catch (e) { err(msgOf(e)); }
+    return;
+  }
+  const del = ev.target.closest("[data-tdel]");
+  if (del) {
+    const c = T.rows.find(x => x.id === del.dataset.tdel); if (!c) return;
+    if (!confirm(c.by === uid() ? "이 댓글을 지울까요?" : "이 댓글을 숨길까요? (지워져요)")) return;
+    try { await deleteDoc(doc(T.col, c.id)); T.rows = T.rows.filter(x => x.id !== c.id); if (T.onDel) T.onDel(); paintTalk(id); }
+    catch (e) { err(msgOf(e)); }
+    return;
+  }
+  if (ev.target.closest("[data-tsend]")) {
+    const ta = host.querySelector("[data-tbody]"), body = (ta.value || "").trim();
+    if (!body) { err("내용을 적어 주세요."); return; }
+    const btn = ev.target.closest("[data-tsend]"); btn.disabled = true; err("");
+    try {
+      const row = { by: uid(), byName: (state.me.name || "").slice(0, 40), body, atMs: Date.now(), at: serverTimestamp() };
+      const ref = await addDoc(T.col, row);
+      T.rows.push({ id: ref.id, ...row }); if (T.onAdd) T.onAdd();
+      const to = new Set([T.owner, ...T.rows.map(c => c.by)]); to.delete(uid());
+      for (const u of to) {
+        const m = (state.members || []).find(x => x.id === u);
+        if (!u || !m || m.jinId !== state.me.jinId) continue;   // 같은 진 사람에게만 (규칙과 같게)
+        try { await addDoc(collection(db, "notices"), { to: u, from: uid(), fromName: state.me.name || "", kind: T.nkind, target: T.ntarget,
+          title: T.title, snippet: body.slice(0, 80), atMs: Date.now(), at: serverTimestamp(), read: false }); } catch {}
+      }
+      paintTalk(id); bump("comment");
+    } catch (e) { err(msgOf(e)); btn.disabled = false; }
+  }
+});
+
+/* ── 셀 보고 댓글 ── */
+function repTalk(r) {
+  return { col: collection(db, "reports", r.id, "comments"), reacts: collection(db, "reports", r.id, "reacts"),
+    owner: r.leaderUid || "", title: `${fmtDate(r.date)} ${r.cellName || cellNameOf(r.cellId) || "셀"}`, nkind: "repcmt", ntarget: { kind: "report", id: r.id } };
+}
+async function openReportById(id) {
+  let r = (state.reps || []).find(x => x.id === id);
+  if (!r) {
+    try { const d = await getDoc(doc(db, "reports", id)); if (d.exists()) { r = { id, ...d.data() }; state.reps = [r, ...(state.reps || [])]; } } catch {}
+  }
+  if (!r) { toast("지금은 볼 수 없는 셀 보고예요."); return; }
+  const from = curScreen; await openReport(id); state.repBack = from;
+}
+/* 홈 셀 보고 카드 — 이번 주 보고에 달린 댓글 · 반응 수 */
+async function repTalkCount(rid) {
+  try { const [c, r] = await Promise.all([getDocs(collection(db, "reports", rid, "comments")), getDocs(collection(db, "reports", rid, "reacts"))]);
+    return { c: c.size, r: pack(r).filter(x => x.pray || x.clap).length }; } catch { return null; }
+}
+
+/* ── 전체 게시판 ── */
+const BCAT = { notice: "공지", share: "나눔", data: "자료" };
+const boardSeen = () => Number(lsGet("mokja-board-seen") || 0);
+const boardNewN = () => (state.board || []).filter(p => !p.hidden && p.by !== uid() && (p.atMs || 0) > boardSeen()).length;
+async function loadBoard(force) {
+  if (!force && state.boardAt && Date.now() - state.boardAt < 60000) return state.board;
+  const me = state.me, col = collection(db, "board"), qs = [];
+  if (isSupU(me)) qs.push(col);
+  else {
+    qs.push(query(col, where("scope", "==", "all")));
+    const js = [...new Set([me.jinId, ...pastorJinsOf(me)].filter(Boolean))];
+    js.forEach(j => qs.push(query(col, where("scope", "==", "jin"), where("jinId", "==", j))));
+  }
+  const rs = await Promise.all(qs.map(q => getDocs(q)));
+  const seen = {};
+  state.board = rs.flatMap(pack).filter(p => seen[p.id] ? false : (seen[p.id] = true))
+    .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || (b.atMs || 0) - (a.atMs || 0));
+  state.boardAt = Date.now();
+  return state.board;
+}
+const canMod = (p) => isSupU(state.me) || (state.me.role === "jinjang" && p.scope === "jin" && p.jinId === state.me.jinId);
+const canNotice = () => isSupU(state.me) || state.me.role === "jinjang" || pastorJinsOf(state.me).length > 0;
+const hostOf = (u) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return ""; } };
+const ytId = (u) => { const m = String(u).match(/(?:youtube\.com\/(?:watch\?v=|shorts\/|live\/)|youtu\.be\/)([\w-]{11})/); return m ? m[1] : ""; };
+function linkCard(l) {
+  const y = ytId(l.url), h = hostOf(l.url);
+  return `<a class="lcard" href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">
+    ${y ? `<img src="https://i.ytimg.com/vi/${y}/mqdefault.jpg" alt="" loading="lazy" referrerpolicy="no-referrer">` : `<span class="lic">${RICON.share}</span>`}
+    <span class="ltx"><b>${esc(l.title || (y ? "유튜브 영상" : h))}</b><span>${esc(h)}</span></span></a>`;
+}
+async function openBoard() {
+  show("s-loading"); markSide("board");
+  await loadOrg();
+  try { await loadBoard(true); } catch (e) { toast(msgOf(e)); state.board = []; }
+  state.bdCat = state.bdCat || "all";
+  renderBoard(); show("s-board");
+  lsSet("mokja-board-seen", String(Date.now()));
+}
+function renderBoard() {
+  const C = state.bdCat, list = (state.board || []).filter(p => (C === "all" || p.cat === C) && (!p.hidden || canMod(p) || p.by === uid()));
+  $("bd-cats").innerHTML = [["all", "모두"], ["notice", "공지"], ["share", "나눔"], ["data", "자료"]]
+    .map(([k, l]) => `<button type="button" data-bdc="${k}" class="${k === C ? "on" : ""}">${l}</button>`).join("");
+  const seen = boardSeen();
+  $("bd-list").innerHTML = list.map(p => `<button type="button" class="post-row${p.pinned ? " pin" : ""}${p.hidden ? " hid" : ""}" data-post="${p.id}">
+      <span class="pr-l">
+        <span class="pr-k"><span class="chip ${p.cat === "notice" ? "rose" : p.cat === "data" ? "warn" : ""}">${BCAT[p.cat] || ""}</span>
+          ${p.pinned ? `<span class="chip ok">고정</span>` : ""}${p.scope === "jin" ? `<span class="chip">우리 진</span>` : ""}${p.hidden ? `<span class="chip lock">숨김</span>` : ""}
+          ${(p.atMs || 0) > seen && p.by !== uid() ? `<span class="dot"></span>` : ""}</span>
+        <b class="pr-t">${esc(p.title)}</b>
+        <span class="pr-s">${esc(p.byName || "")} · ${fmtAgo(p.atMs)}${p.cmtN ? ` · 댓글 ${p.cmtN}` : ""}${(p.links || []).length ? ` · 링크 ${p.links.length}` : ""}</span>
+      </span>
+      ${(p.th || []).length ? `<span class="pr-th"><img src="${p.th[0]}" alt="" loading="lazy">${p.th.length > 1 ? `<i>+${p.th.length - 1}</i>` : ""}</span>` : ""}
+    </button>`).join("")
+    || `<div class="empty-wrap"><img class="empty-art" src="./img/empty-board.webp" alt="" loading="lazy" style="width:200px"><p class="muted">아직 글이 없어요. 첫 글을 남겨 보세요.</p></div>`;
+}
+$("bd-cats").addEventListener("click", (ev) => { const b = ev.target.closest("[data-bdc]"); if (!b) return; state.bdCat = b.dataset.bdc; renderBoard(); });
+$("bd-list").addEventListener("click", (ev) => { const b = ev.target.closest("[data-post]"); if (b) openPost(b.dataset.post); });
+$("bd-back").onclick = () => openHome();
+$("bd-new").onclick = () => openPostEdit(null);
+async function openPost(id) {
+  let p = (state.board || []).find(x => x.id === id);
+  if (!p) { try { const d = await getDoc(doc(db, "board", id)); if (d.exists()) { p = { id, ...d.data() }; state.board = [p, ...(state.board || [])]; } } catch {} }
+  if (!p) { toast("지금은 볼 수 없는 글이에요."); return; }
+  state.post = p; markSide("board");
+  const mine = p.by === uid(), mod = canMod(p);
+  $("pt-acts").innerHTML = (mine ? `<button type="button" class="btn-sm" id="pt-edit">고치기</button>` : "")
+    + (mod ? `<button type="button" class="btn-sm" id="pt-pin">${p.pinned ? "고정 풀기" : "맨 위 고정"}</button><button type="button" class="btn-sm" id="pt-hide">${p.hidden ? "다시 보이기" : "숨기기"}</button>` : "")
+    + (mine || mod ? `<button type="button" class="btn-sm danger" id="pt-del">지우기</button>` : "");
+  $("pt-body").innerHTML = `<article class="post">
+      <p class="pr-k"><span class="chip ${p.cat === "notice" ? "rose" : p.cat === "data" ? "warn" : ""}">${BCAT[p.cat] || ""}</span>${p.scope === "jin" ? `<span class="chip">우리 진</span>` : `<span class="chip">교회 전체</span>`}</p>
+      <h2 class="post-t">${esc(p.title)}</h2>
+      <p class="muted post-m">${esc(p.byName || "")} · ${fmtAgo(p.atMs)}${p.editedAt ? " · 고침" : ""}</p>
+      ${p.body ? `<div class="post-b">${linkify(esc(p.body))}</div>` : ""}
+      ${(p.links || []).length ? `<div class="lcards">${p.links.map(linkCard).join("")}</div>` : ""}
+      ${p.imgN ? `<div class="post-imgs" id="pt-imgs">${(p.th || []).map((t, i) => `<button type="button" class="pimg" data-pimg="${i}"><img src="${t}" alt="사진 ${i + 1}"></button>`).join("")}</div>` : ""}
+    </article>
+    <div id="pt-talk" data-talkbox="1" style="margin-top:16px"></div>`;
+  show("s-post");
+  mountTalk("pt-talk", { col: collection(db, "board", p.id, "comments"), owner: p.by, title: p.title, nkind: "postcmt", ntarget: { kind: "post", id: p.id },
+    onAdd: () => { updateDoc(doc(db, "board", p.id), { cmtN: (p.cmtN || 0) + 1 }).then(() => { p.cmtN = (p.cmtN || 0) + 1; }).catch(() => {}); },
+    onDel: () => { if (p.cmtN > 0) updateDoc(doc(db, "board", p.id), { cmtN: p.cmtN - 1 }).then(() => { p.cmtN--; }).catch(() => {}); } });
+  /* 큰 사진은 열 때만 받아요 */
+  if (p.imgN) for (let i = 0; i < p.imgN; i++) getDoc(doc(db, "board", p.id, "imgs", String(i))).then(d => {
+    const im = document.querySelector(`#pt-imgs [data-pimg="${i}"] img`); if (d.exists() && im && state.post && state.post.id === p.id) im.src = d.data().d; }).catch(() => {});
+}
+const linkify = (h) => h.replace(/(https:\/\/[^\s<]+)/g, (u) => `<a href="${u}" target="_blank" rel="noopener noreferrer">${u}</a>`).replace(/\n/g, "<br>");
+$("pt-back").onclick = () => openBoard();
+document.addEventListener("click", async (ev) => {
+  const p = state.post; if (!p) return;
+  if (ev.target.closest("#pt-edit")) { openPostEdit(p); return; }
+  if (ev.target.closest("#pt-pin") || ev.target.closest("#pt-hide")) {
+    const patch = ev.target.closest("#pt-pin") ? { pinned: !p.pinned, hidden: !!p.hidden } : { pinned: !!p.pinned, hidden: !p.hidden };
+    try { await updateDoc(doc(db, "board", p.id), patch); Object.assign(p, patch); state.boardAt = 0; openPost(p.id); toast("바꿨어요."); } catch (e) { toast(msgOf(e)); }
+    return;
+  }
+  if (ev.target.closest("#pt-del")) {
+    if (!confirm("이 글을 지울까요? 댓글 · 사진도 함께 지워져요.")) return;
+    try {
+      const [cs] = await Promise.all([getDocs(collection(db, "board", p.id, "comments"))]);
+      await Promise.all(cs.docs.map(d => deleteDoc(d.ref)).concat(Array.from({ length: p.imgN || 0 }, (_, i) => deleteDoc(doc(db, "board", p.id, "imgs", String(i))).catch(() => {}))));
+      await deleteDoc(doc(db, "board", p.id)); state.board = (state.board || []).filter(x => x.id !== p.id); state.post = null; toast("지웠어요."); openBoard();
+    } catch (e) { toast(msgOf(e)); }
+    return;
+  }
+  const im = ev.target.closest("[data-pimg]");
+  if (im) { $("pv-img").src = im.querySelector("img").src; $("photo-view").showModal(); }
+});
+
+/* ── 글 쓰기 · 고치기 ── */
+const BD = { links: [], imgs: [] };   // imgs: { th, d } (새로 넣은 것) 또는 { th, keep:i } (예전 것)
+function openPostEdit(p) {
+  state.postEdit = p || null;
+  BD.links = p ? (p.links || []).map(l => ({ ...l })) : [];
+  BD.imgs = p ? (p.th || []).map((t, i) => ({ th: t, keep: i })) : [];
+  $("pe-title-h").textContent = p ? "글 고치기" : "새 글";
+  $("pe-cat").innerHTML = Object.entries(BCAT).filter(([k]) => k !== "notice" || canNotice())
+    .map(([k, l]) => `<button type="button" data-pec="${k}" class="${(p ? p.cat : "share") === k ? "on" : ""}">${l}</button>`).join("");
+  $("pe-scope").innerHTML = [["all", "교회 전체"], ["jin", "우리 진만"]]
+    .map(([k, l]) => `<button type="button" data-pes="${k}" class="${(p ? p.scope : "all") === k ? "on" : ""}"${p ? " disabled" : ""}>${l}</button>`).join("");
+  $("pe-scope-wrap").hidden = !state.me.jinId && !p;
+  $("pe-title").value = p ? p.title : ""; $("pe-body").value = p ? p.body || "" : ""; $("pe-url").value = ""; $("pe-err").textContent = "";
+  paintPe(); $("dlg-post").showModal();
+}
+function paintPe() {
+  $("pe-links").innerHTML = BD.links.map((l, i) => `<div class="pe-l"><span>${esc(hostOf(l.url))}</span><b>${esc(l.url)}</b><button type="button" class="btn-sm" data-pelx="${i}">빼기</button></div>`).join("");
+  $("pe-imgs").innerHTML = BD.imgs.map((m, i) => `<span class="pe-i"><img src="${m.th}" alt=""><button type="button" data-peix="${i}" aria-label="사진 빼기">×</button></span>`).join("")
+    + (BD.imgs.length < 4 ? `<label class="pe-add"><input type="file" accept="image/*" multiple id="pe-file" hidden>＋ 사진<small>${BD.imgs.length}/4</small></label>` : "");
+}
+$("dlg-post").addEventListener("click", (ev) => {
+  const c = ev.target.closest("[data-pec]"); if (c) { $("pe-cat").querySelectorAll("button").forEach(b => b.classList.toggle("on", b === c)); return; }
+  const sc = ev.target.closest("[data-pes]"); if (sc && !sc.disabled) { $("pe-scope").querySelectorAll("button").forEach(b => b.classList.toggle("on", b === sc)); return; }
+  const lx = ev.target.closest("[data-pelx]"); if (lx) { BD.links.splice(+lx.dataset.pelx, 1); paintPe(); return; }
+  const ix = ev.target.closest("[data-peix]"); if (ix) { BD.imgs.splice(+ix.dataset.peix, 1); paintPe(); return; }
+});
+$("pe-url-add").onclick = () => {
+  let u = $("pe-url").value.trim(); if (!u) return;
+  if (!/^https?:\/\//i.test(u)) u = "https://" + u;
+  u = u.replace(/^http:\/\//i, "https://");
+  try { const x = new URL(u); if (!x.hostname.includes(".")) throw 0; } catch { $("pe-err").textContent = "링크 주소를 확인해 주세요."; return; }
+  if (BD.links.length >= 5) { $("pe-err").textContent = "링크는 5개까지예요."; return; }
+  BD.links.push({ url: u.slice(0, 600) }); $("pe-url").value = ""; $("pe-err").textContent = ""; paintPe();
+};
+$("dlg-post").addEventListener("change", async (ev) => {
+  if (ev.target.id !== "pe-file") return;
+  const files = [...ev.target.files].slice(0, 4 - BD.imgs.length);
+  $("pe-err").textContent = "사진을 줄이는 중이에요…";
+  try {
+    for (const f of files) {
+      /* 기기에서 다시 그려 저장해요 — 사진 속 위치(GPS) · 촬영 정보가 남지 않아요 */
+      const [d, th] = await Promise.all([shrinkFit(f, { max: 1600, q: 0.74 }, 600000), shrinkFit(f, { max: 320, q: 0.62 }, 30000)]);
+      BD.imgs.push({ d, th });
+    }
+    $("pe-err").textContent = "";
+  } catch (e) { $("pe-err").textContent = msgOf(e); }
+  paintPe();
+});
+$("pe-cancel").onclick = () => $("dlg-post").close();
+$("pe-save").onclick = async () => {
+  const p = state.postEdit, title = $("pe-title").value.trim(), body = $("pe-body").value.trim();
+  const cat = ($("pe-cat").querySelector(".on") || {}).dataset?.pec || "share";
+  const scope = p ? p.scope : (($("pe-scope").querySelector(".on") || {}).dataset?.pes || "all");
+  if (!title) { $("pe-err").textContent = "제목을 적어 주세요."; return; }
+  if (title.length > 120) { $("pe-err").textContent = "제목은 120자까지예요."; return; }
+  if (body.length > 5000) { $("pe-err").textContent = "내용은 5000자까지예요."; return; }
+  $("pe-save").disabled = true; $("pe-err").textContent = "올리는 중…";
+  try {
+    const keep = BD.imgs, th = keep.map(m => m.th);
+    if (p) {
+      /* 사진 순서가 바뀌었을 수 있어 — 남길 예전 사진은 먼저 읽어 두고 새로 0..n 자리에 다시 써요 */
+      const olds = await Promise.all(keep.map(m => m.keep !== undefined ? getDoc(doc(db, "board", p.id, "imgs", String(m.keep))).then(d => d.exists() ? d.data().d : m.th) : Promise.resolve(m.d)));
+      await Promise.all(olds.map((d, i) => setDoc(doc(db, "board", p.id, "imgs", String(i)), { d })));
+      for (let i = keep.length; i < (p.imgN || 0); i++) await deleteDoc(doc(db, "board", p.id, "imgs", String(i))).catch(() => {});
+      const patch = { title, body, links: BD.links, th, imgN: keep.length, cat, editedAt: Date.now() };
+      await updateDoc(doc(db, "board", p.id), patch); Object.assign(p, patch);
+      $("dlg-post").close(); toast("고쳤어요."); openPost(p.id);
+    } else {
+      const row = { by: uid(), byName: state.me.name || "", role: state.me.role || "", jinId: state.me.jinId || "", scope, cat, title, body,
+        links: BD.links, th, imgN: keep.length, pinned: false, hidden: false, cmtN: 0, atMs: Date.now(), at: serverTimestamp() };
+      const ref = await addDoc(collection(db, "board"), row);
+      await Promise.all(keep.map((m, i) => setDoc(doc(db, "board", ref.id, "imgs", String(i)), { d: m.d })));
+      state.board = [{ id: ref.id, ...row }, ...(state.board || [])];
+      $("dlg-post").close(); toast("올렸어요."); bump("post"); openPost(ref.id);
+    }
+  } catch (e) { $("pe-err").textContent = msgOf(e); }
+  finally { $("pe-save").disabled = false; }
+};
+
+document.addEventListener("click", (ev) => { const b = ev.target.closest("[data-reptalk]"); if (b) openReportById(b.dataset.reptalk); });
+$("btn-m-repcmt").onclick = () => { if (state.meeting && state.meeting.id) openReportById(state.meeting.id); };
