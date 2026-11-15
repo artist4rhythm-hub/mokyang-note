@@ -3,7 +3,7 @@
    - Firebase 통신은 절대 캐시하지 않음 (항상 최신 데이터)
    - 파일을 새로 올리면 CACHE 이름을 바꿔 새 버전을 받게 함 */
 
-const CACHE = "mokja-v45-0";
+const CACHE = "mokja-v46-0";
 const SHELL = [
   "./",
   "./index.html",
@@ -16,7 +16,10 @@ const SHELL = [
   "./icons/favicon-32.png",
   "./icons/favicon-48.png",
   "./fonts/Cafe24SsukssukRegular.woff2",
-  "./fonts/Cafe24SsukssukLight.woff2"
+  "./fonts/Cafe24SsukssukLight.woff2",
+  "./img/home-dark.webp",
+  "./img/home-light.webp",
+  "./img/done-report.webp"
 ];
 /* 36단계 — 글꼴은 바뀌지 않으니 한 번 받으면 기기에 둔 것을 바로 씁니다 (1MB 넘는 파일을 매번 묻지 않게) */
 const FONT_CACHE = "mokja-fonts-1";
@@ -52,19 +55,19 @@ self.addEventListener("fetch", (ev) => {
     return;
   }
 
-  // 네트워크 우선 — 새로 올린 파일이 바로 반영되게.
-  // 브라우저의 HTTP 캐시가 옛 파일을 내주지 않도록 매번 서버에 '바뀌었나' 물어봅니다
-  // (안 바뀌었으면 서버가 짧게 '그대로'라고만 답해서 데이터는 거의 안 씁니다).
-  // 예전에 새로 올려도 Command+Shift+R 을 눌러야 했던 이유가 이것이었어요.
-  ev.respondWith(
-    fetch(req.url, { cache: "no-cache", credentials: "same-origin" })
-      .then(res => {
-        const copy = res.clone();
-        caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {});
-        return res;
-      })
-      .catch(() => caches.match(req).then(hit => hit || caches.match("./index.html")))
-  );
+  if (url.pathname.endsWith("/version.json")) return;   // 새 버전 확인은 늘 서버에서
+
+  // 46단계 — 저장본 먼저(빠르게 열기), 그와 동시에 서버에 '바뀌었나' 물어 저장본을 새것으로 바꿔 둡니다.
+  // 새로 올린 파일은 앱 위 '새 버전 → 지금 새로고침'을 누르면 바로, 안 눌러도 다음에 열 때 들어와요.
+  ev.respondWith(caches.open(CACHE).then(async (c) => {
+    const hit = await c.match(req);
+    const net = fetch(req.url, { cache: "no-cache", credentials: "same-origin" }).then(res => {
+      if (res.ok) c.put(req, res.clone()).catch(() => {});
+      return res;
+    });
+    if (hit) { ev.waitUntil(net.catch(() => {})); return hit; }
+    return net.catch(() => c.match("./index.html"));
+  }));
 });
 
 /* 앱이 열려 있을 때 새 소식을 기기 알림으로 띄웁니다 (페이지가 부탁하면).
