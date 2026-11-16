@@ -26,7 +26,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
 const APP_NAME = "목자의 삶";
-const APP_VERSION = "48.0 (2026-11-15)";
+const APP_VERSION = "48.1 (2026-11-15)";
 /* 35단계 — 버전 표시: v35.0 · 2026.11.12 업데이트 */
 const verNo = () => APP_VERSION.split(" ")[0];
 const verDate = () => (APP_VERSION.match(/\((.*)\)/) || [])[1] || "";
@@ -56,8 +56,16 @@ const fb = initializeApp(firebaseConfig);
 const auth = getAuth(fb);
 /* 46단계 — 빠른 화면: 받은 자료를 이 기기에 저장해 두고, 다음에 열 때는 저장본으로 먼저 보여 준 뒤
    바뀐 것만 받아서 고쳐요. 로그아웃하면 저장본을 지워요 (같이 쓰는 컴퓨터 보호).
-   더보기 › 화면 › '이 기기에 저장해 빠르게 열기'를 끄면 저장하지 않아요. */
-const CACHE_ON = (() => { try { return localStorage.getItem("mokja-cache") !== "0"; } catch { return true; } })();
+   더보기 › 화면 › '이 기기에 저장해 빠르게 열기'를 끄면 저장하지 않아요.
+   48.1 — 처음 값: 폰 · 패드 · 홈 화면에 설치한 앱은 켜짐, 컴퓨터 브라우저는 꺼짐 (교회 사무실처럼 같이 쓰는 컴퓨터일 수 있어서) */
+const CACHE_ON = (() => {
+  try {
+    const v = localStorage.getItem("mokja-cache"); if (v === "1") return true; if (v === "0") return false;
+    const app = (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true;
+    const touch = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.platform || ""));
+    return app || touch;
+  } catch { return false; }
+})();
 let db;
 try {
   db = initializeFirestore(fb, { localCache: CACHE_ON
@@ -109,6 +117,7 @@ const showNow = (id, keepSide) => {
   const sb = $("sidebar");
   const inApp = keepSide || !NO_APP.includes(id);
   sb.style.display = inApp ? "" : "none";
+  document.body.classList.toggle("no-app", !inApp);   // 48.1 — 로그인 · 시작 화면은 왼쪽 메뉴 자리 없이 화면 정가운데
   const sc = document.querySelector(`#${id} .scroll`);
   if (sc) sc.scrollTop = 0;
   if (id !== "s-meeting") rteCloseAll();
@@ -420,7 +429,8 @@ ICON.inbox = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke
 ICON.dir = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3.5" width="14" height="17" rx="2"/><circle cx="12" cy="10" r="2.6"/><path d="M8.5 16.5a3.5 3.5 0 0 1 7 0"/></svg>`;
 ICON.health = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 12h4l2-4.5 4 9 2-4.5h5"/></svg>`;
 const SIDE = [["home","홈"],["inbox","소식"],["board","게시판"],["souls","영혼들"],["dir","교회 명부"],["cal","캘린더"],["meet","셀 보고"],
-  ["health","셀 건강"],["train","훈련 현황"],["stats","활동 통계"],["photos","사진 모아보기"],["interns","인턴 · 후보"],["help","도우미"],["more","더보기"]];
+  ["health","셀 건강"],["train","훈련 현황"],["stats","활동 통계"],["photos","사진 모아보기"],["interns","인턴 · 후보"],["help","도우미"],["notify","알림 설정"],["more","더보기"]];
+ICON.notify = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16.5V11a6 6 0 1 1 12 0v5.5l1.5 2h-15z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/><path d="M19.5 4.5a6 6 0 0 1 1.8 3.5" opacity=".7"/></svg>`;
 ICON.board = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="14" rx="2.5"/><path d="M7.5 9h5M7.5 12.5h9M7.5 16h6"/><circle cx="16.5" cy="9" r="1.2" fill="currentColor"/></svg>`;
 ICON.interns = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7.5" r="3.2"/><path d="M5.5 20v-1.2A4.8 4.8 0 0 1 10.3 14h3.4a4.8 4.8 0 0 1 4.8 4.8V20"/><path d="m16.8 3.8.8 1.6 1.7.2-1.3 1.2.3 1.7-1.5-.8-1.5.8.3-1.7-1.3-1.2 1.7-.2z" fill="currentColor" stroke-width="1"/></svg>`;
 ICON.help = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.1-2.4 3.7M12 16.9v.1"/></svg>`;
@@ -488,6 +498,7 @@ document.addEventListener("click", (ev) => {
   else if (t === "inbox") openInbox();
   else if (t === "dir") openDir();
   else if (t === "health") openHealth();
+  else if (t === "notify") openNotifySet();   // 48.1 — 화면은 그대로 두고 알림 설정 창만
 });
 
 /* ════════ 로그인 ════════ */
@@ -611,10 +622,14 @@ $("btn-setup").onclick = async () => {
   } catch (e) { $("setup-err").textContent = msgOf(e); }
   finally { $("btn-setup").disabled = false; }
 };
+/* 48.1 — 계정 이름: 1~20자 · 시스템 이름은 못 씀 (보안 규칙 okName 과 같아요) */
+const NAME_BAD = /(관리자|수퍼|슈퍼|소유자|운영자|운영진|시스템|목자의 ?삶|admin|super|owner|system)/i;
+const nameErr = (n) => !n ? "이름을 적어주세요." : n.length > 20 ? "이름은 20자까지 적을 수 있어요."
+  : NAME_BAD.test(n) ? "'관리자' 같은 낱말은 이름에 쓸 수 없어요. 실제 이름으로 적어 주세요." : "";
 $("btn-accept").onclick = async () => {
   const name = $("ac-name").value.trim();
   $("accept-err").textContent = "";
-  if (!name) { $("accept-err").textContent = "이름을 적어주세요."; return; }
+  if (nameErr(name)) { $("accept-err").textContent = nameErr(name); return; }
   const u = auth.currentUser, email = (u.email||"").toLowerCase();
   $("btn-accept").disabled = true;
   try {
@@ -3765,15 +3780,26 @@ async function openMore() {
   $("install-sub").textContent = window.matchMedia("(display-mode: standalone)").matches
     ? "이미 앱으로 설치되어 있어요":"폰 홈 화면에서 바로 열 수 있어요";
   renderFontPick();
+  paintMoreNt();
   markSide("more"); show("s-more");
 }
+/* 48.1 — 더보기 맨 위 '알림 설정' 카드: 이 기기 상태를 같이 */
+function paintMoreNt() {
+  const el = $("more-nt-st"); if (!el) return;
+  const on = !!lsGet("mokja-push-key"), P = notifyPrefs();
+  el.textContent = on ? "이 기기 받는 중" : P.device ? "앱 열려 있을 때만" : "꺼짐";
+  el.className = "chip " + (on ? "ok" : "");
+}
+$("btn-go-notify").onclick = () => openNotifySet();
 $("btn-go-train").onclick=()=>openTrainBoard();
 $("btn-go-search").onclick=()=>openSearch();
 $("btn-rename").onclick=async()=>{
-  const name=prompt("이름을 적어주세요", state.me.name||"");
-  if(!name||!name.trim()) return;
-  try{ await updateDoc(doc(db,"users",state.me.id),{name:name.trim()});
-    state.me.name=name.trim(); toast("바꿨어요."); openMore(); }
+  const name=prompt("이름을 적어주세요 (20자까지)", state.me.name||"");
+  if(!name||!name.trim()||name.trim()===state.me.name) return;
+  const before=state.me.name||"", nm=name.trim();
+  if(!isSupU(state.me)&&nameErr(nm)){ toast(nameErr(nm)); return; }
+  try{ await updateDoc(doc(db,"users",state.me.id),{name:nm});
+    state.me.name=nm; log("이름 바꿈", state.me.id, `${before} → ${nm}`); toast("바꿨어요."); openMore(); }
   catch(e){ toast(msgOf(e)); }
 };
 $("btn-refresh").onclick=async()=>{
@@ -5266,6 +5292,15 @@ async function backfillThumbs() {
    올릴 때마다 version.json 도 같이 올립니다. 앱은 열 때 · 다시 볼 때 · 10분마다
    그 파일만 살짝 확인해서(아주 작은 파일), 지금 버전보다 새것이면 위에 알림을 띄웁니다. */
 const CHANGELOG = [
+  { v:"48.1", d:"2026-11-15", items:[
+    "보안 보완 — 쪽지 · 소식 · 댓글 · 반응 · 게시판 글에 남의 이름을 쓸 수 없어요 (서버가 계정 이름과 맞는지 확인)",
+    "게시판 링크는 https 만 · 사진은 기기에서 줄인 사진만 저장되고, 화면에서도 한 번 더 걸러요",
+    "알림을 너무 많이 보내지 못하게 (게시판 글 알림 한 시간 5번 · 쪽지 · 소식 60번) · 알림 속 이름은 계정 이름으로",
+    "'이 기기에 저장해 빠르게 열기' 처음 값 — 폰 · 패드 · 설치한 앱은 켜짐, 컴퓨터 브라우저는 꺼짐 (같이 쓰는 컴퓨터 보호)",
+    "계정 이름에 '관리자' · '수퍼' 같은 낱말은 못 써요 · 이름을 바꾸면 기록이 남아요",
+    "알림 설정을 찾기 쉽게 — 더보기 맨 위 '알림' · 왼쪽 메뉴 '도움 › 알림 설정' (이 기기 상태도 함께)",
+    "글 상자 줄 바꿈 — 낱말 중간에서 끊기지 않고 낱말 단위로 넘어가요 · 더보기 카드 설명은 두 줄까지",
+    "로그인 화면 — 로그인 상자가 화면 정가운데 · 배경 그림이 화면 전체에 (전에는 왼쪽으로 밀리고 오른쪽이 끊겼어요) · 시작 화면들도 같이" ] },
   { v:"48.0", d:"2026-11-15", items:[
     "알림 설정 새로 — 쪽지 · 셀 보고 댓글 · 모임 · 기록 댓글 · 게시판 글 댓글 · 셀 보고 쓸 때 · 게시판 새 글(모두 · 공지만 · 끄기) · 일정 미리(10분 ~ 하루 전)",
     "앱이 닫혀 있어도 알림 — 폰 · 컴퓨터마다 [이 기기에서 받기] (아이폰은 홈 화면 앱) · [시험 알림]",
@@ -9891,7 +9926,7 @@ const HELP = [
       ["pen", "댓글", `셀모임 · '코치 공유' 기록에 댓글이 달리면 소식으로`],
       ["send", "쪽지", `소식 › 쪽지 ${kb("plus", "새 쪽지")} — 같은 진 셀리더 · 코치 · 진장에게`],
       ["faq", "문의 답변", `도우미에 남긴 문의에 답이 오면 여기로`]],
-    tips: [["phone", "관리 서랍 › 알림 설정에서 기기 알림 켜기"], ["refresh", "읽은 소식은 60일 뒤 저절로 정리돼요"]] },
+    tips: [["phone", "더보기 › 알림 설정에서 기기 알림 켜기"], ["refresh", "읽은 소식은 60일 뒤 저절로 정리돼요"]] },
   { id: "dir", g: "look", ic: "dir", c: "#C9A227", t: "교회 명부", s: "셀별 가지 · 목록 · 통계", who: "all",
     steps: [["dir", "셀별로", `맨 위 '섬기는 분들'(진장 · 코치), 그 아래 셀마다 셀리더와 셀원이 가지처럼`],
       ["sort", "목록 · 정렬", `${kb("", "셀원")} ${kb("", "리더들")} → 가나다 · 나이 · 출석률 · 생일순`],
@@ -12215,7 +12250,7 @@ if ($("more-cache")) {
   $("more-cache").checked = CACHE_ON;
   $("more-cache").onchange = async () => {
     const on = $("more-cache").checked;
-    lsSet("mokja-cache", on ? null : "0");
+    lsSet("mokja-cache", on ? "1" : "0");
     if (!on) { lsSet(warmKey, null); try { await terminate(db); await clearIndexedDbPersistence(db); } catch {} }
     toast(on ? "다음에 열 때부터 빠르게 열려요." : "저장본을 지웠어요. 다시 열어요.");
     setTimeout(() => location.reload(), 900);
@@ -12308,7 +12343,7 @@ document.addEventListener("click", async (ev) => {
     if (!body) { err("내용을 적어 주세요."); return; }
     const btn = ev.target.closest("[data-tsend]"); btn.disabled = true; err("");
     try {
-      const row = { by: uid(), byName: (state.me.name || "").slice(0, 40), body, atMs: Date.now(), at: serverTimestamp() };
+      const row = { by: uid(), byName: state.me.name || "", body, atMs: Date.now(), at: serverTimestamp() };   // 이름은 내 계정 이름 그대로 (규칙이 확인)
       const ref = await addDoc(T.col, row);
       T.rows.push({ id: ref.id, ...row }); if (T.onAdd) T.onAdd();
       const to = new Set([T.owner, ...T.rows.map(c => c.by)]); to.delete(uid());
@@ -12366,7 +12401,13 @@ const canMod = (p) => isSupU(state.me) || (state.me.role === "jinjang" && p.scop
 const canNotice = () => isSupU(state.me) || state.me.role === "jinjang" || pastorJinsOf(state.me).length > 0;
 const hostOf = (u) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return ""; } };
 const ytId = (u) => { const m = String(u).match(/(?:youtube\.com\/(?:watch\?v=|shorts\/|live\/)|youtu\.be\/)([\w-]{11})/); return m ? m[1] : ""; };
+/* 48.1 — 화면에 그리기 전에 한 번 더 거르기: 링크는 https 만, 사진은 기기에서 줄인 data:image 만
+   (누군가 앱을 거치지 않고 이상한 주소를 넣어도 눌리거나 밖으로 새지 않게) */
+const safeHttps = (u) => { try { const x = new URL(String(u || "")); return x.protocol === "https:" ? x.href : ""; } catch { return ""; } };
+const safeImg = (d) => /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(String(d || "")) ? d : "";
 function linkCard(l) {
+  if (!safeHttps(l.url)) return "";
+  l = { ...l, url: safeHttps(l.url) };
   const y = ytId(l.url), h = hostOf(l.url);
   return `<a class="lcard" href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">
     ${y ? `<img src="https://i.ytimg.com/vi/${y}/mqdefault.jpg" alt="" loading="lazy" referrerpolicy="no-referrer">` : `<span class="lic">${RICON.share}</span>`}
@@ -12393,7 +12434,7 @@ function renderBoard() {
         <b class="pr-t">${esc(p.title)}</b>
         <span class="pr-s">${esc(p.byName || "")} · ${fmtAgo(p.atMs)}${p.cmtN ? ` · 댓글 ${p.cmtN}` : ""}${(p.links || []).length ? ` · 링크 ${p.links.length}` : ""}</span>
       </span>
-      ${(p.th || []).length ? `<span class="pr-th"><img src="${p.th[0]}" alt="" loading="lazy">${p.th.length > 1 ? `<i>+${p.th.length - 1}</i>` : ""}</span>` : ""}
+      ${(p.th || []).length && safeImg(p.th[0]) ? `<span class="pr-th"><img src="${safeImg(p.th[0])}" alt="" loading="lazy">${p.th.length > 1 ? `<i>+${p.th.length - 1}</i>` : ""}</span>` : ""}
     </button>`).join("")
     || `<div class="empty-wrap"><img class="empty-art" src="./img/empty-board.webp" alt="" loading="lazy" style="width:200px"><p class="muted">아직 글이 없어요. 첫 글을 남겨 보세요.</p></div>`;
 }
@@ -12416,7 +12457,7 @@ async function openPost(id) {
       <p class="muted post-m">${esc(p.byName || "")} · ${fmtAgo(p.atMs)}${p.editedAt ? " · 고침" : ""}</p>
       ${p.body ? `<div class="post-b">${linkify(esc(p.body))}</div>` : ""}
       ${(p.links || []).length ? `<div class="lcards">${p.links.map(linkCard).join("")}</div>` : ""}
-      ${p.imgN ? `<div class="post-imgs" id="pt-imgs">${(p.th || []).map((t, i) => `<button type="button" class="pimg" data-pimg="${i}"><img src="${t}" alt="사진 ${i + 1}"></button>`).join("")}</div>` : ""}
+      ${p.imgN ? `<div class="post-imgs" id="pt-imgs">${(p.th || []).map((t, i) => safeImg(t) ? `<button type="button" class="pimg" data-pimg="${i}"><img src="${safeImg(t)}" alt="사진 ${i + 1}"></button>` : "").join("")}</div>` : ""}
     </article>
     <div id="pt-talk" data-talkbox="1" style="margin-top:16px"></div>`;
   show("s-post");
@@ -12425,9 +12466,9 @@ async function openPost(id) {
     onDel: () => { if (p.cmtN > 0) updateDoc(doc(db, "board", p.id), { cmtN: p.cmtN - 1 }).then(() => { p.cmtN--; }).catch(() => {}); } });
   /* 큰 사진은 열 때만 받아요 */
   if (p.imgN) for (let i = 0; i < p.imgN; i++) getDoc(doc(db, "board", p.id, "imgs", String(i))).then(d => {
-    const im = document.querySelector(`#pt-imgs [data-pimg="${i}"] img`); if (d.exists() && im && state.post && state.post.id === p.id) im.src = d.data().d; }).catch(() => {});
+    const im = document.querySelector(`#pt-imgs [data-pimg="${i}"] img`); if (d.exists() && im && state.post && state.post.id === p.id && safeImg(d.data().d)) im.src = d.data().d; }).catch(() => {});
 }
-const linkify = (h) => h.replace(/(https:\/\/[^\s<]+)/g, (u) => `<a href="${u}" target="_blank" rel="noopener noreferrer">${u}</a>`).replace(/\n/g, "<br>");
+const linkify = (h) => h.replace(/(https:\/\/[^\s<"']+)/g, (u) => `<a href="${u}" target="_blank" rel="noopener noreferrer">${u}</a>`).replace(/\n/g, "<br>");
 $("pt-back").onclick = () => openBoard();
 document.addEventListener("click", async (ev) => {
   const p = state.post; if (!p) return;
@@ -12599,7 +12640,8 @@ function openNotifySet() {
   $("nt-err").textContent = "";
   $("nt-admin").hidden = !isSupU(state.me);
   if (isSupU(state.me)) pushCfg().then(c => { $("nt-vapid").value = c.vapid || ""; $("nt-srv").textContent = c.url ? "서버 주소: " + c.url : "서버 주소가 아직 없어요 — 캘린더 › 실시간 서버 연결 설정에서 넣어요."; });
-  dlgNt.showModal();
+  paintMoreNt();
+  if (!dlgNt.open) dlgNt.showModal();
 }
 $("dlg-notify").addEventListener("click", (ev) => {
   const b = ev.target.closest("[data-ntb]"); if (b) { $("nt-board").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); return; }
@@ -12632,7 +12674,7 @@ $("nt-save").onclick = async () => {
     try { const r = await Notification.requestPermission(); if (r !== "granted") { p.device = false; $("nt-err").textContent = "기기 알림이 허용되지 않았어요. 브라우저 설정에서 허용한 뒤 다시 켜 주세요."; } }
     catch { p.device = false; }
   }
-  try { await updateDoc(doc(db, "users", state.me.id), { notifyPrefs: p }); state.me.notifyPrefs = p; planAlarms();
+  try { await updateDoc(doc(db, "users", state.me.id), { notifyPrefs: p }); state.me.notifyPrefs = p; planAlarms(); paintMoreNt();
         if (!$("nt-err").textContent) { dlgNt.close(); toast("알림 설정을 저장했어요."); } }
   catch (e) { $("nt-err").textContent = msgOf(e); }
 };
@@ -12710,14 +12752,16 @@ const durTx = (s) => s < 60 ? `${s}초` : minTxt(Math.round(s / 60));
 function renderLogs() {
   $("lg-tabs").innerHTML = [["sess", "접속 기록"], ["act", "활동"], ["err", "오류"]].map(([k, l]) => `<button type="button" data-lgt="${k}" class="${LG.tab === k ? "on" : ""}">${l}</button>`).join("");
   $("lg-days").innerHTML = [[7, "7일"], [30, "30일"], [90, "90일"], [180, "180일"]].map(([d, l]) => `<button type="button" data-lgd="${d}" class="${LG.days === d ? "on" : ""}">${l}</button>`).join("");
-  const people = [...new Map((LG.sess || []).map(s => [s.uid, s.name])).entries()].sort((a, b) => String(a[1]).localeCompare(String(b[1]), "ko"));
+  /* 48.1 — 이름은 계정 명단에서 (기록 안의 이름은 참고만) */
+  const nmOf = (s) => memberName(s.uid) || s.name || "—";
+  const people = [...new Map((LG.sess || []).map(s => [s.uid, nmOf(s)])).entries()].sort((a, b) => String(a[1]).localeCompare(String(b[1]), "ko"));
   $("lg-who").innerHTML = `<option value="">모든 사람</option>` + people.map(([u, n]) => `<option value="${esc(u)}"${LG.who === u ? " selected" : ""}>${esc(n || "—")}</option>`).join("");
   $("lg-who").hidden = LG.tab === "err";
   const q = LG.q.trim(), has = (t) => !q || String(t || "").includes(q);
   let html = "";
   if (LG.tab === "sess") {
     const rows = (LG.sess || []).filter(s => (!LG.who || s.uid === LG.who) && has([s.name, s.device, s.ver, (s.screens || []).map(k => SCREEN_NAME[k] || k).join(" ")].join(" ")));
-    const by = {}; rows.forEach(s => { const p = by[s.uid] = by[s.uid] || { name: s.name, role: s.role, n: 0, dur: 0, last: 0, dev: s.device }; p.n++; p.dur += s.dur || 0; if (s.start > p.last) { p.last = s.start; p.dev = s.device; } });
+    const by = {}; rows.forEach(s => { const p = by[s.uid] = by[s.uid] || { name: nmOf(s), role: s.role, n: 0, dur: 0, last: 0, dev: s.device }; p.n++; p.dur += s.dur || 0; if (s.start > p.last) { p.last = s.start; p.dev = s.device; } });
     const P = Object.values(by).sort((a, b) => b.last - a.last);
     html = `<div class="card"><h3 class="lg-h">사람별 <span class="muted">${LG.days}일</span></h3>
       <div class="lg-tw"><table class="lg-t"><thead><tr><th>이름</th><th>마지막 접속</th><th>접속</th><th>모두 머문 시간</th><th>한 번 평균</th><th>기기</th></tr></thead><tbody>
@@ -12725,7 +12769,7 @@ function renderLogs() {
       </tbody></table></div></div>
       <div class="card" style="margin-top:12px"><h3 class="lg-h">접속마다 <span class="muted">${rows.length}번 · 최근 순</span></h3>
       <div class="lg-list">${rows.slice(0, 300).map(s => `<div class="lg-r"><span class="lg-tm">${tHM(s.start)} ~ ${pad2(new Date(s.end).getHours())}:${pad2(new Date(s.end).getMinutes())}</span>
-        <b>${esc(s.name || "—")}</b><span class="chip">${durTx(s.dur || 0)}</span><span class="muted">${esc(s.device || "")}${s.pwa ? " · 앱" : ""} · v${esc(s.ver || "")}</span>
+        <b>${esc(nmOf(s))}</b><span class="chip">${durTx(s.dur || 0)}</span><span class="muted">${esc(s.device || "")}${s.pwa ? " · 앱" : ""} · v${esc(s.ver || "")}</span>
         <p class="lg-flow">${(s.screens || []).map(k => esc(SCREEN_NAME[k] || k)).join(" → ") || "—"}</p></div>`).join("") || `<p class="muted">기록이 없어요. (48단계부터 쌓여요)</p>`}</div></div>`;
   } else if (LG.tab === "act") {
     const rows = (LG.audit || []).filter(a => (!LG.who || a.by === LG.who) && has([a.byName, a.action, a.target, a.detail].join(" ")));

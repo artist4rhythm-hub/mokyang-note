@@ -192,12 +192,12 @@
   .rec{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px}
   .rec .head{display:flex;align-items:center;justify-content:space-between;gap:8px}
   .rec .body{margin-top:9px;font-size:calc(14px*var(--fs,1));line-height:1.75;color:var(--body-tx);white-space:pre-wrap;
-    word-break:break-word}
+    word-break:keep-all;overflow-wrap:anywhere}
   .rec .foot{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
   .rec .blk{margin-top:12px;padding-top:12px;border-top:1px solid var(--line2)}
   .rec .blk .lbl{font-size:calc(11px*var(--fs,1));color:var(--brand);letter-spacing:.04em}
   .rec .blk p{margin-top:5px;font-size:calc(14px*var(--fs,1));line-height:1.75;color:var(--body-tx);white-space:pre-wrap;
-    word-break:break-word}
+    word-break:keep-all;overflow-wrap:anywhere}
   mark{background:var(--mark-bg);color:var(--mark-tx);border-radius:3px;padding:0 2px}
 
   .att{display:flex;gap:4px;flex-shrink:0}
@@ -304,7 +304,7 @@
   .flow .fr.ok::before{background:var(--ok-strong);border-color:var(--ok-strong)}
   .flow .fd{font-size:calc(11px*var(--fs,1));color:var(--dim);padding-top:2px;line-height:1.5}
   .flow .ft{font-size:calc(14px*var(--fs,1));line-height:1.75;color:var(--body-tx);white-space:pre-wrap;
-    word-break:break-word}
+    word-break:keep-all;overflow-wrap:anywhere}
   .flow .fm{font-size:calc(11px*var(--fs,1));color:var(--dim);margin-top:3px}
   .flow .fr.done .ft{color:var(--dim)}
 
@@ -355,8 +355,8 @@
   .cmt{padding:10px 0;border-bottom:1px solid var(--line)}
   .cmt:last-child{border-bottom:none}
   .cmt .h{font-size:calc(12px*var(--fs,1));color:var(--dim);display:flex;justify-content:space-between;gap:8px}
-  .cmt .b{font-size:calc(14px*var(--fs,1));margin-top:4px;white-space:pre-wrap;word-break:break-word}
-  .bub{max-width:82%;padding:9px 12px;border-radius:14px;font-size:calc(14px*var(--fs,1));white-space:pre-wrap;word-break:break-word}
+  .cmt .b{font-size:calc(14px*var(--fs,1));margin-top:4px;white-space:pre-wrap;word-break:keep-all;overflow-wrap:anywhere}
+  .bub{max-width:82%;padding:9px 12px;border-radius:14px;font-size:calc(14px*var(--fs,1));white-space:pre-wrap;word-break:keep-all;overflow-wrap:anywhere}
   .bub.them{align-self:flex-start;background:var(--surface2)}
   .bub.me{align-self:flex-end;background:var(--rose-bg);color:var(--rose-tx)}
   .bub .t{display:block;font-size:calc(10px*var(--fs,1));color:var(--dim);margin-top:4px}
@@ -936,7 +936,7 @@
   .rte-pop button{width:30px;height:30px;border-radius:9px;border:1px solid var(--line);cursor:pointer;font-weight:700;font-size:calc(13px*var(--fs,1));
     display:flex;align-items:center;justify-content:center;background:var(--surface2);color:var(--text)}
   .rte-pop button:hover{outline:2px solid var(--rose-line)}
-  .rte-ed{min-height:220px;padding:14px 16px 18px;outline:none;font-size:calc(15px*var(--fs,1));line-height:1.75;color:var(--text);word-break:break-word;overflow-wrap:anywhere}
+  .rte-ed{min-height:220px;padding:14px 16px 18px;outline:none;font-size:calc(15px*var(--fs,1));line-height:1.75;color:var(--text);word-break:keep-all;overflow-wrap:anywhere}
   .rte-ed:empty::before{content:attr(data-ph);color:var(--dim);pointer-events:none}
   .rte-ed[contenteditable="false"]{min-height:0}
   .rte-ed p,.rte-ed div{margin:0}
@@ -960,7 +960,7 @@
   }
   .rte-dim{position:fixed;inset:0;z-index:74;background:rgba(0,0,0,.5)}
   body.rte-open{overflow:hidden}
-  .rnote{line-height:1.75;word-break:break-word}
+  .rnote{line-height:1.75;word-break:keep-all;overflow-wrap:anywhere}
   .rnote p,.rnote div{margin:0}
   .rnote h3{font-size:calc(17px*var(--fs,1));font-weight:700;margin:10px 0 2px}
   .rnote h4{font-size:calc(15px*var(--fs,1));font-weight:700;margin:8px 0 2px;color:var(--rose-tx)}
@@ -2014,12 +2014,7 @@
   /* 그림 — 비었을 때 · 로그인 */
   .empty-art{display:block;width:140px;height:auto;margin:12px auto 4px;opacity:.95}
   .empty-wrap{text-align:center;padding:8px 0 4px}
-  #s-login{background:linear-gradient(90deg,rgba(15,15,15,.92) 0%,rgba(15,15,15,.78) 38%,rgba(15,15,15,.15) 75%),url("./img/login-dark.webp") center / cover no-repeat,var(--bg)}
-  :root[data-theme="light"] #s-login{background:linear-gradient(90deg,rgba(245,243,242,.95) 0%,rgba(245,243,242,.82) 38%,rgba(245,243,242,.1) 75%),url("./img/login-light.webp") center / cover no-repeat,var(--bg)}
-  @media (max-width:720px){
-    #s-login{background:linear-gradient(180deg,rgba(15,15,15,.94) 0%,rgba(15,15,15,.86) 55%,rgba(15,15,15,.35) 100%),url("./img/login-dark.webp") 80% bottom / cover no-repeat,var(--bg)}
-    :root[data-theme="light"] #s-login{background:linear-gradient(180deg,rgba(245,243,242,.96) 0%,rgba(245,243,242,.86) 50%,rgba(245,243,242,.2) 100%),url("./img/login-phone.webp") center bottom / cover no-repeat,var(--bg)}
-  }
+  /* (로그인 배경은 아래 48.1 블록에서) */
 
   /* ════════ 47단계 — 셀 보고 댓글 · 게시판 · 기간 ════════ */
   .range-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px}
@@ -2058,7 +2053,7 @@
   .post{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:20px}
   .post-t{font-size:calc(21px*var(--fs,1));font-weight:600;margin:10px 0 4px;line-height:1.35}
   .post-m{font-size:calc(12px*var(--fs,1))}
-  .post-b{margin-top:14px;line-height:1.75;font-size:calc(15px*var(--fs,1));word-break:break-word}
+  .post-b{margin-top:14px;line-height:1.75;font-size:calc(15px*var(--fs,1));word-break:keep-all;overflow-wrap:anywhere}
   .post-b a{color:var(--rose-tx)}
   .lcards{display:grid;gap:8px;margin-top:14px}
   .lcard{display:flex;align-items:center;gap:12px;min-height:64px;padding:8px 12px 8px 8px;border-radius:12px;border:1px solid var(--line);
@@ -2110,6 +2105,50 @@
   .lg-flow{flex-basis:100%;margin:2px 0 0 130px;color:var(--sub-tx);font-size:calc(12px*var(--fs,1))}
   .lg-err{font-weight:500;word-break:break-all}
   @media (max-width:720px){ .lg-flow{margin-left:0} }
+
+  /* ════════ 48.1 — 줄 바꿈은 낱말 단위로 (한글이 낱말 중간에서 끊기지 않게) ════════
+     keep-all: 띄어쓰기에서만 줄을 바꿔요 · overflow-wrap:anywhere: 한 낱말이 칸보다 길 때만 그 안에서 끊어요 */
+  body{word-break:keep-all;overflow-wrap:anywhere}
+  p,small,label,.sub,.sub2,.hint,.muted,.err,.empty{text-wrap:pretty}
+  h1,h2,h3,.sec-title,.nm,b{text-wrap:balance}
+  input,textarea,select{word-break:normal}
+  /* 더보기 카드 — 설명은 두 줄까지 보이고 카드 높이는 줄마다 같게 */
+  #s-more .row .sub{white-space:normal;display:-webkit-box !important;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.45}
+  #s-more .list .row{min-height:68px}
+  #s-more .more-nt .chip{flex:none;white-space:nowrap}
+  /* 관리 바로 가기 — 글 칸이 줄어들 수 있게 · 설명 두 줄 */
+  .adm-grid{grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}
+  .adm-grid button{min-height:68px}
+  .adm-grid button>span:last-child{flex:1 1 auto;min-width:0}
+  .adm-grid button small{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .adm-grid button .gx-ico{flex:none}
+  /* 작은 버튼 · 표시 칩은 한 줄로 ('이름\n수정'처럼 갈라지지 않게) */
+  .btn-sm,.chip{white-space:nowrap;flex-shrink:0}
+
+  /* ════════ 48.1 — 로그인 · 시작 화면: 화면 정가운데 · 배경 그림은 화면 전체 ════════
+     전에는 왼쪽 메뉴 자리(224px)만큼 밀리고, 넓은 화면에서는 그림이 1240px에서 끊겼어요 */
+  body.no-app #app{margin-left:0 !important;max-width:none !important}
+  .auth-scr:not([hidden]){position:fixed;inset:0;z-index:30;width:auto !important;max-width:none !important;margin:0 !important;
+    display:flex;flex-direction:column;overflow-y:auto;-webkit-overflow-scrolling:touch;
+    padding:max(24px,env(safe-area-inset-top)) 16px max(24px,env(safe-area-inset-bottom));
+    --auth-card:rgba(24,22,21,.80);--auth-line:rgba(255,255,255,.08);
+    background:linear-gradient(180deg,rgba(12,11,10,.30),rgba(12,11,10,.55)),url("./img/login-dark.webp") center / cover no-repeat,var(--bg)}
+  :root[data-theme="light"] .auth-scr:not([hidden]){--auth-card:rgba(255,253,250,.84);--auth-line:rgba(70,45,30,.08);
+    background:linear-gradient(180deg,rgba(245,243,242,.20),rgba(245,243,242,.40)),url("./img/login-light.webp") center / cover no-repeat,var(--bg)}
+  .auth-scr > .center,.auth-scr > .scroll{margin:auto !important;flex:none !important;width:100% !important;max-width:460px !important;
+    min-height:0;overflow:visible;padding:36px 32px !important;border-radius:24px;border:1px solid var(--auth-line);
+    background:var(--auth-card);-webkit-backdrop-filter:blur(14px) saturate(1.1);backdrop-filter:blur(14px) saturate(1.1);
+    box-shadow:0 24px 64px rgba(0,0,0,.22)}
+  #s-consent > .scroll{max-width:600px !important}
+  .auth-logo{display:block;width:64px;height:64px;margin:0 auto 14px;border-radius:16px;box-shadow:0 6px 18px rgba(0,0,0,.15)}
+  .auth-scr h1,.auth-scr h2{text-align:center}
+  .auth-scr h1 + p.muted,.auth-scr h2 + p.muted{text-align:center}
+  #s-login .center > div[style*="justify-content:space-between"]{margin-top:12px !important}
+  @media (max-width:720px){
+    .auth-scr:not([hidden]){background:linear-gradient(180deg,rgba(12,11,10,.35),rgba(12,11,10,.62)),url("./img/login-dark.webp") 72% center / cover no-repeat,var(--bg)}
+    :root[data-theme="light"] .auth-scr:not([hidden]){background:linear-gradient(180deg,rgba(245,243,242,.15),rgba(245,243,242,.35)),url("./img/login-phone.webp") center bottom / cover no-repeat,var(--bg)}
+    .auth-scr > .center,.auth-scr > .scroll{padding:28px 22px !important;border-radius:20px}
+  }
 </style>
 <script>
   /* 27단계 — 화면 밝기: 다크(기본) · 라이트 · 기기 설정 따르기. 깜빡임 없게 그리기 전에 정해요. */
@@ -2188,8 +2227,9 @@
   </section>
 
   <!-- 로그인 -->
-  <section class="screen" id="s-login" hidden>
+  <section class="screen auth-scr" id="s-login" hidden>
     <div class="center" style="max-width:420px;margin:0 auto;width:100%">
+      <img class="auth-logo" src="./icons/icon-192.png" alt="" width="64" height="64">
       <h1 class="serif" style="font-size:calc(30px*var(--fs,1));font-weight:600">목자의 삶</h1>
       <p class="muted" style="margin-top:8px">맡겨진 영혼을 기록하고 함께 기도해요.</p>
       <div style="height:32px"></div>
@@ -2212,7 +2252,7 @@
   </section>
 
   <!-- 이메일 인증 -->
-  <section class="screen" id="s-verify" hidden>
+  <section class="screen auth-scr" id="s-verify" hidden>
     <div class="center" style="max-width:420px;margin:0 auto;width:100%">
       <h2 class="serif" style="font-size:calc(22px*var(--fs,1));font-weight:600">메일함을 확인해 주세요</h2>
       <p class="muted" style="margin-top:10px"><span id="verify-email"></span> 주소로 인증 메일을 보냈어요.
@@ -2227,7 +2267,7 @@
   </section>
 
   <!-- 최초 설정 -->
-  <section class="screen" id="s-setup" hidden>
+  <section class="screen auth-scr" id="s-setup" hidden>
     <div class="center" style="max-width:420px;margin:0 auto;width:100%">
       <span class="chip rose">최초 설정</span>
       <h2 class="serif" style="font-size:calc(24px*var(--fs,1));font-weight:600;margin-top:12px">목자의 삶을 시작해요</h2>
@@ -2243,7 +2283,7 @@
   </section>
 
   <!-- 초대 수락 -->
-  <section class="screen" id="s-accept" hidden>
+  <section class="screen auth-scr" id="s-accept" hidden>
     <div class="center" style="max-width:420px;margin:0 auto;width:100%">
       <span class="chip rose">초대를 받았어요</span>
       <h2 class="serif" style="font-size:calc(24px*var(--fs,1));font-weight:600;margin-top:12px">환영해요</h2>
@@ -2257,7 +2297,7 @@
   </section>
 
   <!-- 승인 대기 -->
-  <section class="screen" id="s-pending" hidden>
+  <section class="screen auth-scr" id="s-pending" hidden>
     <div class="center" style="max-width:420px;margin:0 auto;width:100%">
       <h2 class="serif" style="font-size:calc(22px*var(--fs,1));font-weight:600">승인 대기 중이에요</h2>
       <p class="muted" style="margin-top:10px"><span id="pending-email"></span> 계정은 아직 등록되지 않았어요.
@@ -2269,7 +2309,7 @@
   </section>
 
   <!-- 21단계 — 개인정보 동의 (처음 한 번) -->
-  <section class="screen" id="s-consent" hidden>
+  <section class="screen auth-scr" id="s-consent" hidden>
     <div class="scroll pad" style="max-width:560px;margin:0 auto;width:100%">
       <h2 class="serif" style="font-size:calc(22px*var(--fs,1));font-weight:600;margin-top:12px">시작하기 전에</h2>
       <p class="muted" style="margin-top:8px">목자의 삶은 셀 식구들을 기억하고 기도하기 위한 메모장이에요.
@@ -3096,6 +3136,16 @@
         </div>
       </div>
 
+      <h3 class="sec-title">알림</h3>
+      <div class="list more-nt">
+        <button class="row" id="btn-go-notify" style="text-align:left;cursor:pointer;width:100%">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16.5V11a6 6 0 1 1 12 0v5.5l1.5 2h-15z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/></svg>
+          <span class="grow"><span class="nm" style="display:block">알림 설정</span>
+            <span class="sub" style="display:block">쪽지 · 댓글 · 게시판 새 글 · 일정 미리 알림 · 앱이 닫혀 있어도 받기</span></span>
+          <span class="chip" id="more-nt-st">—</span>
+        </button>
+      </div>
+
       <div id="more-admin"></div>
       <div class="wide">
         <div>
@@ -3139,12 +3189,12 @@
             <button class="row" id="btn-go-cal-help" style="text-align:left;cursor:pointer;width:100%">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5.5" width="17" height="15" rx="2.5"/><path d="M3.5 10.5h17M8.5 3.5v4M15.5 3.5v4"/></svg>
               <span class="grow"><span class="nm" style="display:block">구글 캘린더 자동 넣기</span>
-                <span class="sub" style="display:block">한 번 연결하면 내 구글 캘린더에 셀모임 · 만남 일정이 자동으로</span></span>
+                <span class="sub" style="display:block">한 번 연결하면 셀모임 · 만남 일정이 내 캘린더에</span></span>
             </button>
             <button class="row" id="btn-go-mine" style="text-align:left;cursor:pointer;width:100%">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 4.5h11v15l-5.5-3-5.5 3z"/></svg>
               <span class="grow"><span class="nm" style="display:block">내 카드</span>
-                <span class="sub" style="display:block">내 출석 · 활동 · 나에 대한 기록 — 기본은 나만 봐요</span></span>
+                <span class="sub" style="display:block">내 출석 · 활동 · 나에 대한 기록 (기본은 나만)</span></span>
             </button>
             <button class="row" id="btn-go-usage" style="text-align:left;cursor:pointer;width:100%" hidden>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 19.5h15M7 16V9.5M12 16V5M17 16v-4.5"/></svg>
