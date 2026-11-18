@@ -26,7 +26,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
 const APP_NAME = "목자의 삶";
-const APP_VERSION = "48.1 (2026-11-15)";
+const APP_VERSION = "48.2 (2026-11-18)";
 /* 35단계 — 버전 표시: v35.0 · 2026.11.12 업데이트 */
 const verNo = () => APP_VERSION.split(" ")[0];
 const verDate = () => (APP_VERSION.match(/\((.*)\)/) || [])[1] || "";
@@ -765,6 +765,10 @@ async function loadMeetings(force) {
     state.meetingsAt = Date.now();
   } catch (e) { state.meetings=[]; toast(msgOf(e)); }
 }
+/* 48.2 — 영혼 카드를 바로 열기 위해 사람별로 받아 둔 것을 기억해요 (고치면 비워요) */
+const soulCachePut = (id, patch) => { if (!id) return; state.soulCache = state.soulCache || {}; state.soulCache[id] = { ...(state.soulCache[id] || {}), ...patch }; };
+const TRAIN_RANK = { ongoing:0, planned:1, done:2, dropped:3 };
+const sortTrain = (a,b) => (TRAIN_RANK[a.status]??9)-(TRAIN_RANK[b.status]??9) || String(b.startDate||"").localeCompare(String(a.startDate||""));
 async function loadRecords(soulId, canSeeAll) {
   const col = collection(db,"souls",soulId,"records");
   try {
@@ -776,6 +780,7 @@ async function loadRecords(soulId, canSeeAll) {
     const seen = {};
     state.records = rows.filter(r => seen[r.id] ? false : (seen[r.id]=true))
       .sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")));
+    soulCachePut(soulId, { records: state.records });
   } catch (e) { state.records=[]; toast(msgOf(e)); }
 }
 /* 한 사람 카드의 기록 — 규칙이 허락하는 세 갈래(내가 쓴 것 · 담당 공개 · 코치 공유)로 나눠 읽습니다.
@@ -824,6 +829,7 @@ async function loadTrainings(soulId) {
     state.trainings = pack(await getDocs(collection(db,"souls",soulId,"trainings")))
       .sort((a,b)=>(rank[a.status]??9)-(rank[b.status]??9)
         || String(b.startDate||"").localeCompare(String(a.startDate||"")));
+    soulCachePut(soulId, { trainings: state.trainings });
   } catch { state.trainings=[]; }
 }
 async function loadPhoto(soulId) {
@@ -839,6 +845,7 @@ async function loadPhoto(soulId) {
    하루 한도에 닿는 가장 큰 이유가 이것이었어요. */
 const invalidate = () => {
   state.allRecords = null; state.allTrainings = null; state.recP = null; state.trP = null;
+  state.soulCache = {};   // 48.2
   state.soulsAt = 0; state.meetingsAt = 0;
   if (typeof gcalSoon === "function") gcalSoon();   // 27단계 — 고치면 구글 캘린더도 따라서
 };
@@ -942,11 +949,29 @@ async function homeBackground() {
     if (canLead()) {
       await loadAllRecords();
       if (onHome()) { renderCare(); renderRooms(); renderHomeReport(); }
+      prefetchIdle();   // 48.2 — 쉬는 틈에 훈련 · 사진 · 소식 · 쪽지
       planAlarms();
       syncCalShare().catch(e => console.warn("캘린더 공유", e));
       gcalDoc().then(() => { renderGcal(); if (gcalTok() || gcalLive()) gcalSync().catch(() => {}); });
     }
   } catch (e) { console.warn("홈 뒤 작업", e); }
+}
+/* 48.2 — 홈이 뜬 뒤 쉬는 틈에 미리 받아 두기 (처음 여는 화면도 바로 열리게).
+   화면이 바쁠 때는 기다렸다가, 한 번에 조금씩 받아요. */
+const idle = (fn) => (window.requestIdleCallback ? requestIdleCallback(fn, { timeout: 3000 }) : setTimeout(fn, 800));
+function prefetchIdle() {
+  if (state.prefetched) return; state.prefetched = true;
+  idle(async () => {
+    try { await loadAllTrainings(); } catch {}
+    try { if (!state.noticesAt) await loadNotices(); } catch {}
+    try { if (!state.msgs) await loadMessages(); } catch {}
+    /* 사진은 내가 맡은 사람만, 다섯 명씩 */
+    const ids = state.souls.filter(s => isLeaderOf(s) && state.photoCache[s.id] === undefined).map(s => s.id).slice(0, 60);
+    for (let i = 0; i < ids.length; i += 5) {
+      await new Promise(r => idle(r));
+      await Promise.all(ids.slice(i, i + 5).map(id => loadPhoto(id).catch(() => null)));
+    }
+  });
 }
 /* 여러 명이 묶인 예정은 한 줄로 */
 function oneLinePerGroup(list) {
@@ -1515,22 +1540,8 @@ $("btn-order-meet").onclick = () =>
   openOrderDlg(state.meeting.cellId, () => renderAttendance(true));
 
 /* ════════ 영혼 카드 ════════ */
-async function openSoul(soulId) {
-  show("s-loading");
-  if (!state.souls.length) { await loadOrg(); await loadSouls(); await loadMeetings(); }
-  const s = state.souls.find(x=>x.id===soulId);
-  if (!s) { toast("카드를 찾을 수 없어요."); openSouls(); return; }
-  state.soul = s; state.soulTab = "rec"; state.recKw = ""; state.recType = "all";
-  state.alerts = [];
-  await Promise.all([loadRecords(soulId, isLeaderOf(s)), loadTrainings(soulId), loadAlerts(soulId, isLeaderOf(s))]);
-  state.shared = isLeaderCard(s) ? await loadShared(s.linkedUid) : [];
-  state.linkedSelf = null;
-  if (isLeaderCard(s) && s.linkedUid && state.me.role === "jinjang" && s.jinId === state.me.jinId) {
-    try { const d = await getDoc(doc(db,"selfCards",s.linkedUid)); state.linkedSelf = d.exists() ? d.data() : null; }
-    catch { state.linkedSelf = null; }   // 본인이 '나만 보기'로 두면 규칙이 막습니다
-  }
-  const photo = await loadPhoto(soulId);
-
+/* 48.2 — 카드 위쪽(사진 · 이름 · 칩 · 연락)만 그리기 */
+function paintSoulHead(s, photo) {
   $("soul-ava").textContent = photo ? "" : initial(s.name);
   $("soul-ava").style.backgroundImage = photo ? `url(${photo})` : "";
   $("soul-name").textContent = s.name;
@@ -1555,8 +1566,43 @@ async function openSoul(soulId) {
   $("soul-edit").hidden = !isLeaderOf(s);
   $("btn-log-new").hidden = !isLeaderOf(s);
   $("btn-rec-new").hidden = !isLeaderOf(s);
+}
+/* 48.2 — 영혼 카드는 누르는 순간 열려요.
+   받아 둔 것(이 카드를 전에 연 것 · 홈이 미리 받아 둔 기록과 훈련)으로 먼저 그리고,
+   기록 · 훈련 · 민감 메모 · 사진을 한꺼번에(차례로가 아니라 동시에) 받아서 다시 고쳐요. */
+async function openSoul(soulId) {
+  if (!state.souls.length) { show("s-loading"); await loadOrg(); await loadSouls(); await loadMeetings(); }
+  const s = state.souls.find(x=>x.id===soulId);
+  if (!s) { toast("카드를 찾을 수 없어요."); openSouls(); return; }
+  state.soul = s; state.soulTab = "rec"; state.recKw = ""; state.recType = "all";
+  const sc = (state.soulCache || {})[soulId] || {};
+  state.records = sc.records || (state.allRecords ? state.allRecords.filter(r => r.soulId === soulId) : []);
+  state.trainings = sc.trainings || (state.allTrainings ? state.allTrainings.filter(t => t.soulId === soulId).sort(sortTrain) : []);
+  state.alerts = sc.alerts || []; state.shared = sc.shared || []; state.linkedSelf = sc.linkedSelf ?? null;
+  state.soulLoading = !sc.records;   // 비어 보이면 "불러오는 중…"
+  paintSoulHead(s, state.photoCache[soulId] || null);
   renderSoulTabs(); renderSoulBody();
   show("s-soul");
+  const tk = state.soulTk = (state.soulTk || 0) + 1, mine = isLeaderOf(s);
+  const linked = isLeaderCard(s) && s.linkedUid && state.me.role === "jinjang" && s.jinId === state.me.jinId;
+  const [records, trainings, alerts, shared, linkedSelf, photo] = await Promise.all([
+    fetchRecords(soulId, mine).then(rs => rs.sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")))).catch(e => { toast(msgOf(e)); return null; }),
+    getDocs(collection(db,"souls",soulId,"trainings")).then(r => pack(r).sort(sortTrain)).catch(() => null),
+    fetchAlerts(soulId, mine, s),
+    isLeaderCard(s) ? loadShared(s.linkedUid) : Promise.resolve([]),
+    linked ? getDoc(doc(db,"selfCards",s.linkedUid)).then(d => d.exists() ? d.data() : null).catch(() => null)   // 본인이 '나만 보기'로 두면 규칙이 막습니다
+      : Promise.resolve(null),
+    loadPhoto(soulId)]);
+  const fresh = { records: records || state.records, trainings: trainings || state.trainings, alerts, shared, linkedSelf };
+  soulCachePut(soulId, fresh);
+  if (state.soulTk !== tk || !state.soul || state.soul.id !== soulId) return;   // 그 사이 다른 카드를 열었으면 그대로
+  state.soulLoading = false;
+  Object.assign(state, fresh);
+  paintSoulHead(s, photo);
+  if ($("s-soul").hidden) return;
+  const ae = document.activeElement;
+  if (ae && $("s-soul").contains(ae) && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)) return;   // 찾기 칸에 쓰는 중이면 다음 글자에서 같이 그려요
+  renderSoulTabs(); renderSoulBody();
 }
 function updateSummary() {
   const s = state.soul, n = daysSince(s.lastMetAt), rate = attendRate(attKey(s),attCell(s));
@@ -1726,6 +1772,7 @@ function renderSoulBody() {
         ? `<div class="flow">${list.map(r=>flowRow(r,kw)).join("")}</div>`
         : ""}
       <div class="list">${flowing ? "" : list.length ? list.map(r=>recCard(r,kw,false)).join("")
+        : state.soulLoading && !kw ? `<p class="muted" style="text-align:center;padding:28px 0">기록을 불러오는 중…</p>`
         : `<img class="empty-art" src="./img/${kw ? "empty-search" : "empty-records"}.webp" alt="" loading="lazy"><p class="muted" style="text-align:center">${kw?"찾는 말이 없어요."
           : state.recType==="update"?"아직 적은 근황이 없어요.<br>셀모임에서 이름 옆 ▾ 를 눌러 적으시면 여기에 쌓여요."
           : mine?"아직 기록이 없어요. 아래 '만남 기록'으로 첫 기록을 남겨보세요."
@@ -5292,6 +5339,11 @@ async function backfillThumbs() {
    올릴 때마다 version.json 도 같이 올립니다. 앱은 열 때 · 다시 볼 때 · 10분마다
    그 파일만 살짝 확인해서(아주 작은 파일), 지금 버전보다 새것이면 위에 알림을 띄웁니다. */
 const CHANGELOG = [
+  { v:"48.2", d:"2026-11-18", items:[
+    "화면 바로 열기 — 영혼 카드를 누르면 기다리지 않고 바로 열려요. 이미 받아 둔 기록을 먼저 보여 주고, 새것은 뒤에서 받아 고쳐요",
+    "소식함 · 게시판 · 셀 보고 모아보기도 받아 둔 것을 먼저 보여 준 뒤 뒤에서 새로 고쳐요",
+    "홈이 뜬 뒤 쉬는 틈에 훈련 이력 · 사진 · 소식 · 쪽지를 미리 받아 둬요 (처음 여는 화면도 빨라요)",
+    "오래된 소식 정리는 화면을 띄운 뒤 뒤에서 해요"]},
   { v:"48.1", d:"2026-11-15", items:[
     "보안 보완 — 쪽지 · 소식 · 댓글 · 반응 · 게시판 글에 남의 이름을 쓸 수 없어요 (서버가 계정 이름과 맞는지 확인)",
     "게시판 링크는 https 만 · 사진은 기기에서 줄인 사진만 저장되고, 화면에서도 한 번 더 걸러요",
@@ -5762,18 +5814,26 @@ $("th-send").onclick = async () => {
 };
 
 /* ════════ 소식함 ════════ */
+/* 48.2 — 소식 · 쪽지를 받아 둔 게 있으면 바로 보여 주고, 뒤에서 함께(동시에) 새로 받아요.
+   오래된 소식 정리(60일)는 화면을 띄운 뒤 뒤에서 해요. */
+async function loadNotices() {
+  const rows = pack(await getDocs(query(collection(db,"notices"), where("to","==",uid()))));
+  const old = Date.now() - 60*86400000, gone = rows.filter(n => n.read && (n.atMs||0) < old);
+  if (gone.length) setTimeout(() => gone.forEach(n => deleteDoc(doc(db,"notices",n.id)).catch(() => {})), 1500);
+  state.notices = rows.filter(n => !(n.read && (n.atMs||0) < old)).sort((a,b)=>(b.atMs||0)-(a.atMs||0));
+  state.noticesAt = Date.now();
+  return state.notices;
+}
 async function openInbox(tab) {
-  show("s-loading"); markSide("inbox");
-  await loadOrg();
+  markSide("inbox");
   state.ibTab = tab || state.ibTab || "notice";
-  try {
-    const rows = pack(await getDocs(query(collection(db,"notices"), where("to","==",uid()))));
-    /* 읽은 지 오래된 알림은 정리합니다 (60일) */
-    const old = Date.now() - 60*86400000;
-    for (const n of rows.filter(n => n.read && (n.atMs||0) < old)) { try { await deleteDoc(doc(db,"notices",n.id)); } catch {} }
-    state.notices = rows.filter(n => !(n.read && (n.atMs||0) < old)).sort((a,b)=>(b.atMs||0)-(a.atMs||0));
-  } catch (e) { state.notices = []; toast(msgOf(e)); }
-  try { await loadMessages(); } catch (e) { state.msgs = []; toast(msgOf(e)); }
+  const had = !!(state.noticesAt && state.notices && state.msgs);
+  if (had) { renderInbox(); show("s-inbox"); }
+  else { show("s-loading"); await loadOrg(); }
+  const [a, b] = await Promise.allSettled([loadNotices(), loadMessages()]);
+  if (a.status === "rejected") { if (!had) state.notices = []; toast(msgOf(a.reason)); }
+  if (b.status === "rejected") { if (!had) state.msgs = []; toast(msgOf(b.reason)); }
+  if (had && $("s-inbox").hidden) return;   // 그 사이 다른 화면으로 갔으면 그대로
   renderInbox(); show("s-inbox");
 }
 function renderInbox() {
@@ -5867,6 +5927,9 @@ function startLive() {
     (snap) => {
       const rows = pack(snap), prev = state["live_"+kind];
       state["live_"+kind] = rows;
+      /* 48.2 — 받아 둔 소식함에도 새것을 바로 끼워 둬요 (열 때 기다리지 않게) */
+      const keep = kind === "notice" ? state.notices : state.msgs;
+      if (keep) rows.forEach(r => { if (!keep.some(x => x.id === r.id)) keep[kind === "notice" ? "unshift" : "push"](r); });
       if (prev) rows.filter(r => !prev.some(p=>p.id===r.id)).forEach(r => alertNew(kind, r));
       renderBadges();
     }, () => {});
@@ -7544,7 +7607,22 @@ async function loadAlerts(soulId, canSeeAll) {
     const seen = {};
     state.alerts = parts.flatMap(pack).filter(r => seen[r.id] ? false : (seen[r.id] = true))
       .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+    soulCachePut(soulId, { alerts: state.alerts });
   } catch { state.alerts = []; }
+}
+/* 48.2 — 같은 일을 하되 state 를 건드리지 않고 돌려줘요 (그 사이 다른 카드를 열어도 섞이지 않게) */
+async function fetchAlerts(soulId, canSeeAll, s) {
+  if (pastorView(s)) return [];
+  const col = collection(db, "souls", soulId, "alerts");
+  try {
+    const parts = canSeeAll
+      ? await Promise.all([getDocs(query(col, where("by", "==", uid()))),
+          getDocs(query(col, where("scope", "==", "leader"))), getDocs(query(col, where("scope", "==", "coach")))])
+      : [await getDocs(query(col, where("scope", "==", "coach")))];
+    const seen = {};
+    return parts.flatMap(pack).filter(r => seen[r.id] ? false : (seen[r.id] = true))
+      .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+  } catch { return []; }
 }
 function alertBlock(s) {
   const mine = isLeaderOf(s), list = state.alerts || [];
@@ -8153,12 +8231,18 @@ async function openReports(cellId) {
   state.repF = { cellId: cellId === undefined ? (pf.cellId || "") : cellId, months: pf.months || REP_MONTHS, yms: pf.yms || null, q: pf.q || "" }; state.repCalYm = "";
   if (canLead()) syncMyReports().catch(() => {});
   renderRepChips();
-  $("rep-list").innerHTML = `<p class="muted">불러오는 중…</p>`;
+  /* 48.2 — 같은 조건으로 본 적 있으면 그 목록을 먼저 보여 주고 뒤에서 새로 받아요 */
+  const rk = JSON.stringify([state.repF.jinId||"", state.repF.cellId, state.repF.months, state.repF.yms]);
+  state.repCache = state.repCache || {};
+  if (state.repCache[rk]) { state.reps = state.repCache[rk]; renderRepList(); }
+  else $("rep-list").innerHTML = `<p class="muted">불러오는 중…</p>`;
   markSide("meet"); show("s-reports");
   try {
-    state.reps = await loadReports(state.repF);
-    renderRepList();
-  } catch (e) { $("rep-list").innerHTML = `<p class="err">${esc(msgOf(e))}</p>`; }
+    const got = await loadReports(state.repF);
+    state.repCache[rk] = got;
+    if (JSON.stringify([state.repF.jinId||"", state.repF.cellId, state.repF.months, state.repF.yms]) !== rk) return;   // 그 사이 조건을 바꿨으면 그대로
+    state.reps = got; renderRepList();
+  } catch (e) { if (!state.repCache[rk]) $("rep-list").innerHTML = `<p class="err">${esc(msgOf(e))}</p>`; }
 }
 function repCells() {
   const js = new Set(repJins());
@@ -12414,10 +12498,13 @@ function linkCard(l) {
     <span class="ltx"><b>${esc(l.title || (y ? "유튜브 영상" : h))}</b><span>${esc(h)}</span></span></a>`;
 }
 async function openBoard() {
-  show("s-loading"); markSide("board");
-  await loadOrg();
-  try { await loadBoard(true); } catch (e) { toast(msgOf(e)); state.board = []; }
-  state.bdCat = state.bdCat || "all";
+  markSide("board"); state.bdCat = state.bdCat || "all";
+  /* 48.2 — 홈이 미리 받아 둔 글이 있으면 바로 보여 주고 뒤에서 새로 받아요 */
+  const had = !!(state.boardAt && state.board);
+  if (had) { renderBoard(); show("s-board"); }
+  else { show("s-loading"); await loadOrg(); }
+  try { await loadBoard(true); } catch (e) { toast(msgOf(e)); if (!had) state.board = []; }
+  if (had && $("s-board").hidden) return;
   renderBoard(); show("s-board");
   lsSet("mokja-board-seen", String(Date.now()));
 }
