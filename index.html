@@ -2149,6 +2149,35 @@
     :root[data-theme="light"] .auth-scr:not([hidden]){background:linear-gradient(180deg,rgba(245,243,242,.15),rgba(245,243,242,.35)),url("./img/login-phone.webp") center bottom / cover no-repeat,var(--bg)}
     .auth-scr > .center,.auth-scr > .scroll{padding:28px 22px !important;border-radius:20px}
   }
+
+  /* ════════ 49단계 — 훈련: 연도만 고르기 · 훈련 현황에서 한 번에 입력 ════════ */
+  .yr-quick{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:8px}
+  .yr-quick button{height:36px;padding:0 4px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--tx);font:inherit;font-size:calc(13px*var(--fs,1));cursor:pointer}
+  .yr-quick button.on{background:var(--brand);border-color:var(--brand);color:#fff}
+  .tre-hx{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:flex-end}
+  .tre-go{height:36px}
+  .tre-top{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:4px 2px 12px;border-bottom:1px solid var(--line);margin-bottom:8px}
+  .tre-top .hint{margin:0;flex:1 1 320px}
+  .tre-yr{display:flex;flex-direction:column;gap:4px;font-size:calc(12px*var(--fs,1));color:var(--dim)}
+  .tre-yr select{height:36px;min-width:140px}
+  .gx-mx .ck.ed{border:1px dashed var(--line2,var(--line));cursor:pointer;min-width:44px;height:36px;font:inherit;font-size:calc(12px*var(--fs,1));background:var(--surface);color:var(--dim)}
+  .gx-mx .ck.ed.done{background:var(--gx-sage);color:#fff;border-style:solid;border-color:transparent}
+  .gx-mx .ck.ed.ongoing,.gx-mx .ck.ed.planned{background:var(--gx-gold-s);color:var(--gx-gold);border-style:solid;border-color:transparent}
+  .gx-mx .ck.ed.dropped{background:var(--warn-bg);color:var(--warn-tx);border-style:solid;border-color:transparent}
+  .gx-mx .ck.ed.chg{outline:2px solid var(--brand);outline-offset:2px}
+  .gx-mx .ck.ed:active{transform:scale(.94)}
+  .tre-col{display:inline-flex;flex-direction:column;align-items:center;gap:2px;min-height:44px;padding:4px 8px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--tx);font:inherit;font-size:calc(12px*var(--fs,1));cursor:pointer;white-space:nowrap}
+  .tre-col small{font-size:calc(10px*var(--fs,1));color:var(--dim)}
+  .tre-col:hover{border-color:var(--brand)}
+  .tr-editing tr.tre-ro{opacity:.4}
+  .tr-editing .gx-mx th:first-child,.tr-editing .gx-mx td.nm{position:sticky;left:0;z-index:2}
+  .tr-editing .gx-mx td.nm{background:var(--surface2)}
+  .tr-editing .gx-mx th:first-child{background:var(--surface)}
+  .tre-foot{position:sticky;bottom:0;z-index:3;display:flex;align-items:center;gap:8px;margin:8px -20px -18px;padding:12px 20px;
+    background:var(--surface);border-top:1px solid var(--line);border-radius:0 0 var(--r-card,20px) var(--r-card,20px);box-shadow:0 -6px 16px rgba(0,0,0,.06)}
+  .tre-foot>span{flex:1;font-size:calc(13px*var(--fs,1));color:var(--dim)}
+  .tre-foot .btn,.tre-foot .btn-ghost{width:auto;min-width:96px;height:44px;margin:0;padding:0 18px}
+  @media (max-width:720px){ .tre-foot .btn,.tre-foot .btn-ghost{min-width:84px} }
 </style>
 <script>
   /* 27단계 — 화면 밝기: 다크(기본) · 라이트 · 기기 설정 따르기. 깜빡임 없게 그리기 전에 정해요. */
@@ -3752,11 +3781,9 @@
         <option value="dropped">중도 포기</option>
       </select></div>
   </div>
-  <div class="two">
-    <div class="field"><label for="tr-start">시작일</label><input id="tr-start" type="date"></div>
-    <div class="field"><label for="tr-end">종료일</label><input id="tr-end" type="date"></div>
-  </div>
-  <div class="field" style="margin-top:-6px"><label class="check"><input type="checkbox" id="tr-nodate"> 날짜를 몰라요 — 비워 두고 저장</label></div>
+  <div class="field"><label for="tr-year">언제 <span class="muted" style="font-weight:400">— 연도만 골라요</span></label>
+    <div class="yr-quick" id="tr-yq" role="group" aria-label="연도 빠르게 고르기"></div>
+    <select id="tr-year" aria-label="연도"></select></div>
   <div class="field"><label for="tr-note">메모 · 사유</label><input id="tr-note" placeholder="중도 포기면 사유를 적어주세요"></div>
   <p class="err" id="train-err"></p>
   <div class="dlg-btns">
