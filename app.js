@@ -26,7 +26,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
 const APP_NAME = "목자의 삶";
-const APP_VERSION = "49.0 (2026-11-18)";
+const APP_VERSION = "49.1 (2026-11-18)";
 /* 35단계 — 버전 표시: v35.0 · 2026.11.12 업데이트 */
 const verNo = () => APP_VERSION.split(" ")[0];
 const verDate = () => (APP_VERSION.match(/\((.*)\)/) || [])[1] || "";
@@ -2893,6 +2893,7 @@ async function moveCourse(courseId, dir) {
 /* 41단계 — openTrainBoard 는 맨 아래 41단계 묶음으로 옮겼어요 */
 $("train-back").onclick = () => openMore();
 $("s-train").addEventListener("click",(ev)=>{
+  if (ev.target.closest("[data-coc],[data-tre],[data-trbap]")) return;   // 49단계 — 회차 표 · 입력 칸은 영혼 카드로 가지 않게
   const r=ev.target.closest("[data-gosoul3]"); if(!r) return; openSoul(r.dataset.gosoul3);
 });
 
@@ -3837,6 +3838,7 @@ async function openMore() {
     ? "이미 앱으로 설치되어 있어요":"폰 홈 화면에서 바로 열 수 있어요";
   renderFontPick();
   paintMoreNt();
+  $("btn-go-srv").hidden = !isSupU(state.me);
   markSide("more"); show("s-more");
 }
 /* 48.1 — 더보기 맨 위 '알림 설정' 카드: 이 기기 상태를 같이 */
@@ -3847,6 +3849,14 @@ function paintMoreNt() {
   el.className = "chip " + (on ? "ok" : "");
 }
 $("btn-go-notify").onclick = () => openNotifySet();
+/* 49단계 — 더보기 '설정' 한 곳에: 알림 · 공유 · 모임 종류 · 캘린더 · 화면 · (관리자) 서버 */
+$("btn-go-share").onclick = () => openShare();
+$("btn-go-look").onclick = () => $("more-look").scrollIntoView({ behavior: "smooth", block: "start" });
+$("btn-go-srv").onclick = async () => {
+  await openCal();
+  setTimeout(() => { const u = $("gcfg-url"); if (!u) return; const d = u.closest("details"); if (d) d.open = true;
+    (d || u).scrollIntoView({ behavior: "smooth", block: "center" }); }, 250);
+};
 $("btn-go-train").onclick=()=>openTrainBoard();
 $("btn-go-search").onclick=()=>openSearch();
 $("btn-rename").onclick=async()=>{
@@ -5348,6 +5358,11 @@ async function backfillThumbs() {
    올릴 때마다 version.json 도 같이 올립니다. 앱은 열 때 · 다시 볼 때 · 10분마다
    그 파일만 살짝 확인해서(아주 작은 파일), 지금 버전보다 새것이면 위에 알림을 띄웁니다. */
 const CHANGELOG = [
+  { v:"49.1", d:"2026-11-18", items:[
+    "교회 명부 한 번에 고치기 — 명부 › [✎ 한 번에 고치기] · 연락처 · 생일 · 음력 · 직분 · 침례 · 침례일을 표에서 바로 고치고 [저장] 한 번 (고칠 수 있는 사람만 · 내가 맡은 영혼 카드도 같이)",
+    "침례일도 표에서 — 명부 표 · 훈련 현황 [한 번에 입력] 표에 '침례일' 칸 (2019 · 2019-5 · 2019-5-19 · 적으면 침례 ✓ 저절로)",
+    "회차 표 — 훈련 현황(내 셀)의 '3/8' 칸이나 과정 이름 옆 [회차 표] · 위에 그 회차에 만난 날, 온 사람 칸을 눌러 ✓ · 같이 듣는 사람 모두 한 번에 · 8회 모두 ✓면 수료",
+    "설정을 한 곳에 — 더보기 맨 위 '설정': 알림 · 공유 설정 · 모임 종류 · 구글 캘린더 · 화면 · 글자 · 글꼴 · (관리자) 캘린더 서버 · 알림 열쇠"]},
   { v:"49.0", d:"2026-11-18", items:[
     "훈련 현황에서 한 번에 입력 — [✎ 한 번에 입력]을 누르고 표의 칸을 누르면 바뀌어요 (· → ✓수료 → 수강 중 → ·) · 과정 이름을 누르면 비어 있는 칸이 모두 수료 · 침례도 같이 · [저장] 한 번으로",
     "내 셀(영혼 카드)은 훈련 기록이 저절로 만들어지고 고쳐지고 지워져요 · 전체 · 셀마다(교회 명부)는 '수료한 훈련' · 침례 체크 — 내가 고칠 수 있는 사람만",
@@ -6298,6 +6313,8 @@ function renderDir() {
   state.dirView = state.dirView || "stats";
   $("dir-view").querySelectorAll("[data-dv]").forEach(b => b.classList.toggle("on", b.dataset.dv === state.dirView));
   $("dir-roles").hidden = state.dirView === "stats";
+  $("dir-dv-edit").hidden = !pool.some(canEditMember);
+  if (state.dirView === "edit" && $("dir-dv-edit").hidden) state.dirView = "list";
   if (state.dirView === "stats") {
     $("dir-sort").hidden = true; $("dir-ratio").innerHTML = "";
     const scope = state.dirCell === "all" ? pool : state.dirCell === "none" ? pool.filter(m => !cellOfM(m)) : pool.filter(m => cellOfM(m) === state.dirCell);
@@ -6311,6 +6328,12 @@ function renderDir() {
   if (state.dirRole === "member") list = list.filter(m => !isLead(m));
   if (state.dirRole === "new") list = list.filter(m => !m.uid && !(m.soulIds||[]).length);
   if (kw) list = list.filter(m => (m.name||"").includes(kw) || (kwd.length >= 3 && String(m.phone||"").replace(/\D/g,"").includes(kwd)));
+  if (state.dirView === "edit") {
+    $("dir-sort").hidden = true; $("dir-ratio").innerHTML = ""; $("dir-roles").hidden = true;
+    const ci = (m) => { const i = cells.findIndex(c => c.id === cellOfM(m)); return i < 0 ? 999 : i; };
+    renderDirEdit(list.slice().sort((a, b) => ci(a) - ci(b) || ((a.rank || 999) - (b.rank || 999)) || (a.name || "").localeCompare(b.name || "", "ko")), cellOfM);
+    return;
+  }
   /* 30단계 — 침례 · 새로운 삶 · 제자의 삶 · 정회원으로 거르기 (목록 보기) */
   const listMode = !(!kw && state.dirRole === "all" && state.dirCell !== "none");
   const preF = list;
@@ -6596,6 +6619,107 @@ $("md-save").onclick = async () => {
   } catch (e) { $("md-err").textContent = msgOf(e); }
   finally { $("md-save").disabled = false; }
 };
+
+
+/* ════════ 49단계 — 교회 명부 한 번에 고치기 ════════
+   명단을 표로 — 연락처 · 생일(월-일) · 음력 · 직분 · 침례 · 침례일을 칸에서 바로 고치고 [저장] 한 번.
+   고칠 수 있는 사람만 칸이 열려요 (명부 카드 [고치기]와 같은 권한 · 같은 보안 규칙). 내가 맡은 영혼 카드도 같이 맞춰요. */
+const DE_KEYS = ["phone", "birth", "lunar", "position", "bap", "bapAt"];
+function deOrig(m, k) {
+  return k === "phone" ? (m.phone || "") : k === "birth" ? (m.birthMD ? fmtRaw("0000-" + m.birthMD) : "") : k === "lunar" ? !!m.lunar
+    : k === "position" ? (m.position || "") : k === "bap" ? bapOf(m) === "y" : k === "bapAt" ? (m.baptizedAt ? fmtRaw(m.baptizedAt) : "") : "";
+}
+function deVal(m, k) { const d = (state.dirDraft || {})[m.id]; return d && k in d ? d[k] : deOrig(m, k); }
+function deSet(m, k, v) {
+  state.dirDraft = state.dirDraft || {}; const d = state.dirDraft[m.id] = state.dirDraft[m.id] || {};
+  if (v === deOrig(m, k)) delete d[k]; else d[k] = v;
+  if (!Object.keys(d).length) delete state.dirDraft[m.id];
+}
+const deCount = () => Object.values(state.dirDraft || {}).reduce((n, d) => n + Object.keys(d).length, 0);
+function renderDirEdit(list, cellOfM) {
+  state.deList = list.map(m => m.id);
+  const pos = [...new Set(dirPool().map(m => m.position).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ko"));
+  const edN = list.filter(canEditMember).length;
+  $("dir-count").textContent = `${list.length}명 · 고칠 수 있는 사람 ${edN}명`;
+  const chg = (m, k) => { const d = (state.dirDraft || {})[m.id]; return d && k in d ? " chg" : ""; };
+  const inp = (m, k, ph, extra = "") => `<input class="de-in${chg(m, k)}" data-de="${m.id}" data-k="${k}" value="${esc(deVal(m, k))}" placeholder="${ph}" ${extra}>`;
+  const row = (m) => { const e = canEditMember(m), b = deVal(m, "bap");
+    if (!e) return `<tr class="tre-ro"><td class="nm">${avatar(m, 28)}<span>${esc(m.name)}</span></td><td class="cl">${esc(cellNameOf(cellOfM(m)) || "")}</td>
+      <td>${esc(m.phone || "")}</td><td>${esc(deOrig(m, "birth"))}${m.lunar ? " (음)" : ""}</td><td></td><td>${esc(m.position || "")}</td><td>${bapOf(m) === "y" ? "✓" : "·"}</td><td>${esc(deOrig(m, "bapAt"))}</td></tr>`;
+    return `<tr><td class="nm">${avatar(m, 28)}<span>${esc(m.name)}</span></td><td class="cl">${esc(cellNameOf(cellOfM(m)) || "")}</td>
+      <td>${inp(m, "phone", "010-0000-0000", 'inputmode="tel" style="width:140px"')}</td>
+      <td>${inp(m, "birth", "월-일", 'style="width:84px"')}</td>
+      <td><button type="button" class="ck ed ${deVal(m, "lunar") ? "done" : "n"}${chg(m, "lunar")}" data-de="${m.id}" data-k="lunar" aria-label="${esc(m.name)} 음력">${deVal(m, "lunar") ? "음" : "·"}</button></td>
+      <td>${inp(m, "position", "예) 집사", 'list="dl-position" style="width:96px"')}</td>
+      <td><button type="button" class="ck ed ${b ? "done" : "n"}${chg(m, "bap")}" data-de="${m.id}" data-k="bap" aria-label="${esc(m.name)} 침례">${b ? "✓" : "·"}</button></td>
+      <td>${inp(m, "bapAt", "연-월-일", 'style="width:112px"')}</td></tr>`; };
+  const n = deCount();
+  $("dir-list").innerHTML = `<div class="gx-card tr-editing de-card" id="de-card">
+      <div class="tre-top"><p class="hint">칸을 눌러 바로 고쳐요 · 생일은 <b>3-5</b> · 침례일은 <b>2019</b> · <b>2019-5</b> · <b>2019-5-19</b> 처럼 · 저장을 눌러야 들어가요${edN < list.length ? " · 흐린 줄은 내가 고칠 수 없는 사람" : ""}</p></div>
+      ${list.length ? `<div class="gx-mxwrap"><div class="matrix gx-mx de-mx"><table><thead><tr><th style="text-align:left">이름</th><th>셀</th><th>연락처</th><th>생일</th><th>음력</th><th>직분</th><th>침례</th><th>침례일</th></tr></thead>
+        <tbody>${list.map(row).join("")}</tbody></table></div></div>` : `<p class="muted" style="margin:14px 0">이 조건에 맞는 사람이 없어요.</p>`}
+      <div class="tre-foot"><span id="de-n">${n ? `<b>${n}칸</b> 고침` : "고친 칸이 없어요"}</span>
+        <button type="button" class="btn-ghost" id="de-cancel">되돌리기</button><button type="button" class="btn" id="de-save" ${n ? "" : "disabled"}>저장</button></div>
+    </div>`;
+  if (!$("dl-position")) { const dl = document.createElement("datalist"); dl.id = "dl-position"; document.body.appendChild(dl); }
+  if (pos.length) $("dl-position").innerHTML = [...new Set([...pos, ...Array.from($("dl-position").options).map(o => o.value)])].map(p => `<option value="${esc(p)}">`).join("");
+}
+function paintDeFoot() {
+  const n = deCount(); if (!$("de-n")) return;
+  $("de-n").innerHTML = n ? `<b>${n}칸</b> 고침` : "고친 칸이 없어요"; $("de-save").disabled = !n;
+}
+$("dir-list").addEventListener("input", (ev) => {
+  const i = ev.target.closest("input[data-de]"); if (!i) return;
+  const m = memberById(i.dataset.de) || (state.dir || []).find(x => x.id === i.dataset.de); if (!m) return;
+  deSet(m, i.dataset.k, i.value.trim() === deOrig(m, i.dataset.k) ? deOrig(m, i.dataset.k) : i.value);
+  i.classList.toggle("chg", !!((state.dirDraft || {})[m.id] && i.dataset.k in state.dirDraft[m.id]));
+  /* 침례일을 적으면 침례 ✓도 같이 */
+  if (i.dataset.k === "bapAt" && i.value.trim() && !deVal(m, "bap")) {
+    deSet(m, "bap", true); const b = i.closest("tr").querySelector('[data-k="bap"]'); if (b) { b.className = "ck ed done" + (deOrig(m, "bap") ? "" : " chg"); b.textContent = "✓"; }
+  }
+  paintDeFoot();
+});
+$("dir-list").addEventListener("click", async (ev) => {
+  if (ev.target.closest("#de-cancel")) { if (deCount() && !confirm("고친 칸을 모두 되돌릴까요?")) return; state.dirDraft = {}; renderDir(); return; }
+  if (ev.target.closest("#de-save")) { saveDirEdit(); return; }
+  const b = ev.target.closest("button[data-de]"); if (!b) return;
+  const m = memberById(b.dataset.de) || (state.dir || []).find(x => x.id === b.dataset.de); if (!m || !canEditMember(m)) return;
+  const k = b.dataset.k, v = !deVal(m, k); deSet(m, k, v);
+  b.className = `ck ed ${v ? "done" : "n"}${(state.dirDraft[m.id] || {})[k] !== undefined ? " chg" : ""}`; b.textContent = v ? (k === "lunar" ? "음" : "✓") : "·";
+  paintDeFoot();
+});
+async function saveDirEdit() {
+  const D = { ...(state.dirDraft || {}) }, ids = Object.keys(D); if (!ids.length) return;
+  const btn = $("de-save"); btn.disabled = true; btn.textContent = "저장 중…";
+  let ok = 0; const fails = [];
+  for (const id of ids) {
+    const m = memberById(id) || (state.dir || []).find(x => x.id === id); if (!m || !canEditMember(m)) continue;
+    const d = D[id], f = {}, sp = {};
+    try {
+      if ("phone" in d) { f.phone = fmtPhone(d.phone); sp.phone = f.phone; }
+      if ("position" in d) { f.position = String(d.position).trim(); sp.position = f.position; }
+      if ("lunar" in d) { f.lunar = !!d.lunar; sp.lunar = f.lunar; }
+      if ("birth" in d) {
+        const raw = String(d.birth).trim(), bp = raw ? parseDateLoose(raw) : "", md = bp ? mdOf(bp) : "";
+        if (raw && !md) throw new Error(`생일은 월-일로 (예: 3-5) — '${raw}'`);
+        f.birthMD = md;
+      }
+      if ("bapAt" in d) { const v = parseDateLoose(String(d.bapAt).trim()); if (v === null) throw new Error(`침례일 형식 — '${d.bapAt}' (예: 2019-5-19)`); f.baptizedAt = v; sp.baptizedAt = v; if (v) { f.bap = "y"; sp.bap = "y"; } }
+      if ("bap" in d) { f.bap = d.bap ? "y" : "n"; sp.bap = f.bap; if (!d.bap) { f.baptizedAt = ""; sp.baptizedAt = ""; } }
+      await updateDoc(doc(db, "members", m.id), { ...f, updatedAt: serverTimestamp() }); Object.assign(m, f);
+      for (const s of (state.souls || []).filter(x => isLeaderOf(x) && !isLeaderCard(x) && ((m.soulIds || []).includes(x.id) || x.memberId === m.id))) {
+        const p2 = { ...sp };
+        if ("birthMD" in f && f.birthMD) { const yr = String(s.birth || "").split("-")[0]; p2.birth = `${yr && yr.length === 4 ? yr : "0000"}-${f.birthMD}`; }
+        if (Object.keys(p2).length) { try { await updateDoc(doc(db, "souls", s.id), p2); Object.assign(s, p2); } catch {} }
+      }
+      delete state.dirDraft[id]; ok += Object.keys(d).length;
+    } catch (e) { fails.push(`${m.name}: ${msgOf(e)}`); }
+  }
+  invalidate(); bump("dirBulk");
+  if (ok) await log("명부 한 번에 고침", `${ok}칸`, "");
+  renderDir();
+  toast(fails.length ? `${ok}칸 저장 · ${fails.length}명은 못 했어요 — ${fails[0]}` : `${ok}칸 저장했어요.`);
+}
 
 /* ── 다른 셀로 옮기기 (진장 · 코치 · 수퍼) ── */
 const dlgMv = $("dlg-move");
@@ -9692,6 +9816,8 @@ async function syncRankToDir(souls) {
 /* 29단계 — 명부: 명단 / 통계 · 정렬 */
 $("dir-view").addEventListener("click", (ev) => {
   const b = ev.target.closest("[data-dv]"); if (!b) return;
+  if (state.dirView === "edit" && b.dataset.dv !== "edit" && Object.keys(state.dirDraft || {}).length && !confirm("고친 칸을 저장하지 않고 나갈까요?")) return;
+  if (b.dataset.dv !== "edit") state.dirDraft = {};
   state.dirView = b.dataset.dv; renderDir();
 });
 $("dir-sort").addEventListener("click", async (ev) => {
@@ -11976,14 +12102,18 @@ function renderTrain() {
     return `<button type="button" class="ck ed ${st || "n"} ${chg ? "chg" : ""}" data-tre="${p.soul || p.mem}" data-trn="${esc(n)}" aria-label="${esc(p.name)} ${esc(n)} ${st ? (TSTAT[st] || "") : "없음"}">${st ? CK[st] : "·"}</button>`; };
   const bapEd = (p) => { const b = effBap(p), chg = (p.soul || p.mem) + "|__bap" in (state.trDraft || {});
     return `<button type="button" class="ck ed ${b ? "done" : "n"} ${chg ? "chg" : ""}" data-tre="${p.soul || p.mem}" data-trn="__bap" aria-label="${esc(p.name)} 침례 ${b ? "받음" : "아직"}">${b ? "✓" : "·"}</button>`; };
-  const thC = (n) => ED ? `<th><button type="button" class="tre-col" data-trcol="${esc(n)}" title="${esc(n)} — 비어 있는 칸 모두 수료">${esc(n)}<small>모두 ✓</small></button></th>` : `<th>${esc(n)}</th>`;
-  const matrix = `<div class="gx-mxwrap"><div class="matrix gx-mx" id="train-matrix"><table><thead><tr><th style="text-align:left">이름</th>${showCell ? "<th>셀</th>" : ""}${ED ? thC("__bap").replace(/>__bap<small>/, ">침례<small>").replace('title="__bap', 'title="침례') : "<th>침례</th>"}
+  const multi = (n) => D.src === "souls" && (state.courses.find(c => c.name === n) || {}).sessions > 1;
+  const thN = (n) => multi(n) ? `<th><span class="th-co">${esc(n)}<button type="button" class="btn-sm co-go" data-coc="${esc(n)}" title="${esc(n)} 회차를 같이 듣는 사람들 한 번에">회차 표</button></span></th>` : `<th>${esc(n)}</th>`;
+  const thC = (n) => ED ? `<th><button type="button" class="tre-col" data-trcol="${esc(n)}" title="${esc(n)} — 비어 있는 칸 모두 수료">${esc(n)}<small>모두 ✓</small></button></th>` : thN(n);
+  const matrix = `<div class="gx-mxwrap"><div class="matrix gx-mx" id="train-matrix"><table><thead><tr><th style="text-align:left">이름</th>${showCell ? "<th>셀</th>" : ""}${ED ? thC("__bap").replace(/>__bap<small>/, ">침례<small>").replace('title="__bap', 'title="침례') + "<th>침례일</th>" : "<th>침례</th>"}
       ${D.courses.map(thC).join("")}</tr></thead><tbody>
       ${P.map(p => { const e = ED && canEd(p);
         return `<tr ${ED ? (e ? "" : `class="tre-ro"`) : p.soul ? `data-gosoul3="${p.soul}" style="cursor:pointer"` : p.mem ? `data-trmem="${p.mem}" style="cursor:pointer"` : ""}><td class="nm">${avatar(p.o, 28)}<span>${esc(p.name)}</span>${p.intern ? ` <span class="chip intern" style="height:20px">인턴</span>` : ""}</td>
         ${showCell ? `<td class="cl">${esc(cellNameOf(p.cellId) || "")}</td>` : ""}
         <td title="${p.bapAt ? fmtDate(p.bapAt, true) : ""}">${e ? bapEd(p) : `<span class="ck ${p.bap ? "done" : "n"}">${p.bap ? "✓" : "·"}</span>`}</td>
-        ${D.courses.map(n => { if (e) return `<td>${cellEd(p, n)}</td>`; const st = p.st[n]; return `<td><span class="ck ${st || "n"}" title="${esc(n)} ${st ? (TSTAT[st] || "") : ""}">${st ? (p.lab[n] || CK[st]) : "·"}</span></td>`; }).join("")}</tr>`; }).join("")}
+        ${ED ? `<td>${e ? `<input class="de-in tre-date${(p.soul || p.mem) + "|__bapAt" in (state.trDraft || {}) ? " chg" : ""}" data-trbap="${p.soul || p.mem}" value="${esc(trEffBapAt(p))}" placeholder="연-월-일">` : esc(p.bapAt ? fmtRaw(p.bapAt) : "")}</td>` : ""}
+        ${D.courses.map(n => { if (e) return `<td>${cellEd(p, n)}</td>`; const st = p.st[n]; if (!ED && multi(n) && p.lab[n]) return `<td><button type="button" class="ck ${st} co-cell" data-coc="${esc(n)}" title="${esc(n)} 회차 표 열기">${p.lab[n]}</button></td>`;
+          return `<td><span class="ck ${st || "n"}" title="${esc(n)} ${st ? (TSTAT[st] || "") : ""}">${st ? (p.lab[n] || CK[st]) : "·"}</span></td>`; }).join("")}</tr>`; }).join("")}
       </tbody></table></div></div>`;
   const nChg = Object.keys(state.trDraft || {}).length;
   const edTop = ED ? `<div class="tre-top">
@@ -12019,9 +12149,94 @@ $("s-train").addEventListener("click", (ev) => {
   if (ev.target.closest("#tre-save")) { saveTrainBulk(); return; }
   const c = ev.target.closest("[data-tre]"); if (c) { trCycle(c.dataset.tre, c.dataset.trn); return; }
   const h = ev.target.closest("[data-trcol]"); if (h) { trFillCol(h.dataset.trcol); return; }
+  const co = ev.target.closest("[data-coc]"); if (co) { ev.stopPropagation(); openCohort(co.dataset.coc); return; }
   const r = ev.target.closest("[data-trmem]"); if (r) openMember(r.dataset.trmem);
 });
 $("s-train").addEventListener("change", (ev) => { if (ev.target.id === "tre-year") state.trYear = ev.target.value; });
+/* 침례일 — 적는 동안 다시 그리지 않고 (다음 칸으로 바로 넘어가게) 바꾼 칸 수만 고쳐요 */
+$("s-train").addEventListener("input", (ev) => {
+  const i = ev.target.closest("[data-trbap]"); if (!i) return;
+  const D = trData(), p = D.people.find(x => (x.soul || x.mem) === i.dataset.trbap); if (!p) return;
+  trSet(p, "__bapAt", i.value.trim());
+  i.classList.toggle("chg", (p.soul || p.mem) + "|__bapAt" in (state.trDraft || {}));
+  if (i.value.trim() && !trEffBap(p)) { trSet(p, "__bap", true); const b = i.closest("tr").querySelector('[data-trn="__bap"]'); if (b) { b.className = "ck ed done" + (p.bap ? "" : " chg"); b.textContent = "✓"; } }
+  const n = Object.keys(state.trDraft || {}).length, f = document.querySelector(".tre-foot > span"), sb = $("tre-save");
+  if (f) f.innerHTML = n ? `<b>${n}칸</b> 바꿈` : "바꾼 칸이 없어요"; if (sb) sb.disabled = !n;
+});
+
+/* ════════ 49단계 — 회차 표: 같이 듣는 사람들의 회차를 한 번에 (새로운 삶처럼 여러 번 만나는 과정) ════════
+   훈련 현황(내 셀)의 '3/8' 칸이나 과정 이름 옆 [회차 표]에서 열려요.
+   위 날짜는 그 회차에 모두 함께 만난 날 — ✓가 있는 사람 모두에게 들어가요. 저장하면 영혼 카드의 훈련 기록 '회차 기록'과 같아요. */
+const dlgCo = $("dlg-cohort");
+let CO = null;
+function openCohort(courseName) {
+  const c = state.courses.find(x => x.name === courseName); if (!c) return;
+  const N = c.sessions || 1, souls = state.souls.filter(sx => isLeaderOf(sx));
+  const latest = {}; (state.trAll || []).filter(t => t.courseId === c.id && t.status !== "dropped").forEach(t => { const cur = latest[t.soulId]; if (!cur || tKey(t) > tKey(cur)) latest[t.soulId] = t; });
+  const rows = souls.map(sx => { const t = latest[sx.id] || null, log = (t && t.sessionLog) || [];
+    return { s: sx, t, ok: Array.from({ length: N }, (_, i) => !!(log.find(x => x.no === i + 1) || {}).ok), date: Array.from({ length: N }, (_, i) => (log.find(x => x.no === i + 1) || {}).date || "") }; });
+  const rk = (r) => !r.t ? 3 : r.t.status === "ongoing" ? 0 : r.t.status === "planned" ? 1 : 2;
+  rows.sort((a, b) => rk(a) - rk(b) || String(a.s.name).localeCompare(String(b.s.name), "ko"));
+  /* 회차마다 가장 많이 적힌 날짜를 위 칸에 */
+  const hd = Array.from({ length: N }, (_, i) => { const cnt = {}; rows.forEach(r => { const d = r.date[i]; if (d) cnt[d] = (cnt[d] || 0) + 1; });
+    return Object.entries(cnt).sort((a, b) => b[1] - a[1])[0]?.[0] || ""; });
+  CO = { c, N, rows, hd, hd0: hd.slice(), ok0: rows.map(r => r.ok.slice()), showAll: false };
+  $("co-title").textContent = `${c.name} 회차 표`;
+  $("co-sub").textContent = `${N}번 만나는 과정이에요. 위 칸에 그 회차에 만난 날을 적고, 온 사람 칸을 눌러 ✓ — 저장하면 모두에게 들어가요.`;
+  $("co-err").textContent = ""; paintCohort(); dlgCo.showModal();
+}
+function paintCohort() {
+  const { N, rows, hd } = CO, shown = rows.filter((r, i) => CO.showAll || r.t || r.ok.some(Boolean) || CO.ok0[i].some(Boolean));
+  const hidden = rows.length - shown.length;
+  $("co-mx").innerHTML = `<table><thead><tr><th style="text-align:left">이름</th>${Array.from({ length: N }, (_, i) => `<th><span class="co-h">${i + 1}회<input type="date" class="co-d" data-cod="${i}" value="${hd[i] || ""}" aria-label="${i + 1}회 만난 날"></span></th>`).join("")}<th>합</th></tr></thead>
+    <tbody>${shown.map(r => { const ri = rows.indexOf(r), n = r.ok.filter(Boolean).length;
+      return `<tr><td class="nm">${avatar(r.s, 28)}<span>${esc(r.s.name)}</span>${r.t ? "" : ` <span class="chip" style="height:20px">새로</span>`}</td>
+        ${r.ok.map((o, i) => `<td><button type="button" class="ck ed ${o ? "done" : "n"}${o !== CO.ok0[ri][i] ? " chg" : ""}" data-cor="${ri}" data-coi="${i}" aria-label="${esc(r.s.name)} ${i + 1}회 ${o ? "만남" : "아직"}">${o ? "✓" : "·"}</button></td>`).join("")}
+        <td><b>${n}</b>/${N}</td></tr>`; }).join("")}</tbody></table>
+    ${hidden ? `<button type="button" class="btn-sm" id="co-more" style="margin-top:10px">이 과정을 아직 시작 안 한 사람 ${hidden}명 더 보기</button>` : ""}`;
+}
+$("co-mx").addEventListener("click", (ev) => {
+  if (ev.target.closest("#co-more")) { CO.showAll = true; paintCohort(); return; }
+  const b = ev.target.closest("[data-cor]"); if (!b) return;
+  const r = CO.rows[+b.dataset.cor], i = +b.dataset.coi; r.ok[i] = !r.ok[i];
+  b.className = `ck ed ${r.ok[i] ? "done" : "n"}${r.ok[i] !== CO.ok0[+b.dataset.cor][i] ? " chg" : ""}`; b.textContent = r.ok[i] ? "✓" : "·";
+  const tr = b.closest("tr"); tr.lastElementChild.innerHTML = `<b>${r.ok.filter(Boolean).length}</b>/${CO.N}`;
+});
+$("co-mx").addEventListener("change", (ev) => { const d = ev.target.closest("[data-cod]"); if (d) CO.hd[+d.dataset.cod] = d.value; });
+$("co-cancel").onclick = () => dlgCo.close();
+$("co-save").onclick = async () => {
+  const { c, N, rows, hd } = CO, auto = $("co-auto").checked;
+  $("co-save").disabled = true; $("co-err").textContent = "";
+  let ok = 0; const fails = [];
+  for (const [ri, r] of rows.entries()) {
+    const okChanged = r.ok.some((o, i) => o !== CO.ok0[ri][i]);
+    const dateChanged = hd.some((d, i) => d !== CO.hd0[i] && r.ok[i]);
+    if (!okChanged && !dateChanged) continue;
+    if (!r.t && !r.ok.some(Boolean)) continue;
+    const log = Array.from({ length: N }, (_, i) => ({ no: i + 1, date: (r.ok[i] && hd[i]) || r.date[i] || hd[i] || "", ok: r.ok[i] }))
+      .filter(x => x.ok || x.date);
+    const okN = r.ok.filter(Boolean).length, dates = log.filter(x => x.ok && x.date).map(x => x.date).sort();
+    const status = auto && okN === N ? "done" : okN ? (r.t && r.t.status === "done" ? "done" : "ongoing") : (r.t ? r.t.status : "planned");
+    const yr = dates.length ? Number(dates[dates.length - 1].slice(0, 4)) : (r.t && r.t.year) || new Date().getFullYear();
+    try {
+      if (r.t) {
+        const patch = { sessionLog: log, status, by: uid() };
+        if (!r.t.year || (status === "done" && r.t.status !== "done")) patch.year = yr;
+        await updateDoc(doc(db, "souls", r.s.id, "trainings", r.t.id), patch);
+      } else {
+        await addDoc(collection(db, "souls", r.s.id, "trainings"), { courseId: c.id, courseName: c.name, totalSessions: N, cohort: "", status,
+          year: yr, startDate: "", endDate: "", note: "", sponsorKind: "", sponsorId: "", sponsorName: "", sessionLog: log, by: uid(), createdAt: serverTimestamp() });
+      }
+      syncMemberTrain(r.s.id, true); ok++;
+    } catch (e) { fails.push(`${r.s.name}: ${msgOf(e)}`); }
+  }
+  $("co-save").disabled = false;
+  if (fails.length) { $("co-err").textContent = `${ok}명 저장 · ${fails.length}명은 못 했어요 — ${fails[0]}`; return; }
+  dlgCo.close(); invalidate(); bump("cohortSave");
+  try { state.trAll = await loadAllTrainings(true); } catch {}
+  if (!$("s-train").hidden) renderTrain();
+  toast(ok ? `${ok}명의 회차를 저장했어요.` : "바뀐 것이 없어요.");
+};
 
 /* ════════ 49단계 — 훈련 현황에서 한 번에 입력 ════════
    내 셀(영혼 카드): 영혼 카드의 훈련 기록을 만들고 · 고치고 · 지워요 (명부 '수료한 훈련'도 저절로 맞춰져요)
@@ -12032,8 +12247,9 @@ function trCanEdit(p, src) {
 }
 function trEff(p, n) { const k = (p.soul || p.mem) + "|" + n, d = state.trDraft || {}; return k in d ? d[k] : (p.st[n] || ""); }
 function trEffBap(p) { const k = (p.soul || p.mem) + "|__bap", d = state.trDraft || {}; return k in d ? d[k] : !!p.bap; }
+function trEffBapAt(p) { const k = (p.soul || p.mem) + "|__bapAt", d = state.trDraft || {}; return k in d ? d[k] : (p.bapAt ? fmtRaw(p.bapAt) : ""); }
 function trSet(p, n, v) {
-  const k = (p.soul || p.mem) + "|" + n, orig = n === "__bap" ? !!p.bap : (p.st[n] || "");
+  const k = (p.soul || p.mem) + "|" + n, orig = n === "__bap" ? !!p.bap : n === "__bapAt" ? (p.bapAt ? fmtRaw(p.bapAt) : "") : (p.st[n] || "");
   state.trDraft = state.trDraft || {};
   if (v === orig) delete state.trDraft[k]; else state.trDraft[k] = v;
 }
@@ -12063,6 +12279,7 @@ async function saveTrainBulk() {
   const D = trData(), draft = { ...(state.trDraft || {}) }, keys = Object.keys(draft); if (!keys.length) return;
   const btn = $("tre-save"); if (btn) { btn.disabled = true; btn.textContent = "저장 중…"; }
   const year = state.trYear === "" ? "" : Number(state.trYear ?? new Date().getFullYear());
+  for (const k of keys.filter(k => k.endsWith("|__bapAt"))) { if (parseDateLoose(String(draft[k]).trim()) === null) { toast(`침례일 형식을 확인해 주세요 — '${draft[k]}' (예: 2019 · 2019-5 · 2019-5-19)`); if (btn) { btn.disabled = false; btn.textContent = "저장"; } return; } }
   const byP = {}; keys.forEach(k => { const i = k.lastIndexOf("|"); const pid = k.slice(0, i), n = k.slice(i + 1); (byP[pid] = byP[pid] || []).push([n, draft[k]]); });
   let ok = 0, bad = 0; const fails = [];
   await Promise.all(Object.entries(byP).map(async ([pid, ch]) => {
@@ -12072,7 +12289,8 @@ async function saveTrainBulk() {
         const s = p.o, m = s.memberId && memberById(s.memberId), mine = (state.trAll || []).filter(t => t.soulId === s.id);
         const dropDirect = [];
         for (const [n, v] of ch) {
-          if (n === "__bap") { const bap = v ? "y" : "n"; await updateDoc(doc(db, "souls", s.id), { bap }); s.bap = bap; syncMemberField(s, { bap }); ok++; continue; }
+          if (n === "__bap") { const bap = v ? "y" : "n", sp = { bap }; if (!v && s.baptizedAt) sp.baptizedAt = ""; await updateDoc(doc(db, "souls", s.id), sp); Object.assign(s, sp); syncMemberField(s, sp); ok++; continue; }
+          if (n === "__bapAt") { const at = parseDateLoose(String(v).trim()) || "", sp = { baptizedAt: at }; if (at) sp.bap = "y"; await updateDoc(doc(db, "souls", s.id), sp); Object.assign(s, sp); syncMemberField(s, sp); ok++; continue; }
           const c = state.courses.find(x => x.name === n); if (!c) continue;
           const t = mine.filter(x => x.courseId === c.id).sort((a, b) => tKey(b).localeCompare(tKey(a)))[0];
           if (!v) { if (t) await deleteDoc(doc(db, "souls", s.id, "trainings", t.id)); dropDirect.push(n); }
@@ -12091,10 +12309,11 @@ async function saveTrainBulk() {
       } else {
         const m = p.o, done = new Set(m.trainingsDone || []), dir = new Set(m.trainDirect || []), patch = { updatedAt: serverTimestamp() };
         for (const [n, v] of ch) {
-          if (n === "__bap") { patch.bap = v ? "y" : "n"; continue; }
+          if (n === "__bap") { patch.bap = v ? "y" : "n"; if (!v) patch.baptizedAt = ""; continue; }
+          if (n === "__bapAt") { patch.baptizedAt = parseDateLoose(String(v).trim()) || ""; if (patch.baptizedAt) patch.bap = "y"; continue; }
           if (v) { done.add(n); dir.add(n); } else { done.delete(n); dir.delete(n); }
         }
-        if (ch.some(([n]) => n !== "__bap")) { patch.trainingsDone = faithSortCourses([...done]); patch.trainDirect = [...dir]; }
+        if (ch.some(([n]) => !n.startsWith("__bap"))) { patch.trainingsDone = faithSortCourses([...done]); patch.trainDirect = [...dir]; }
         await updateDoc(doc(db, "members", m.id), patch); Object.assign(m, patch); ok += ch.length;
       }
     } catch (e) { bad += ch.length; fails.push(`${p.name}: ${msgOf(e)}`); }

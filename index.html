@@ -2115,7 +2115,7 @@
   /* 더보기 카드 — 설명은 두 줄까지 보이고 카드 높이는 줄마다 같게 */
   #s-more .row .sub{white-space:normal;display:-webkit-box !important;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.45}
   #s-more .list .row{min-height:68px}
-  #s-more .more-nt .chip{flex:none;white-space:nowrap}
+  #s-more .more-set .chip{flex:none;white-space:nowrap}
   /* 관리 바로 가기 — 글 칸이 줄어들 수 있게 · 설명 두 줄 */
   .adm-grid{grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}
   .adm-grid button{min-height:68px}
@@ -2178,6 +2178,31 @@
   .tre-foot>span{flex:1;font-size:calc(13px*var(--fs,1));color:var(--dim)}
   .tre-foot .btn,.tre-foot .btn-ghost{width:auto;min-width:96px;height:44px;margin:0;padding:0 18px}
   @media (max-width:720px){ .tre-foot .btn,.tre-foot .btn-ghost{min-width:84px} }
+
+  /* ════════ 49단계 — 회차 표 · 명부 한 번에 고치기 · 설정 ════════ */
+  .th-co{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+  .co-go{height:30px;padding:0 10px;font-size:calc(11px*var(--fs,1))}
+  .gx-mx button.co-cell{border:none;cursor:pointer;font:inherit;font-size:calc(11px*var(--fs,1));min-width:44px;height:30px;text-decoration:underline dotted;text-underline-offset:3px}
+  #dlg-cohort{width:min(96vw,980px)}
+  .co-wrap:focus,.co-wrap:focus-visible{outline:none}
+  .co-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -4px;padding:0 4px}
+  .co-mx table{width:max-content;min-width:100%}
+  .co-mx th{min-width:136px} .co-mx th:first-child{min-width:120px}
+  .co-mx th:first-child,.co-mx td.nm{position:sticky;left:0;z-index:2}
+  .co-mx td.nm{background:var(--surface2)} .co-mx th:first-child{background:var(--surface)}
+  .co-h{display:inline-flex;flex-direction:column;align-items:center;gap:4px}
+  .co-d{height:36px;width:128px;padding:0 6px;font-size:calc(12px*var(--fs,1))}
+  .co-mx .ck.ed{min-width:40px}
+  .de-in{height:36px;padding:0 10px;font-size:calc(13px*var(--fs,1));border-radius:10px}
+  .de-in.chg{outline:2px solid var(--brand);outline-offset:1px}
+  .de-card{margin-top:4px}
+  .de-mx td{white-space:nowrap}
+  .tr-editing .gx-mx td.nm,.co-mx td.nm{display:table-cell;vertical-align:middle;white-space:nowrap}
+  .tr-editing .gx-mx td.nm > *,.co-mx td.nm > *{vertical-align:middle}
+  .tr-editing .gx-mx td.nm > .ava,.co-mx td.nm > .ava{display:inline-flex !important}
+  .tr-editing .gx-mx td.nm > span:not(.ava),.co-mx td.nm > span:not(.ava){margin-left:8px}
+  .gx-mx td{vertical-align:middle}
+  .tre-date{width:112px}
 </style>
 <script>
   /* 27단계 — 화면 밝기: 다크(기본) · 라이트 · 기기 설정 따르기. 깜빡임 없게 그리기 전에 정해요. */
@@ -3165,13 +3190,38 @@
         </div>
       </div>
 
-      <h3 class="sec-title">알림</h3>
-      <div class="list more-nt">
+      <h3 class="sec-title">설정</h3>
+      <div class="list more-set">
         <button class="row" id="btn-go-notify" style="text-align:left;cursor:pointer;width:100%">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16.5V11a6 6 0 1 1 12 0v5.5l1.5 2h-15z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/></svg>
           <span class="grow"><span class="nm" style="display:block">알림 설정</span>
-            <span class="sub" style="display:block">쪽지 · 댓글 · 게시판 새 글 · 일정 미리 알림 · 앱이 닫혀 있어도 받기</span></span>
+            <span class="sub" style="display:block">쪽지 · 댓글 · 게시판 · 일정 · 앱이 닫혀 있어도</span></span>
           <span class="chip" id="more-nt-st">—</span>
+        </button>
+        <button class="row" id="btn-go-share" style="text-align:left;cursor:pointer;width:100%">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="12" r="2.5"/><circle cx="17" cy="6.5" r="2.5"/><circle cx="17" cy="17.5" r="2.5"/><path d="m9.2 10.8 5.6-3.1M9.2 13.2l5.6 3.1"/></svg>
+          <span class="grow"><span class="nm" style="display:block">공유 설정</span>
+            <span class="sub" style="display:block">새로 쓰는 카드 · 기록 · 셀모임을 누구까지 보게 할지</span></span>
+        </button>
+        <button class="row" id="btn-go-kinds" style="text-align:left;cursor:pointer;width:100%">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+          <span class="grow"><span class="nm" style="display:block">모임 종류 설정</span>
+            <span class="sub" style="display:block">기록할 때 뜨는 종류 · 순서 · 숨기기</span></span>
+        </button>
+        <button class="row" id="btn-go-cal-help" style="text-align:left;cursor:pointer;width:100%">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5.5" width="17" height="15" rx="2.5"/><path d="M3.5 10.5h17M8.5 3.5v4M15.5 3.5v4"/></svg>
+          <span class="grow"><span class="nm" style="display:block">구글 캘린더 자동 넣기</span>
+            <span class="sub" style="display:block">한 번 연결하면 셀모임 · 만남 일정이 내 캘린더에</span></span>
+        </button>
+        <button class="row" id="btn-go-look" style="text-align:left;cursor:pointer;width:100%">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19h3M6.5 19l4-14h3l4 14M8.5 13h7"/></svg>
+          <span class="grow"><span class="nm" style="display:block">화면 · 글자 · 글꼴</span>
+            <span class="sub" style="display:block">라이트 · 블랙 · 글자 크기 · 글꼴 · 빠르게 열기</span></span>
+        </button>
+        <button class="row" id="btn-go-srv" style="text-align:left;cursor:pointer;width:100%" hidden>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4.5" width="16" height="6" rx="1.5"/><rect x="4" y="13.5" width="16" height="6" rx="1.5"/><path d="M7.5 7.5h.01M7.5 16.5h.01"/></svg>
+          <span class="grow"><span class="nm" style="display:block">캘린더 서버 · 알림 열쇠</span>
+            <span class="sub" style="display:block">관리자 — 실시간 서버 주소 · 클라이언트 ID · 웹 푸시 인증서</span></span>
         </button>
       </div>
 
@@ -3205,20 +3255,10 @@
               <span class="grow"><span class="nm" style="display:block">사진 모아보기</span>
                 <span class="sub" style="display:block">셀별 얼굴 · 셀모임 · 만남 사진</span></span>
             </button>
-            <button class="row" id="btn-go-kinds" style="text-align:left;cursor:pointer;width:100%">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
-              <span class="grow"><span class="nm" style="display:block">모임 종류 설정</span>
-                <span class="sub" style="display:block">기록할 때 뜨는 종류 · 순서 · 숨기기</span></span>
-            </button>
             <button class="row" id="btn-go-search" style="text-align:left;cursor:pointer;width:100%">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>
               <span class="grow"><span class="nm" style="display:block">기록 검색</span>
                 <span class="sub" style="display:block">모든 영혼의 기록에서 단어 찾기</span></span>
-            </button>
-            <button class="row" id="btn-go-cal-help" style="text-align:left;cursor:pointer;width:100%">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5.5" width="17" height="15" rx="2.5"/><path d="M3.5 10.5h17M8.5 3.5v4M15.5 3.5v4"/></svg>
-              <span class="grow"><span class="nm" style="display:block">구글 캘린더 자동 넣기</span>
-                <span class="sub" style="display:block">한 번 연결하면 셀모임 · 만남 일정이 내 캘린더에</span></span>
             </button>
             <button class="row" id="btn-go-mine" style="text-align:left;cursor:pointer;width:100%">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 4.5h11v15l-5.5-3-5.5 3z"/></svg>
@@ -3256,7 +3296,7 @@
         </div>
       </div>
 
-      <h3 class="sec-title">화면</h3>
+      <h3 class="sec-title" id="more-look">화면</h3>
       <div class="seg" id="more-theme" style="margin:0">
         <button type="button" data-theme="light">라이트</button>
         <button type="button" data-theme="dark">블랙</button>
@@ -3312,6 +3352,7 @@
       <div class="seg" id="dir-view" style="margin:12px 0 0">
         <button type="button" data-dv="stats" class="on">통계 · 그래프</button>
         <button type="button" data-dv="list">명단</button>
+        <button type="button" data-dv="edit" id="dir-dv-edit" hidden>✎ 한 번에 고치기</button>
       </div>
       <div class="seg" id="dir-cells"></div>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
@@ -3790,6 +3831,16 @@
     <button class="btn-ghost" id="tr-cancel">취소</button>
     <button class="btn" id="tr-save">저장</button>
   </div>
+</dialog>
+
+<!-- 49단계 — 회차 표: 같이 듣는 사람들 회차를 한 번에 -->
+<dialog id="dlg-cohort" class="wide-dlg">
+  <h3 id="co-title">회차 표</h3>
+  <p class="hint" id="co-sub" style="margin:-4px 0 12px"></p>
+  <div class="co-wrap"><div class="matrix gx-mx co-mx" id="co-mx"></div></div>
+  <label class="check" style="margin-top:12px"><input type="checkbox" id="co-auto" checked> 모든 회차에 ✓가 있으면 수료로 표시</label>
+  <p class="err" id="co-err"></p>
+  <div class="dlg-btns"><button class="btn-ghost" id="co-cancel">닫기</button><button class="btn" id="co-save">저장</button></div>
 </dialog>
 
 <!-- 회차 기록 -->
