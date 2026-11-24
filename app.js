@@ -20,13 +20,13 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
 import {
   getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache,
-  getDocsFromCache, getDocFromCache, terminate, clearIndexedDbPersistence,
+  getDocsFromCache, getDocFromCache, getDocFromServer, terminate, clearIndexedDbPersistence,
   doc, getDoc as _getDoc, setDoc, updateDoc, deleteDoc,
   collection, addDoc, getDocs as _getDocs, query, where, serverTimestamp, onSnapshot, increment
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
 const APP_NAME = "목자의 삶";
-const APP_VERSION = "49.1 (2026-11-18)";
+const APP_VERSION = "50.0 (2026-11-24)";
 /* 35단계 — 버전 표시: v35.0 · 2026.11.12 업데이트 */
 const verNo = () => APP_VERSION.split(" ")[0];
 const verDate = () => (APP_VERSION.match(/\((.*)\)/) || [])[1] || "";
@@ -3576,8 +3576,8 @@ $("meet-chart").addEventListener("click",(ev)=>{
 });
 $("btn-meet-new").onclick=()=>openMeeting(null);
 $("btn-meet-all").onclick=()=>openReports("");
-$("meeting-back").onclick=()=>
-  (state.meeting && state.meeting.back==="cal") ? openCal()
+$("meeting-back").onclick=()=> !mtLeaveOk() ? null
+  : (state.meeting && state.meeting.back==="cal") ? openCal()
   : (state.meeting && state.meeting.back==="home") ? openHome()
   : (state.meeting && state.meeting.back==="rep") ? openReports() : openMeet();
 
@@ -3587,10 +3587,11 @@ function openMeeting(id, opts) {
   const cells = myCells();
   if(!m && !cells.length){ toast("먼저 셀을 만들어 주세요. 리더 관리에서 추가할 수 있어요."); return; }
   state.meeting = m ? { attendance:{}, reasons:{}, notes:{}, reasonKinds:{}, ...m } : {
-    id:null, cellId:defaultCellId(), jinId:state.me.jinId, date:o.date||todayStr(), time:"",
+    id:null, cellId:(o.cellId && cells.some(c=>c.id===o.cellId) ? o.cellId : defaultCellId()), jinId:state.me.jinId, date:o.date||todayStr(), time:"",
     timeEnd:"", place:"", topic:"", note:"", visitors:"",
     attendance:{}, reasons:{}, notes:{}, reasonKinds:{}, open:{} };
   state.meeting.back = o.back || null;
+  state.meeting.date0 = m ? m.date : null;   /* 50단계 — 저장된 날짜 (바꾸면 저장할 때 '새 보고로 따로 남기기'를 물어봐요) */
   state.meeting.open = state.meeting.open || {};
   state.meeting.shots = (m && m.photos ? m.photos.slice() : []);
   const mine = !m || m.leaderUid===uid();
@@ -3624,12 +3625,15 @@ function openMeeting(id, opts) {
     $("btn-m-repcmt").textContent = `셀 보고 댓글 ${n.c}${n.r ? ` · 반응 ${n.r}` : ""}`; });
   state.meeting.reasonKinds = { ...(state.meeting.reasonKinds||{}) };
   renderReportBox();
+  mtOnOpen(m); mtDateNote();
   if (m) loadComments(meetTarget(m)).then(rows => {
     if (state.meeting && state.meeting.id === m.id)
       $("btn-m-cmt").textContent = rows.length ? `댓글 ${rows.length}개` : "댓글 남기기";
   }).catch(()=>{});
 }
-$("m-cell").onchange=()=>{ state.meeting.cellId=$("m-cell").value; renderAttendance(true); };
+$("m-cell").onchange=()=>{ state.meeting.cellId=$("m-cell").value; renderAttendance(true); mtDateNote(); };
+$("m-date").addEventListener("change", () => mtDateNote());
+$("m-date").addEventListener("input", () => mtDateNote());
 $("btn-all-present").onclick=()=>{
   const lk = state.meeting.leaderUid || uid();
   if (!state.meeting.attendance[lk]) state.meeting.attendance[lk] = "present";
@@ -3719,8 +3723,9 @@ $("list-att").addEventListener("input",(ev)=>{
     state.meeting.notes[id][n.dataset.k]=n.value; }
 });
 
-$("btn-meeting-save").onclick=async()=>{
-  const mt=state.meeting;
+/* 50단계 — 저장 본체: 덮어쓰기 막기(다른 기기에서 먼저 고쳤는지 확인) · 저장 전 모습은 타임머신에 · 영혼 카드에서 고친 기록은 안 덮어써요 */
+async function saveMeetingCore(opts) {
+  const o = opts || {}, mt=state.meeting;
   $("meeting-err").textContent="";
   const cellId=$("m-cell").value||mt.cellId;
   const data={ cellId, jinId:state.me.jinId, leaderUid:state.me.id,
@@ -3730,10 +3735,33 @@ $("btn-meeting-save").onclick=async()=>{
     note:meetRte().text, noteHtml:meetRte().html, visitors:$("m-visitor").value.trim(),
     attendance:mt.attendance, reasons:mt.reasons, notes:mt.notes,
     reasonKinds:Object.fromEntries(Object.entries(mt.reasonKinds||{}).filter(([k])=>mt.attendance[k]==="absent")),
-    recRefs: mt.recRefs||{}, share: sharePrefs().meetPastor ? "pastor" : "", updatedAt:serverTimestamp() };
-  $("btn-meeting-save").disabled=true;
+    recRefs: mt.recRefs||{}, share: sharePrefs().meetPastor ? "pastor" : "", savedAtMs: Date.now(), updatedAt:serverTimestamp() };
+  let mid=mt.id, srv=null;
+  /* 50단계 — 저장된 보고의 날짜를 바꿨으면: 새 보고로 따로 남기기(추천) / 날짜만 옮기기 — 그냥 덮어쓰지 않아요 */
+  if (mid && mt.date0 && data.date !== mt.date0 && !o.dateChoice) {
+    const ch = await mtAskDate(mt.date0, data.date);
+    if (!ch) throw new Error("저장하지 않았어요 — 날짜를 원래대로 두거나, 다시 저장을 눌러 골라 주세요.");
+    o.dateChoice = ch;
+  }
+  const asNew = !!(mid && o.dateChoice === "new");
+  /* 같은 날 이 셀의 보고가 이미 있으면 한 번 더 물어봐요 (같은 날 두 개가 되지 않게) */
+  if ((!mid || data.date !== mt.date0) && !o.dupOk) {
+    const dup = state.meetings.find(x => x.cellId === cellId && x.date === data.date && x.id !== mt.id);
+    if (dup && !confirm(`${fmtDate(data.date)}에 이미 이 셀의 보고가 있어요${dup.reportedAt ? " (보고함)" : ""}.\n\n그래도 같은 날 보고를 하나 더 남길까요?\n(취소하면 저장하지 않아요 — 날짜 아래 [그 보고 열기]로 그 보고를 고칠 수 있어요)`))
+      throw new Error("저장하지 않았어요 — 같은 날 보고가 이미 있어요.");
+  }
+  if (asNew) { mid = null; data.recRefs = {}; mt.shots = (mt.shots || []).filter(x => !x.id); }
+  /* 서버의 지금 모습 — 다른 기기 · 다른 창에서 먼저 저장했으면 알려요 */
+  if (mid) {
+    try { const sn = await getDocFromServer(doc(db,"meetings",mid)); srv = sn.exists() ? sn.data() : null; } catch { srv = null; }
+    if (srv && (srv.savedAtMs||0) > (mt.base||0) && mtSig(mtFormOf(srv)) !== mtSig(mtFormOf(data)) && !o.force) {
+      const when = srv.savedAtMs ? fmtClock(srv.savedAtMs) : "조금 전";
+      if (!confirm(`이 셀 보고는 다른 기기(또는 다른 창)에서 ${when}에 먼저 저장됐어요.\n\n지금 저장하면 그 내용 위에 덮어써요. (덮어쓴 내용은 타임머신에 남아서 되살릴 수 있어요)\n\n그래도 지금 화면 내용으로 저장할까요?`)) {
+        mtShowNewer(srv); throw new Error("저장을 멈췄어요 — 위 노란 칸에서 최신 내용을 불러올 수 있어요.");
+      }
+    }
+  }
   try {
-    let mid=mt.id;
     if(!mid){ const ref=await addDoc(collection(db,"meetings"),{...data,createdAt:serverTimestamp()});
       mid=ref.id; }
     /* 개인별 근황·기도제목을 각자 영혼 카드에 반영 */
@@ -3741,10 +3769,16 @@ $("btn-meeting-save").onclick=async()=>{
     for (const s of state.souls.filter(x=>x.cellId===cellId && isLeaderOf(x))) {
       const nt = mt.notes[s.id]||{};
       const mine = refs[s.id]||{};
+      const prevNt = ((srv && srv.notes) || {})[s.id] || {};
       for (const [k,type,extra] of [["update","meet",{kind:"cell"}],["pray","pray",{prayStatus:"praying"}]]) {
         const txt = (nt[k]||"").trim();
         const existing = mine[k];
+        const prevTxt = String(prevNt[k]||"").trim();
+        /* 50단계 — 그 사람 영혼 카드에서 따로 고친 기록이면 덮어쓰거나 지우지 않아요 */
+        const touched = async () => { if (!srv) return false; try { const r = await _getDoc(doc(db,"souls",s.id,"records",existing)); return r.exists() && String(r.data().body||"").trim() !== prevTxt; } catch { return false; } };
+        if (existing && srv && txt === prevTxt) continue;
         if (txt && existing) {
+          if (await touched()) continue;
           await updateDoc(doc(db,"souls",s.id,"records",existing),
             { body:txt, date:data.date, ...(type==="meet"?{update:txt}:{}) });
         } else if (txt && !existing) {
@@ -3755,6 +3789,7 @@ $("btn-meeting-save").onclick=async()=>{
             ...extra, meetingId:mid, by:uid(), byName:state.me.name||"", createdAt:serverTimestamp() });
           mine[k]=r.id;
         } else if (!txt && existing) {
+          if (await touched()) { delete mine[k]; continue; }
           try { await deleteDoc(doc(db,"souls",s.id,"records",existing)); } catch {}
           delete mine[k];
         }
@@ -3768,14 +3803,56 @@ $("btn-meeting-save").onclick=async()=>{
         }
       }
     }
+    /* 타임머신 — 덮어쓰기 전 서버 모습을 남겨요 (내용이 같으면 안 남김) */
+    if (srv && mtSig(mtFormOf(srv)) !== mtSig(mtFormOf(data))) {
+      try { await addDoc(collection(db,"meetings",mid,"versions"), { by: uid(), kind: o.restore ? "restore" : "before", atMs: Number(srv.savedAtMs) || Date.now(), at: serverTimestamp(), snap: mtFormOf(srv) });
+        mtTrimVersions(mid); } catch (e) { console.warn("타임머신", e); }
+    }
     const photos = await putMeetShots(mid, cellId);
     await updateDoc(doc(db,"meetings",mid), { ...data, recRefs:refs, photos });
     try { await syncReport(mid, { ...data, recRefs:refs }); } catch (e) { console.warn("보고 사본", e); }
-    await loadMeetings(); invalidate(); toast("저장했어요."); bump("meetingSave");
-    if (mt.back === "cal") openCal(); else if (mt.back === "home") openHome(); else if (mt.back === "rep") openReports(); else openMeet();
-  } catch(e){ $("meeting-err").textContent=msgOf(e); }
-  finally { $("btn-meeting-save").disabled=false; }
+    mt.id = mid; mt.base = data.savedAtMs; mt.recRefs = refs; mt.date0 = data.date; mt.date = data.date;
+    if (asNew) { ["reportedAt", "reportedBy", "check", "checkedAt", "checkedBy", "createdAt"].forEach(k => delete mt[k]);
+      $("meeting-title").textContent = fmtDate(data.date) + " 모임"; $("meeting-del").hidden = false; }
+    else if (o.dateChoice === "move") $("meeting-title").textContent = fmtDate(data.date) + " 모임";
+    mtDraftClear();
+    if (mt.dk !== "m_" + mid) { mt.dk = "m_" + mid; mtDraftClear(); }
+    await loadMeetings(); invalidate(); bump("meetingSave");
+    if (asNew) { renderReportBox(); toast(`새 보고로 따로 남겼어요 — 원래 보고는 그대로예요.`); }
+    mtDateNote();
+    return state.meetings.find(x => x.id === mid) || { id: mid, ...data };
+  } catch(e){ throw e; }
+}
+function meetLeave() {
+  const mt = state.meeting || {};
+  if (mt.back === "cal") openCal(); else if (mt.back === "home") openHome(); else if (mt.back === "rep") openReports(); else openMeet();
+}
+const mtBusy = (on) => { ["btn-meeting-save", "btn-meeting-report"].forEach(i => { if ($(i)) $(i).disabled = on; }); };
+/* [저장] — 보고 전이면 '마지막 단계: 보고하기' 창을 띄워요 */
+$("btn-meeting-save").onclick = async () => {
+  mtBusy(true);
+  try {
+    const m = await saveMeetingCore();
+    if (!m.reportedAt) { state.meeting.saved = m; paintMtSteps(); $("md-steps").innerHTML = mtStepsHtml(3); $("dlg-mdone").showModal(); }
+    else { toast("저장했어요."); meetLeave(); }
+  } catch (e) { $("meeting-err").textContent = msgOf(e); }
+  finally { mtBusy(false); }
 };
+/* [저장하고 보고하기] — 한 번에 마지막 단계까지 */
+$("btn-meeting-report").onclick = async () => {
+  mtBusy(true);
+  try { const ex = state.meeting.id && state.meetings.find(x => x.id === state.meeting.id);
+    const m = ex && !mtDirty() && !state.meeting.newer ? ex : await saveMeetingCore(); await reportMeeting(m); toast("저장하고 보고했어요. 코치 · 진장에게 소식이 갔어요."); meetLeave(); }
+  catch (e) { $("meeting-err").textContent = msgOf(e); }
+  finally { mtBusy(false); }
+};
+$("md-report").onclick = async () => {
+  $("md-report").disabled = true;
+  try { await reportMeeting(state.meeting.saved); $("dlg-mdone").close(); toast("보고했어요. 코치 · 진장에게 소식이 갔어요."); meetLeave(); }
+  catch (e) { toast(msgOf(e)); }
+  finally { $("md-report").disabled = false; }
+};
+$("md-later").onclick = () => { $("dlg-mdone").close(); toast("저장했어요 — 홈 '이번 주 셀 보고'에 [보고하기]가 남아 있어요."); meetLeave(); };
 $("meeting-del").onclick=async()=>{
   if(!state.meeting.id) return;
   if(!confirm("이 모임 기록을 지울까요? 각자 카드에 쌓인 나눔은 남아요.")) return;
@@ -5358,6 +5435,16 @@ async function backfillThumbs() {
    올릴 때마다 version.json 도 같이 올립니다. 앱은 열 때 · 다시 볼 때 · 10분마다
    그 파일만 살짝 확인해서(아주 작은 파일), 지금 버전보다 새것이면 위에 알림을 띄웁니다. */
 const CHANGELOG = [
+  { v:"50.0", d:"2026-11-24", items:[
+    "셀 보고 단계가 한눈에 — 위에 ① 쓰기 › ② 저장 › ③ 보고 · 아래 [저장] [저장하고 보고하기] 두 버튼 (폰에서도 아래에 붙어 있어요)",
+    "[저장]만 누르면 '저장했어요 ✓ — 마지막 단계: 보고하기' 창 · 나중에 하면 홈 카드가 '보고만 남았어요 · [보고하기]'로 (홈에서 바로 보고)",
+    "자동 저장 — 쓰는 동안 1초마다 이 기기에, 15초마다 클라우드에 (본인만) · 앱이 꺼져도 다시 열면 '저장하지 않은 글이 있어요 [이어서 쓰기]'",
+    "타임머신 — 셀 보고 아래 [🕘 타임머신 · 이전 기록]: 저장했던 모습 · 이 기기 자동 저장을 골라 다시 불러오기",
+    "덮어쓰기 막기 — 다른 기기 · 다른 창에서 먼저 저장했으면 저장 전에 물어보고, 덮어쓴 모습은 타임머신에 · 열 때 서버의 최신 모습으로 · 영혼 카드에서 따로 고친 기록은 셀 보고 저장이 덮어쓰지 않아요",
+    "저장하지 않고 뒤로 가면 한 번 물어봐요 (자동 저장은 이미 돼 있어요)",
+    "지난 주 셀 보고도 쓰기 — 홈 카드 '안 쓴 주 · 지난 보고 쓰기' · ＋ › '지난 · 다른 날 셀 보고': 빠진 주를 누르거나 날짜를 골라 새 보고로 따로",
+    "저장된 보고의 날짜를 바꾸면 그냥 덮어쓰지 않아요 — 저장할 때 [새 보고로 따로 남기기(추천)] · [날짜만 옮기기] · [취소] 가운데 골라요 · 날짜 칸 아래에 미리 알려 줘요",
+    "같은 날 이 셀의 보고가 이미 있으면 날짜 칸 아래 '이미 있어요 · [그 보고 열기]' · 저장할 때도 한 번 물어봐요"]},
   { v:"49.1", d:"2026-11-18", items:[
     "교회 명부 한 번에 고치기 — 명부 › [✎ 한 번에 고치기] · 연락처 · 생일 · 음력 · 직분 · 침례 · 침례일을 표에서 바로 고치고 [저장] 한 번 (고칠 수 있는 사람만 · 내가 맡은 영혼 카드도 같이)",
     "침례일도 표에서 — 명부 표 · 훈련 현황 [한 번에 입력] 표에 '침례일' 칸 (2019 · 2019-5 · 2019-5-19 · 적으면 침례 ✓ 저절로)",
@@ -7826,6 +7913,20 @@ async function sendNotices(toList, payload) {
       ...payload, atMs: Date.now(), at: serverTimestamp(), read: false }); } catch {}
   }
 }
+/* 50단계 — 보고하기 (모임 화면 · 저장 뒤 창 · 홈 카드 어디서든 같은 동작) */
+async function reportMeeting(m) {
+  if (!m || !m.id) throw new Error("먼저 저장해 주세요.");
+  if (m.reportedAt) return m;
+  await updateDoc(doc(db, "meetings", m.id), { reportedAt: todayStr() });
+  m.reportedAt = todayStr();
+  const lm = state.meetings.find(x => x.id === m.id); if (lm) lm.reportedAt = m.reportedAt;
+  const cn = (state.cells.find(c => c.id === m.cellId) || {}).name || "셀";
+  await sendNotices(overseers(m.cellId, m.jinId).map(u => u.id), { kind: "report",
+    target: { kind: "meeting", id: m.id, report: true }, title: `${cn} ${fmtDate(m.date)} 셀 보고`,
+    snippet: `출석 ${Object.values(m.attendance || {}).filter(v => v && v !== "absent").length}명${m.topic ? " · " + m.topic : ""}` });
+  bump("meetingReport"); invalidate();
+  return m;
+}
 function renderReportBox() {
   const box = $("m-report"), m = state.meeting && state.meeting.id ? state.meetings.find(x => x.id === state.meeting.id) : null;
   if (!m) { box.hidden = true; return; }
@@ -7837,8 +7938,7 @@ function renderReportBox() {
   if (mine) {
     html += m.reportedAt
       ? `<p class="muted" style="font-size:calc(13px*var(--fs,1));margin-top:6px">${fmtDate(m.reportedAt)}에 보고했어요.${ck ? "" : " 코치 · 진장 확인을 기다리는 중이에요."}</p>${ckLine}`
-      : `<p class="muted" style="font-size:calc(13px*var(--fs,1));margin-top:6px">출석과 나눔을 다 적었으면 코치 · 진장에게 알려요.</p>
-         <button class="btn-sm" id="btn-m-report" style="margin-top:10px">코치에게 보고하기</button>`;
+      : `<p class="muted" style="font-size:calc(13px*var(--fs,1));margin-top:6px">아직 보고 전이에요 — 다 적었으면 아래 <b>[저장하고 보고하기]</b>를 눌러 주세요. 담당 코치 · 진장에게 가요.</p>`;
   } else if (seer) {
     html += `<p class="muted" style="font-size:calc(13px*var(--fs,1));margin-top:6px">${m.reportedAt ? `${fmtDate(m.reportedAt)}에 보고됨` : "아직 보고 전이에요 (기록은 볼 수 있어요)"}</p>${ckLine}`
       + (ck && ck.by !== uid() ? "" : `
@@ -7847,19 +7947,7 @@ function renderReportBox() {
         <button class="btn-sm" id="btn-m-check" style="margin-top:8px">${ck ? "다시 남기기" : "확인했어요"}</button>`);
   } else html += m.reportedAt ? `<p class="muted" style="font-size:calc(13px*var(--fs,1));margin-top:6px">${fmtDate(m.reportedAt)}에 보고됨</p>${ckLine}` : "";
   box.innerHTML = html; box.hidden = false;
-  const rb = $("btn-m-report");
-  if (rb) rb.onclick = async () => {
-    rb.disabled = true;
-    try {
-      await updateDoc(doc(db, "meetings", m.id), { reportedAt: todayStr() });
-      m.reportedAt = todayStr();
-      const cn = (state.cells.find(c => c.id === m.cellId) || {}).name || "셀";
-      await sendNotices(overseers(m.cellId, m.jinId).map(u => u.id), { kind: "report",
-        target: { kind: "meeting", id: m.id, report: true }, title: `${cn} ${fmtDate(m.date)} 셀 보고`,
-        snippet: `출석 ${Object.values(m.attendance || {}).filter(v => v && v !== "absent").length}명${m.topic ? " · " + m.topic : ""}` });
-      toast("보고했어요. 코치 · 진장에게 소식이 갔어요."); bump("meetingReport"); renderReportBox();
-    } catch (e) { toast(msgOf(e)); rb.disabled = false; }
-  };
+
   const cb = $("btn-m-check");
   if (cb) cb.onclick = async () => {
     cb.disabled = true;
@@ -12164,6 +12252,245 @@ $("s-train").addEventListener("input", (ev) => {
   if (f) f.innerHTML = n ? `<b>${n}칸</b> 바꿈` : "바꾼 칸이 없어요"; if (sb) sb.disabled = !n;
 });
 
+/* ════════ 50단계 — 셀 보고: 단계(쓰기 → 저장 → 보고) · 자동 저장 · 타임머신 · 덮어쓰기 막기 ════════
+   자동 저장 — 쓰는 동안 1초 뒤 이 기기에, 15초마다(또는 앱을 내릴 때) 클라우드(drafts · 본인만)에. 저장하면 지워져요.
+   타임머신 — 저장할 때마다 '저장 전 모습'을 meetings/{id}/versions 에(본인만) + 이 기기 자동 저장 12개.
+   덮어쓰기 막기 — 열 때 서버의 최신 모습을 다시 읽고, 저장할 때 다른 곳에서 먼저 저장했으면 물어봐요. */
+const MT_KEYS = ["date", "cellId", "time", "timeEnd", "place", "topic", "note", "noteHtml", "visitors", "attendance", "reasons", "notes", "reasonKinds"];
+function mtFormOf(d) {
+  const o = {}; MT_KEYS.forEach(k => { const v = d ? d[k] : undefined;
+    o[k] = ["attendance", "reasons", "notes", "reasonKinds"].includes(k) ? JSON.parse(JSON.stringify(v || {})) : (v == null ? "" : String(v)); });
+  return o;
+}
+const mtSort = (v) => Array.isArray(v) ? v.map(mtSort) : v && typeof v === "object" ? Object.keys(v).sort().reduce((a, k) => { const x = v[k]; if (x !== "" && x != null && !(typeof x === "object" && !Object.keys(x).length)) a[k] = mtSort(x); return a; }, {}) : v;
+const mtSig = (f) => JSON.stringify(mtSort(f));
+function mtCurForm() {
+  const mt = state.meeting || {};
+  return mtFormOf({ date: $("m-date").value || todayStr(), cellId: $("m-cell").value || mt.cellId, time: $("m-time").value || "", timeEnd: $("m-time-end").value || "",
+    place: $("m-place").value.trim(), topic: $("m-topic").value.trim(), note: meetRte().text, noteHtml: meetRte().html, visitors: $("m-visitor").value.trim(),
+    attendance: mt.attendance, reasons: mt.reasons, notes: mt.notes, reasonKinds: mt.reasonKinds });
+}
+function mtApply(f) {
+  const mt = state.meeting; if (!mt || !f) return;
+  Object.assign(mt, { date: f.date || mt.date, cellId: f.cellId || mt.cellId, time: f.time, timeEnd: f.timeEnd, place: f.place, topic: f.topic, visitors: f.visitors,
+    attendance: { ...(f.attendance || {}) }, reasons: { ...(f.reasons || {}) }, notes: JSON.parse(JSON.stringify(f.notes || {})), reasonKinds: { ...(f.reasonKinds || {}) } });
+  $("m-date").value = mt.date; if ([...$("m-cell").options].some(o => o.value === mt.cellId)) $("m-cell").value = mt.cellId;
+  $("m-time").value = f.time || ""; $("m-time-end").value = f.timeEnd || ""; $("m-place").value = f.place || ""; $("m-topic").value = f.topic || ""; $("m-visitor").value = f.visitors || "";
+  meetRte().html = f.noteHtml || textToHtml(f.note || "");
+  renderAttendance(true);
+}
+const fmtClock = (ms) => { const d = new Date(Number(ms)), t = todayStr(), ds = ymd(d);
+  return `${ds === t ? "오늘" : fmtDate(ds)} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
+const mtSum = (f) => { const n = Object.values(f.attendance || {}).filter(v => v && v !== "absent").length, c = String(f.note || "").length + Object.values(f.notes || {}).reduce((a, x) => a + String(x.update || "").length + String(x.pray || "").length, 0);
+  return `출석 ${n}명 · 글 ${c.toLocaleString()}자${f.topic ? " · " + f.topic : ""}`; };
+const mtLK = (dk) => `mokja-md:${uid()}:${dk}`, mtHK = (dk) => `mokja-mh:${uid()}:${dk}`;
+const mtDid = (dk) => `${uid()}_${String(dk).replace(/[^A-Za-z0-9_-]/g, "-")}`;
+const lsJ = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } };
+const lsJset = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+
+/* 단계 표시 */
+function mtStepsHtml(cur) {
+  const L = ["쓰기", "저장", "보고"];
+  return L.map((t, i) => `<span class="st ${i + 1 < cur ? "done" : i + 1 === cur ? "now" : ""}"><b>${i + 1 < cur ? "✓" : i + 1}</b>${t}</span>`).join('<span class="ar">›</span>');
+}
+function paintMtSteps() {
+  const mt = state.meeting; if (!mt || !$("mt-steps")) return;
+  const m = mt.id ? state.meetings.find(x => x.id === mt.id) : null, mine = !m || m.leaderUid === uid();
+  $("mt-steps").hidden = !mine;
+  const reported = !!(m && m.reportedAt), dirty = mtDirty();
+  const cur = reported ? 4 : m && !dirty ? 3 : 1;
+  $("mt-steps").innerHTML = mtStepsHtml(cur) + `<span class="hint" style="margin-left:6px">${reported ? `${fmtDate(m.reportedAt)}에 보고했어요` : m && !dirty ? "저장됨 — 마지막으로 <b>보고하기</b>만 남았어요" : m ? "고친 내용이 있어요 — 저장해 주세요" : "다 적으면 저장 → 보고"}</span>`;
+  const rb = $("btn-meeting-report"), sb = $("btn-meeting-save");
+  if (rb) { rb.hidden = !mine || reported; rb.textContent = m && !dirty ? "보고하기" : "저장하고 보고하기"; }
+  if (sb) sb.className = reported ? "btn" : "btn-ghost";
+}
+const mtDirty = () => { const mt = state.meeting; if (!mt || mt.sig0 == null) return false; try { return mtSig(mtCurForm()) !== mt.sig0; } catch { return false; } };
+
+/* 자동 저장 */
+let mtT1 = null, mtT2 = null;
+function mtAutosave() {
+  const mt = state.meeting; if (!mt || mt.ro || $("s-meeting").hidden) return;
+  clearTimeout(mtT1); mtT1 = setTimeout(() => {
+    if (!state.meeting || state.meeting !== mt) return;
+    const f = mtCurForm(), sg = mtSig(f);
+    if (sg === mt.sig0) { paintMtSteps(); return; }                       // 저장된 모습 그대로면 남기지 않아요
+    if (sg === mt.lastSig) { paintMtSteps(); return; }
+    mt.lastSig = sg; const ts = Date.now();
+    lsJset(mtLK(mt.dk), { ts, f, mid: mt.id || "" });
+    const h = lsJ(mtHK(mt.dk), []); if (!h.length || ts - h[0].ts > 90000) { h.unshift({ ts, f }); lsJset(mtHK(mt.dk), h.slice(0, 12)); } else { h[0] = { ts, f }; lsJset(mtHK(mt.dk), h); }
+    $("mt-auto").textContent = `자동 저장 ${fmtClock(ts).replace(/^오늘 /, "")} · 이 기기`;
+    paintMtSteps();
+    clearTimeout(mtT2); mtT2 = setTimeout(() => mtCloud(mt), 15000);
+  }, 1000);
+}
+async function mtCloud(mt) {
+  const d = lsJ(mtLK(mt.dk), null); if (!d || d.cloudTs === d.ts) return;
+  try { await setDoc(doc(db, "drafts", mtDid(mt.dk)), { uid: uid(), dk: mt.dk, mid: mt.id || "", ts: d.ts, f: d.f });
+    d.cloudTs = d.ts; lsJset(mtLK(mt.dk), d);
+    if (state.meeting === mt) $("mt-auto").textContent = `자동 저장 ${fmtClock(d.ts).replace(/^오늘 /, "")} · 이 기기 + 클라우드`; } catch (e) { console.warn("자동 저장(클라우드)", e); }
+}
+function mtDraftClear() {
+  const mt = state.meeting; if (!mt || !mt.dk) return;
+  clearTimeout(mtT1); clearTimeout(mtT2);
+  lsJset(mtLK(mt.dk), null); deleteDoc(doc(db, "drafts", mtDid(mt.dk))).catch(() => {});
+  mt.sig0 = mtSig(mtCurForm()); mt.lastSig = mt.sig0; $("mt-auto").textContent = `저장됨 ${fmtClock(Date.now()).replace(/^오늘 /, "")}`;
+}
+["input", "change"].forEach(t => $("s-meeting").addEventListener(t, () => mtAutosave()));
+$("s-meeting").addEventListener("click", (ev) => { if (ev.target.closest("#list-att, .rte, .att, [data-att], button")) mtAutosave(); });
+document.addEventListener("visibilitychange", () => { const mt = state.meeting; if (document.visibilityState === "hidden" && mt && !$("s-meeting").hidden) { clearTimeout(mtT1); mtAutosaveNow(); mtCloud(mt); } });
+window.addEventListener("pagehide", () => { const mt = state.meeting; if (mt && !$("s-meeting").hidden) mtAutosaveNow(); });
+function mtAutosaveNow() { const mt = state.meeting; if (!mt || mt.ro) return; const f = mtCurForm(), sg = mtSig(f); if (sg === mt.sig0) return; mt.lastSig = sg; lsJset(mtLK(mt.dk), { ...(lsJ(mtLK(mt.dk), {}) || {}), ts: Date.now(), f, mid: mt.id || "" }); }
+
+/* 열 때 — 최신 확인 · 저장 안 된 글 되살리기 */
+function mtBanner(html) { const b = $("mt-restore"); b.innerHTML = html; b.hidden = !html; }
+function mtShowNewer(srv) {
+  state.meeting.newer = srv;
+  mtBanner(`<p><b>다른 기기(또는 다른 창)에서 ${srv.savedAtMs ? fmtClock(srv.savedAtMs) : "조금 전"}에 저장한 최신 내용</b>이 있어요. 지금 화면은 그보다 예전 모습이에요.</p>
+    <button type="button" class="btn-sm" id="mt-take-new">최신 내용 불러오기</button><button type="button" class="btn-sm" id="mt-keep">지금 화면 그대로</button>`);
+}
+async function mtOnOpen(m) {
+  const mt = state.meeting; mtBanner("");
+  mt.base = m ? Number(m.savedAtMs) || 0 : 0;
+  mt.dk = m ? "m_" + m.id : `n_${mt.cellId}_${mt.date}`;
+  mt.ro = !!(m && m.leaderUid !== uid());
+  mt.sig0 = mtSig(mtCurForm()); mt.lastSig = mt.sig0;
+  $("mt-auto").textContent = mt.ro ? "" : m ? `저장됨${m.savedAtMs ? " " + fmtClock(m.savedAtMs).replace(/^오늘 /, "") : ""} · 쓰는 동안 자동 저장돼요` : "쓰는 동안 자동 저장돼요 (이 기기 + 클라우드)";
+  paintMtSteps();
+  if (mt.ro) return;
+  /* ① 서버 최신 — 저장본(기기 캐시)으로 열었을 수 있어서 다시 읽어요 */
+  if (m) try {
+    const sn = await getDocFromServer(doc(db, "meetings", m.id));
+    if (state.meeting !== mt) return;
+    if (sn.exists()) { const srv = sn.data();
+      if ((Number(srv.savedAtMs) || 0) > mt.base && mtSig(mtFormOf(srv)) !== mt.sig0) {
+        if (!mtDirty()) { mtApply(mtFormOf(srv)); mt.base = Number(srv.savedAtMs) || 0; mt.recRefs = srv.recRefs || mt.recRefs; mt.sig0 = mtSig(mtCurForm()); mt.lastSig = mt.sig0; toast("다른 기기에서 고친 최신 내용으로 열었어요."); }
+        else mtShowNewer(srv);
+      } }
+  } catch {}
+  /* ② 저장 안 된 글 (이 기기 · 클라우드) */
+  const loc = lsJ(mtLK(mt.dk), null);
+  let cloud = null; try { const c = await _getDoc(doc(db, "drafts", mtDid(mt.dk))); cloud = c.exists() ? c.data() : null; } catch {}
+  if (state.meeting !== mt) return;
+  const cand = [loc && { ...loc, src: "이 기기" }, cloud && { ts: cloud.ts, f: cloud.f, src: "클라우드(다른 기기 포함)" }].filter(x => x && x.f && x.ts > mt.base && mtSig(x.f) !== mt.sig0).sort((a, b) => b.ts - a.ts)[0];
+  if (cand && !mt.newer) {
+    mt.cand = cand;
+    mtBanner(`<p><b>저장하지 않은 글이 있어요</b> — ${fmtClock(cand.ts)} · ${cand.src} 자동 저장 · ${esc(mtSum(cand.f))}</p>
+      <button type="button" class="btn-sm" id="mt-take-draft">이어서 쓰기 (불러오기)</button><button type="button" class="btn-sm" id="mt-drop-draft">버리기</button>`);
+  }
+}
+$("mt-restore").addEventListener("click", (ev) => {
+  const mt = state.meeting; if (!mt) return;
+  if (ev.target.closest("#mt-take-draft") && mt.cand) { mtKeepNow(); mtApply(mt.cand.f); mtBanner(""); toast("불러왔어요 — 저장을 눌러야 반영돼요."); mtAutosave(); paintMtSteps(); return; }
+  if (ev.target.closest("#mt-drop-draft")) { if (!confirm("저장하지 않은 글을 버릴까요? (타임머신의 '이 기기 자동 저장'에는 남아 있어요)")) return; lsJset(mtLK(mt.dk), null); deleteDoc(doc(db, "drafts", mtDid(mt.dk))).catch(() => {}); mtBanner(""); return; }
+  if (ev.target.closest("#mt-take-new") && mt.newer) { mtKeepNow(); const srv = mt.newer; mtApply(mtFormOf(srv)); mt.base = Number(srv.savedAtMs) || 0; mt.recRefs = srv.recRefs || mt.recRefs; mt.sig0 = mtSig(mtCurForm()); mt.newer = null; mtBanner(""); toast("최신 내용을 불러왔어요. 지금 화면에 있던 글은 타임머신에 남겨 뒀어요."); paintMtSteps(); return; }
+  if (ev.target.closest("#mt-keep")) { mt.base = Number((mt.newer || {}).savedAtMs) || mt.base; mt.newer = null; mtBanner(""); toast("지금 화면 그대로 둘게요 — 저장하면 덮어써요 (덮어쓴 내용은 타임머신에)."); }
+});
+/* 불러오기 전에 지금 화면을 이 기기 타임머신에 */
+function mtKeepNow() { const mt = state.meeting; if (!mt || mt.ro) return; const f = mtCurForm(); if (mtSig(f) === mt.sig0) return; const h = lsJ(mtHK(mt.dk), []); h.unshift({ ts: Date.now(), f, note: "불러오기 전 화면" }); lsJset(mtHK(mt.dk), h.slice(0, 12)); }
+
+/* 타임머신 창 */
+let MH = [];
+$("btn-mt-history").onclick = async () => {
+  const mt = state.meeting; if (!mt) return;
+  $("mh-err").textContent = ""; $("mh-list").innerHTML = `<p class="muted">불러오는 중…</p>`; $("dlg-mhist").showModal();
+  const local = lsJ(mtHK(mt.dk), []).map(x => ({ ts: x.ts, f: x.f, src: x.note || "이 기기 자동 저장" }));
+  let ver = [];
+  if (mt.id && !mt.ro) try { ver = (await _getDocs(collection(db, "meetings", mt.id, "versions"))).docs.map(d => d.data()).map(v => ({ ts: v.atMs, f: v.snap, src: v.kind === "restore" ? "되돌리기 전 모습" : "저장했던 모습" })); } catch (e) { $("mh-err").textContent = msgOf(e); }
+  MH = [...ver, ...local].filter(x => x.f).sort((a, b) => b.ts - a.ts);
+  $("mh-list").innerHTML = MH.length ? MH.map((x, i) => `<div class="row"><div class="grow"><p class="nm">${fmtClock(x.ts)} <span class="chip" style="height:22px">${esc(x.src)}</span></p><p class="sub">${esc(mtSum(x.f))}</p></div>
+      ${mt.ro ? "" : `<button type="button" class="btn-sm" data-mh="${i}">불러오기</button>`}</div>`).join("")
+    : `<p class="muted" style="margin:8px 0">아직 남은 이전 기록이 없어요. 쓰는 동안 · 저장할 때마다 여기에 쌓여요.</p>`;
+};
+$("mh-list").addEventListener("click", (ev) => {
+  const b = ev.target.closest("[data-mh]"); if (!b) return; const x = MH[+b.dataset.mh]; if (!x) return;
+  mtKeepNow(); mtApply(mtFormOf(x.f)); state.meeting.restoring = true; $("dlg-mhist").close(); mtBanner("");
+  toast(`${fmtClock(x.ts)} 모습을 불러왔어요 — 저장을 눌러야 반영돼요.`); mtAutosave(); paintMtSteps();
+});
+$("mh-close").onclick = () => $("dlg-mhist").close();
+async function mtTrimVersions(mid) {
+  try { const vs = (await _getDocs(collection(db, "meetings", mid, "versions"))).docs.sort((a, b) => (b.data().atMs || 0) - (a.data().atMs || 0));
+    for (const d of vs.slice(30)) await deleteDoc(d.ref); } catch {}
+}
+/* 뒤로 — 저장 안 한 글이 있으면 한 번 물어봐요 (자동 저장은 이미 돼 있어요) */
+function mtLeaveOk() {
+  const mt = state.meeting; if (!mt || mt.ro || !mtDirty()) return true;
+  mtAutosaveNow(); mtCloud(mt);
+  return confirm("저장하지 않은 글이 있어요.\n\n나가도 자동 저장돼 있어서 다음에 열면 이어서 쓸 수 있어요. 지금 나갈까요?");
+}
+
+/* 날짜 칸 아래 안내 — 저장된 보고의 날짜를 바꿨을 때 · 그 날 이미 보고가 있을 때 */
+function mtDateNote() {
+  const mt = state.meeting, el = $("m-date-note"); if (!mt || !el) return;
+  if (mt.ro) { el.hidden = true; el.innerHTML = ""; return; }
+  const d = $("m-date").value, cellId = $("m-cell").value || mt.cellId;
+  const other = d ? state.meetings.find(x => x.cellId === cellId && x.date === d && x.id !== mt.id) : null;
+  let h = "";
+  if (mt.id && mt.date0 && d && d !== mt.date0) h += `<span>날짜를 <b>${fmtDate(mt.date0)} → ${fmtDate(d)}</b>로 바꿨어요. 저장할 때 <b>새 보고로 따로 남길지</b> 물어볼게요 — ${fmtDate(mt.date0)} 보고는 그대로 둘 수 있어요.</span>`;
+  if (other) h += `<span>${fmtDate(d)}에 이 셀의 보고가 이미 있어요${other.reportedAt ? " (보고함)" : ""}.</span><button type="button" class="btn-sm" data-mtopen="${other.id}">그 보고 열기</button>`;
+  el.innerHTML = h; el.hidden = !h;
+}
+$("m-date-note").addEventListener("click", (ev) => {
+  const b = ev.target.closest("[data-mtopen]"); if (!b) return;
+  const back = (state.meeting || {}).back || null;
+  if (!mtLeaveOk()) return; openMeeting(b.dataset.mtopen, { back });
+});
+/* 저장된 보고의 날짜를 바꾸고 저장할 때 — "new"(새 보고로 따로) / "move"(날짜만 옮기기) / null(취소) */
+function mtAskDate(from, to) {
+  return new Promise((res) => {
+    const d = $("dlg-mdate"); let done = false;
+    const fin = (v) => { if (done) return; done = true; if (d.open) d.close(); res(v); };
+    $("mdt-sub").innerHTML = `이 보고는 <b>${fmtDate(from)}(${wdOf(from)})</b> 셀 보고예요. 날짜를 <b>${fmtDate(to)}(${wdOf(to)})</b>로 바꿨어요.`;
+    $("mdt-new-t").textContent = `${fmtDate(to)} 보고로 따로 남기기`;
+    $("mdt-new-s").textContent = `${fmtDate(from)} 보고는 그대로 두고 새 보고를 하나 더 만들어요 (추천 · 사진은 원래 보고에 남아요)`;
+    $("mdt-move-s").textContent = `날짜를 잘못 적었을 때만 — ${fmtDate(from)} 보고가 ${fmtDate(to)}로 옮겨져요 (예전 모습은 타임머신에)`;
+    $("mdt-new").onclick = () => fin("new"); $("mdt-move").onclick = () => fin("move"); $("mdt-cancel").onclick = () => fin(null);
+    d.onclose = () => fin(null);
+    d.showModal();
+  });
+}
+
+/* 지난 · 다른 날 셀 보고 — 빠진 주(모임 요일 기준 최근 8주)와 날짜 고르기 */
+function missedWeeks(cellId, n) {
+  const p = reportPlan(cellId); if (!p.due) return [];
+  const first = p.ms.length ? p.ms[p.ms.length - 1].date : null, out = [];
+  for (let k = 0; k <= (n || 8); k++) {
+    const d = addDays(p.due, -7 * k); if (first && d < first) break;
+    if (p.ms.some(m => Math.abs(daysBetween(m.date, d)) <= 3)) continue;
+    if (lsGet(skipKey(cellId, d)) === "1") continue;
+    out.push(d);
+  }
+  return out;
+}
+let MPB = "home";
+function openMPick(cellId, back) {
+  const cs = ledCells().length ? ledCells() : myCells(); if (!cs.length) { toast("먼저 셀을 만들어 주세요."); return; }
+  const cid = cellId && cs.some(c => c.id === cellId) ? cellId : cs[0].id; MPB = back || "home";
+  $("mp-cell").innerHTML = cs.map(c => `<option value="${c.id}"${c.id === cid ? " selected" : ""}>${esc(c.name)}</option>`).join("");
+  $("mp-cell-f").hidden = cs.length < 2;
+  $("mp-date").max = todayStr(); $("mp-date").value = missedWeeks(cid)[0] || "";
+  paintMPick(); $("dlg-mpick").showModal();
+}
+function paintMPick() {
+  const cid = $("mp-cell").value, miss = missedWeeks(cid), d = $("mp-date").value;
+  $("mp-miss").innerHTML = miss.length ? `<p class="hint" style="width:100%;margin:0">안 쓴 주</p>` + miss.map(x => `<button type="button" class="pchip${x === d ? " on" : ""}" data-mpd="${x}">${fmtDate(x)}(${wdOf(x)})</button>`).join("")
+    : `<p class="hint" style="margin:0">빠진 주가 없어요 — 아래에서 날짜를 골라요.</p>`;
+  const ex = d ? state.meetings.find(m => m.cellId === cid && m.date === d) : null;
+  $("mp-note").innerHTML = !d ? "" : ex ? `${fmtDate(d)}에는 이미 보고가 있어요${ex.reportedAt ? " (보고함)" : ""} — <button type="button" class="link" data-mpopen="${ex.id}">그 보고 열기 ›</button>`
+    : `${fmtDate(d)}(${wdOf(d)}) 새 보고를 써요 — 다른 보고는 그대로예요.`;
+  $("mp-go").disabled = !d;
+  $("mp-go").textContent = ex ? "그래도 새로 쓰기" : "새 보고 쓰기";
+}
+$("mp-cell").onchange = () => { $("mp-date").value = missedWeeks($("mp-cell").value)[0] || ""; paintMPick(); };
+["input", "change"].forEach(t => $("mp-date").addEventListener(t, () => paintMPick()));
+$("mp-miss").addEventListener("click", (ev) => { const b = ev.target.closest("[data-mpd]"); if (!b) return; $("mp-date").value = b.dataset.mpd; paintMPick(); });
+$("mp-note").addEventListener("click", (ev) => { const b = ev.target.closest("[data-mpopen]"); if (!b) return; $("dlg-mpick").close(); openMeeting(b.dataset.mpopen, { back: MPB }); });
+$("mp-close").onclick = () => $("dlg-mpick").close();
+$("mp-go").onclick = () => {
+  const d = $("mp-date").value, cid = $("mp-cell").value; if (!d) return;
+  if (d > todayStr() && !confirm(`${fmtDate(d)}은 아직 오지 않은 날이에요. 그래도 미리 쓸까요?`)) return;
+  $("dlg-mpick").close(); openMeeting(null, { date: d, cellId: cid, back: MPB });
+};
+
 /* ════════ 49단계 — 회차 표: 같이 듣는 사람들의 회차를 한 번에 (새로운 삶처럼 여러 번 만나는 과정) ════════
    훈련 현황(내 셀)의 '3/8' 칸이나 과정 이름 옆 [회차 표]에서 열려요.
    위 날짜는 그 회차에 모두 함께 만난 날 — ✓가 있는 사람 모두에게 들어가요. 저장하면 영혼 카드의 훈련 기록 '회차 기록'과 같아요. */
@@ -12462,14 +12789,14 @@ function renderHomeReport() {
         first: [`첫 셀 보고를 써 볼까요`, `<span class="chip">처음</span>모임이 끝나면 출석과 나눔을 남겨요`, "셀 보고 쓰기"],
         today: [`오늘은 ${p.due ? wdOf(p.due) : ""}요일 셀모임 날이에요`, `<span class="chip rose">오늘</span>${p.time ? esc(fmtSpan(p.time, "")) + " · " : ""}모임이 끝나면 바로 써요`, "셀 보고 쓰기"],
         todo: [`${when(p.due)} 셀모임 보고를 써 주세요`, `<span class="chip rose">아직 안 씀</span>모임 끝난 지 ${ago}일`, "셀 보고 쓰기"],
-        saved: [`${when(p.cur ? p.cur.date : p.due)} 셀 보고를 마무리해 주세요`, `<span class="chip warn">저장만 했어요</span>보고하면 코치 · 진장에게 가요`, "이어서 쓰기"],
+        saved: [`${when(p.cur ? p.cur.date : p.due)} 셀 보고 — 보고만 남았어요`, `<span class="chip warn">저장됨 · 보고 전</span>마지막으로 [보고하기]를 누르면 코치 · 진장에게 가요`, "보고하기"],
         done: [`${when(p.cur ? p.cur.date : p.due)} 셀 보고를 마쳤어요`, `<span class="chip ok">보고함</span>${p.cur && p.cur.check ? "진장 · 코치가 확인했어요" : `출석 ${p.cur ? attN(p.cur) : 0}/${p.roster}`}`, "보고 보기"],
         skip: [`${when(p.due)}에는 모임이 없었어요`, `<span class="chip">모임 없음</span>다음 모임에 써요`, "그래도 쓰기"]
       }[p.st];
       const m = p.cur;
       const step = (on, t) => `<span class="rp-step${on ? " on" : ""}"><i></i>${t}</span>`;
       const steps = step(m && attN(m), `출석 ${m ? attN(m) + "/" : ""}${p.roster}명`) + step(m && (m.noteHtml || m.note || m.topic), "모임 나눔")
-        + step(m && Object.values(m.notes || {}).some(Boolean), "기도 · 개인 나눔") + step(m && (m.photos || []).length, "사진");
+        + step(m && Object.values(m.notes || {}).some(Boolean), "기도 · 개인 나눔") + step(m && (m.photos || []).length, "사진") + step(m && m.reportedAt, "보고");
       const prevTx = p.prev ? `지난 보고 ${fmtDate(p.prev.date)} · 출석 ${attN(p.prev)}/${p.roster}` : "";
       const nextTx = p.next && p.st !== "first" ? `다음 모임 ${fmtDate(p.next)}(${wdOf(p.next)})${p.time ? " " + esc(fmtSpan(p.time, "")) : ""}` : "";
       const done = p.st === "done";
@@ -12483,10 +12810,12 @@ function renderHomeReport() {
         </div>
         <div class="rp-r">
           ${done ? `<img class="rp-art" src="./img/done-report.webp" alt="" width="120" height="120" loading="lazy">` : ""}
-          <button type="button" class="${done ? "btn-ghost" : "btn"} rp-go" data-rpgo="${c.id}">${T[2]}${done ? "" : " →"}</button>
+          <button type="button" class="${done ? "btn-ghost" : "btn"} rp-go" ${p.st === "saved" && p.cur ? `data-rpreport="${p.cur.id}"` : `data-rpgo="${c.id}"`}>${T[2]}${done ? "" : " →"}</button>
           <div class="rp-links">
+            ${p.st === "saved" ? `<button type="button" class="link" data-rpgo="${c.id}">고치러 가기 ›</button>` : ""}
             ${["todo"].includes(p.st) ? `<button type="button" class="link" data-rpskip="${c.id}">이번 주는 모임이 없었어요</button>` : ""}
             ${p.st === "skip" ? `<button type="button" class="link" data-rpunskip="${c.id}">되돌리기</button>` : ""}
+            ${p.st !== "first" ? (() => { const ms = missedWeeks(c.id).filter(d => !(d === p.due && ["todo", "today"].includes(p.st))); return `<button type="button" class="link${ms.length ? " warn" : ""}" data-rppast="${c.id}">${ms.length ? `안 쓴 주 ${ms.length} · 지난 보고 쓰기 ›` : "지난 · 다른 날 보고 쓰기 ›"}</button>`; })() : ""}
             <button type="button" class="link" data-tab="meet">모든 셀 보고 ›</button>
           </div>
         </div>
@@ -12521,6 +12850,10 @@ function renderHomeReport() {
   box.innerHTML = "";
 }
 document.addEventListener("click", (ev) => {
+  const rr = ev.target.closest("[data-rpreport]");
+  if (rr) { const m = state.meetings.find(x => x.id === rr.dataset.rpreport); if (!m) return;
+    if (!confirm(`${fmtDate(m.date)} 셀 보고를 담당 코치 · 진장에게 보낼까요?\n(출석 ${attN(m)}명${m.topic ? " · " + m.topic : ""})`)) return;
+    rr.disabled = true; reportMeeting(m).then(() => { toast("보고했어요. 코치 · 진장에게 소식이 갔어요."); renderHomeReport(); }).catch(e => { rr.disabled = false; toast(msgOf(e)); }); return; }
   const g = ev.target.closest("[data-rpgo]");
   if (g) { rpGo(reportPlan(g.dataset.rpgo)); return; }
   const k = ev.target.closest("[data-rpskip]");
@@ -12528,6 +12861,8 @@ document.addEventListener("click", (ev) => {
   const u = ev.target.closest("[data-rpunskip]");
   if (u) { const p = reportPlan(u.dataset.rpunskip); if (p.due) lsSet(skipKey(p.cellId, p.due), null); renderHomeReport(); return; }
   if (ev.target.closest("[data-rpall]")) { openReports(""); return; }
+  const pp = ev.target.closest("[data-rppast]");
+  if (pp) { openMPick(pp.dataset.rppast, "home"); return; }
   const cl = ev.target.closest("[data-carelog]");
   if (cl) { $("dlg-add").open && $("dlg-add").close(); openLog(cl.dataset.carelog, null, { kind: "call", back: "home" }); return; }
 });
@@ -12537,12 +12872,14 @@ function openAdd() {
   if (!canLead()) { toast("기록은 셀을 맡은 분이 써요."); return; }
   const cells = ledCells().length ? ledCells() : myCells();
   const p = cells.length ? reportPlan(cells[0].id) : null;
-  const rpSub = !p ? "셀이 아직 없어요" : p.st === "done" ? "이번 주 보고함 · 다음 모임에 써요"
+  const miss = p ? missedWeeks(p.cellId).filter(d => !(d === p.due && ["todo", "today"].includes(p.st))) : [];
+  const rpSub = !p ? "셀이 아직 없어요" : p.st === "done" ? `이번 주(${fmtDate(p.cur ? p.cur.date : p.due)}) 보고함 · 보기 · 고치기`
     : p.st === "saved" ? "저장만 했어요 · 이어서 쓰기" : p.st === "first" ? "첫 셀 보고"
     : p.due ? `${fmtDate(p.due)}(${wdOf(p.due)}) 셀모임 · ${p.st === "today" ? "오늘" : "아직 안 씀"}` : "";
   const opt = (k, ic, t, sub, hl) => `<button type="button" class="add-opt${hl ? " hl" : ""}" data-addk="${k}"><span class="ic">${ic}</span><span class="tx"><b>${t}</b><span>${sub}</span></span></button>`;
   const sug = careSuggest();
   $("add-body").innerHTML = opt("report", ICON.meet, "셀 보고", esc(rpSub), p && p.st !== "done")
+    + (p ? opt("past", "↺", "지난 · 다른 날 셀 보고", miss.length ? `안 쓴 주 ${miss.length}개 · ${miss.slice(0, 2).map(d => fmtDate(d)).join(", ")}${miss.length > 2 ? " …" : ""} — 새로 따로 남겨요` : "날짜를 골라 새 보고로 따로 남겨요", p.st === "done" && miss.length) : "")
     + opt("one", "♡", "1:1 만남", "한 사람과 만났어요")
     + opt("small", "◎", "다른 모임", "심방 · 예배 후 교제 · 전도 · 소그룹 · 직접 적기")
     + opt("call", "☎", "관심 기록", "전화 · 문자 · 안부 한 줄")
@@ -12555,6 +12892,7 @@ $("dlg-add").addEventListener("click", (ev) => {
   const b = ev.target.closest("[data-addk]"); if (!b) return;
   const k = b.dataset.addk; $("dlg-add").close();
   if (k === "report") { const cs = ledCells().length ? ledCells() : myCells(); if (!cs.length) { toast("먼저 셀을 만들어 주세요."); return; } rpGo(reportPlan(cs[0].id)); }
+  else if (k === "past") { const cs = ledCells().length ? ledCells() : myCells(); openMPick(cs.length ? cs[0].id : null, "home"); }
   else openLog(null, null, { kind: k, noPick: true, back: "home" });
 });
 document.addEventListener("click", (ev) => { if (ev.target.closest("[data-addopen]")) openAdd(); });
